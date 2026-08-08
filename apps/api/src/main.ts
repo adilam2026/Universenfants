@@ -1,12 +1,18 @@
 import "reflect-metadata";
+import { join } from "node:path";
 import { NestFactory } from "@nestjs/core";
 import { ValidationPipe } from "@nestjs/common";
+import type { NestExpressApplication } from "@nestjs/platform-express";
 import { SwaggerModule, DocumentBuilder } from "@nestjs/swagger";
 import { AppModule } from "./app.module";
 import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { cors: false });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { cors: false });
+
+  // Repli local pour les images produit quand R2 n'est pas configuré (voir StorageModule).
+  // __dirname (pas process.cwd()) pour rester correct quel que soit le répertoire de lancement.
+  app.useStaticAssets(process.env.UPLOADS_DIR ?? join(__dirname, "..", "uploads"), { prefix: "/uploads/" });
 
   const corsOrigins = (process.env.CORS_ORIGINS ?? "").split(",").filter(Boolean);
   app.enableCors({

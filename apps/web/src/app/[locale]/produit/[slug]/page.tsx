@@ -4,6 +4,7 @@ import { getTranslations, getLocale, setRequestLocale } from "next-intl/server";
 import { getProductBySlug, getProducts } from "@/lib/api";
 import { localized } from "@/lib/localized";
 import { ProductCard } from "@/components/product-card";
+import { ProductGallery } from "@/components/product-gallery";
 import { AddToCartButton } from "@/components/add-to-cart-button";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -35,7 +36,7 @@ export default async function ProductPage({ params }: PageProps<"/[locale]/produ
         {categoryName} › {name}
       </p>
       <div className="grid md:grid-cols-2 gap-8">
-        <div className="aspect-square rounded-3xl bg-brand-primary-soft flex items-center justify-center text-8xl">🧸</div>
+        <ProductGallery images={product.images} alt={name} />
 
         <div>
           <p className="text-xs font-bold uppercase text-muted-foreground">

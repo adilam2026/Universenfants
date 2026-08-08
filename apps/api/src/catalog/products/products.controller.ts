@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Headers, Param, Patch, Post, Query, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Delete, Get, Headers, Param, Patch, Post, Query, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { ApiTags } from "@nestjs/swagger";
 import { PermissionCode } from "@universenfants/shared";
@@ -84,5 +84,29 @@ export class ProductsController {
   @RequirePermissions(PermissionCode.STOCK_UPDATE)
   adjustStock(@Param("id") id: string, @Body() dto: AdjustStockDto, @CurrentUser() user: RequestUser) {
     return this.service.adjustStock(id, dto, user.sub);
+  }
+
+  @Post(":id/images")
+  @UseGuards(JwtAuthGuard, StaffGuard, PermissionsGuard)
+  @RequirePermissions(PermissionCode.PRODUCT_UPDATE)
+  @UseInterceptors(FileInterceptor("file", { limits: { fileSize: 8 * 1024 * 1024 } }))
+  addImage(@Param("id") id: string, @UploadedFile() file?: Express.Multer.File) {
+    if (!file) throw new BadRequestException("Fichier requis");
+    if (!file.mimetype.startsWith("image/")) throw new BadRequestException("Le fichier doit être une image");
+    return this.service.addImage(id, file.buffer);
+  }
+
+  @Delete(":id/images/:imageId")
+  @UseGuards(JwtAuthGuard, StaffGuard, PermissionsGuard)
+  @RequirePermissions(PermissionCode.PRODUCT_UPDATE)
+  removeImage(@Param("id") id: string, @Param("imageId") imageId: string) {
+    return this.service.removeImage(id, imageId);
+  }
+
+  @Patch(":id/images/reorder")
+  @UseGuards(JwtAuthGuard, StaffGuard, PermissionsGuard)
+  @RequirePermissions(PermissionCode.PRODUCT_UPDATE)
+  reorderImages(@Param("id") id: string, @Body() body: { imageIds: string[] }) {
+    return this.service.reorderImages(id, body.imageIds);
   }
 }

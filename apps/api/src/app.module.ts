@@ -20,6 +20,7 @@ import { PromotionsModule } from "./marketing/promotions/promotions.module";
 import { SettingsModule } from "./settings/settings.module";
 import { AnalyticsModule } from "./analytics/analytics.module";
 import { SearchModule } from "./search/search.module";
+import { StorageModule } from "./storage/storage.module";
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { SearchModule } from "./search/search.module";
     PrismaModule,
     RedisModule,
     SearchModule,
+    StorageModule,
     AuthModule,
     CategoriesModule,
     BrandsModule,

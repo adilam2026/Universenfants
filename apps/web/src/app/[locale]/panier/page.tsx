@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
+import Image from "next/image";
 import { Minus, Plus, Trash2, Share2, ShoppingBag } from "lucide-react";
 import { useCart, broadcastCartUpdate } from "@/hooks/use-cart";
 import { updateCartLine, removeCartLine, applyCoupon, removeCoupon, shareCart } from "@/lib/cart-client";
@@ -71,7 +72,9 @@ export default function CartPage() {
             <div className="rounded-2xl border border-border divide-y divide-border overflow-hidden bg-card">
               {cart.lines.map((line) => (
                 <div key={line.id} className="flex gap-3 p-3.5">
-                  <div className="size-16 shrink-0 rounded-xl bg-brand-primary-soft flex items-center justify-center text-2xl">🧸</div>
+                  <div className="relative size-16 shrink-0 rounded-xl bg-brand-primary-soft flex items-center justify-center text-2xl overflow-hidden">
+                    {line.image ? <Image src={line.image} alt="" fill sizes="64px" className="object-cover" /> : "🧸"}
+                  </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-bold">{line.name}</p>
                     {line.variantLabel && <p className="text-xs text-muted-foreground">{line.variantLabel}</p>}

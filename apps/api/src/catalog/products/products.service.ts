@@ -3,6 +3,7 @@ import type { Prisma, PrismaClient } from "@prisma/client";
 import * as XLSX from "xlsx";
 import { PrismaService } from "../../prisma/prisma.service";
 import { SearchService, type ProductSearchDoc } from "../../search/search.service";
+import { ImageService } from "../../storage/image.service";
 import type { QueryProductsDto } from "./dto/query-products.dto";
 import type { UpsertProductDto } from "./dto/upsert-product.dto";
 import type { AdjustStockDto } from "./dto/adjust-stock.dto";
@@ -43,6 +44,7 @@ export class ProductsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly search: SearchService,
+    private readonly images: ImageService,
   ) {}
 
   async list(query: QueryProductsDto) {
@@ -433,5 +435,49 @@ export class ProductsService {
         });
       }
     }
+  }
+
+  // ------------------------------------------------------------------
+  // Images produit
+  // ------------------------------------------------------------------
+
+  async addImage(productId: string, buffer: Buffer) {
+    const product = await this.prisma.product.findUnique({ where: { id: productId } });
+    if (!product) throw new NotFoundException("Produit introuvable");
+
+    const uploaded = await this.images.processAndUpload(buffer, `products/${productId}`);
+    const maxOrder = await this.prisma.productImage.aggregate({ where: { productId }, _max: { order: true } });
+
+    await this.prisma.productImage.create({
+      data: {
+        productId,
+        url: uploaded.url,
+        thumbnailUrl: uploaded.thumbnailUrl,
+        key: uploaded.key,
+        order: (maxOrder._max.order ?? -1) + 1,
+      },
+    });
+    return this.prisma.productImage.findMany({ where: { productId }, orderBy: { order: "asc" } });
+  }
+
+  async removeImage(productId: string, imageId: string) {
+    const image = await this.prisma.productImage.findFirst({ where: { id: imageId, productId } });
+    if (!image) throw new NotFoundException("Image introuvable");
+
+    await this.prisma.productImage.delete({ where: { id: imageId } });
+    if (image.key) {
+      await this.images.remove(image.key).catch(() => undefined);
+      await this.images.remove(`${image.key.replace(/\.webp$/, "")}-thumb.webp`).catch(() => undefined);
+    }
+    return this.prisma.productImage.findMany({ where: { productId }, orderBy: { order: "asc" } });
+  }
+
+  async reorderImages(productId: string, imageIds: string[]) {
+    await this.prisma.$transaction(
+      imageIds.map((id, index) =>
+        this.prisma.productImage.updateMany({ where: { id, productId }, data: { order: index } }),
+      ),
+    );
+    return this.prisma.productImage.findMany({ where: { productId }, orderBy: { order: "asc" } });
   }
 }

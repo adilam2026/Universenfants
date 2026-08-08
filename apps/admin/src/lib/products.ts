@@ -1,4 +1,11 @@
-import { apiFetch } from "./api-client";
+import { apiFetch, getStaffToken } from "./api-client";
+
+export interface AdminProductImage {
+  id: string;
+  url: string;
+  thumbnailUrl: string | null;
+  order: number;
+}
 
 export interface AdminProduct {
   id: string;
@@ -25,6 +32,7 @@ export interface AdminProduct {
   metaDescription: string | null;
   category: { id: string; nameFr: string };
   brand: { id: string; name: string } | null;
+  images: AdminProductImage[];
 }
 
 export interface UpsertProductPayload {
@@ -73,3 +81,27 @@ export type StockAdjustReason = "SUPPLIER_RECEIPT" | "INVENTORY_CORRECTION" | "R
 
 export const adjustStock = (id: string, delta: number, reason: StockAdjustReason) =>
   apiFetch<{ stock: number }>(`/products/${id}/stock`, { method: "POST", body: JSON.stringify({ delta, reason }) });
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api";
+
+export async function uploadProductImage(productId: string, file: File): Promise<AdminProductImage[]> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const token = getStaffToken();
+  const res = await fetch(`${API_URL}/products/${productId}/images`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    body: formData,
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.message ?? `Erreur (${res.status})`);
+  }
+  return res.json();
+}
+
+export const removeProductImage = (productId: string, imageId: string) =>
+  apiFetch<AdminProductImage[]>(`/products/${productId}/images/${imageId}`, { method: "DELETE" });
+
+export const reorderProductImages = (productId: string, imageIds: string[]) =>
+  apiFetch<AdminProductImage[]>(`/products/${productId}/images/reorder`, { method: "PATCH", body: JSON.stringify({ imageIds }) });

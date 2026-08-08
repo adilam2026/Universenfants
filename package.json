@@ -29,7 +29,8 @@
       "@prisma/engines",
       "@scarf/scarf",
       "argon2",
-      "prisma"
+      "prisma",
+      "sharp"
     ]
   }
 }

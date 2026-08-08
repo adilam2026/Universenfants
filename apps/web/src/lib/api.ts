@@ -15,6 +15,7 @@ export interface Category {
 export interface ProductImage {
   id: string;
   url: string;
+  thumbnailUrl?: string | null;
 }
 
 export interface ProductSummary {

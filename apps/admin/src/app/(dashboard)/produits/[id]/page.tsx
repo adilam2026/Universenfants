@@ -3,6 +3,7 @@
 import { use, useEffect, useState } from "react";
 import { ProductForm } from "@/components/product-form";
 import { StockAdjustCard } from "@/components/stock-adjust-card";
+import { ProductImagesCard } from "@/components/product-images-card";
 import { getAdminProduct, type AdminProduct } from "@/lib/products";
 
 export default function EditProductPage({ params }: { params: Promise<{ id: string }> }) {
@@ -23,7 +24,14 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
     <div>
       <h1 className="text-xl font-bold mb-5">{product.nameFr}</h1>
       <div className="grid lg:grid-cols-[1fr_280px] gap-5 items-start">
-        <ProductForm product={product} />
+        <div className="flex flex-col gap-5">
+          <ProductImagesCard
+            productId={product.id}
+            images={product.images}
+            onChanged={(images) => setProduct((prev) => (prev ? { ...prev, images } : prev))}
+          />
+          <ProductForm product={product} />
+        </div>
         <StockAdjustCard
           product={product}
           onAdjusted={(newStock) => setProduct((prev) => (prev ? { ...prev, stock: newStock } : prev))}

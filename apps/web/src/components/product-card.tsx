@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations, useLocale } from "next-intl";
+import Image from "next/image";
 import { Heart } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import type { ProductSummary } from "@/lib/api";
@@ -33,7 +34,17 @@ export function ProductCard({ product }: { product: ProductSummary }) {
         >
           <Heart className="size-4" />
         </button>
-        <div className="flex h-full items-center justify-center text-4xl">🧸</div>
+        {product.images[0] ? (
+          <Image
+            src={product.images[0].url}
+            alt={localized(product.nameFr, product.nameAr, locale)}
+            fill
+            sizes="(max-width: 640px) 45vw, (max-width: 1024px) 30vw, 220px"
+            className="object-cover"
+          />
+        ) : (
+          <div className="flex h-full items-center justify-center text-4xl">🧸</div>
+        )}
       </Link>
       <div className="p-3 flex flex-col gap-1">
         {product.brand && <span className="text-[11px] font-bold uppercase text-muted-foreground">{product.brand.name}</span>}
