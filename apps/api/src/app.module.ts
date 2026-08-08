@@ -9,6 +9,9 @@ import { AuthModule } from "./auth/auth.module";
 import { CategoriesModule } from "./catalog/categories/categories.module";
 import { BrandsModule } from "./catalog/brands/brands.module";
 import { ProductsModule } from "./catalog/products/products.module";
+import { CartModule } from "./cart/cart.module";
+import { WishlistModule } from "./wishlist/wishlist.module";
+import { OrdersModule } from "./orders/orders.module";
 
 @Module({
   imports: [
@@ -20,6 +23,9 @@ import { ProductsModule } from "./catalog/products/products.module";
     CategoriesModule,
     BrandsModule,
     ProductsModule,
+    CartModule,
+    WishlistModule,
+    OrdersModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

@@ -1,0 +1,359 @@
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import type { Prisma } from "@prisma/client";
+import { PrismaService } from "../prisma/prisma.service";
+import { ProductsService, type StockLine } from "../catalog/products/products.service";
+import {
+  DEFAULT_GLOBAL_FREE_SHIPPING_THRESHOLD,
+  DEFAULT_LOYALTY_REDEEM_RATE,
+  DEFAULT_VAT_RATE,
+  ORDER_NUMBER_PREFIX,
+} from "@universenfants/shared";
+import type { CheckoutDto } from "./dto/checkout.dto";
+import type { UpdateOrderStatusDto } from "./dto/update-order-status.dto";
+
+// §74 : l'annulation n'est autorisée qu'avant expédition.
+const CANCELLABLE_STATUSES = new Set(["PENDING", "CONFIRMED", "PREPARING"]);
+const NEXT_STATUS: Record<string, string[]> = {
+  PENDING: ["CONFIRMED", "CANCELLED"],
+  CONFIRMED: ["PREPARING", "CANCELLED"],
+  PREPARING: ["SHIPPED", "CANCELLED"],
+  SHIPPED: ["DELIVERED"],
+  DELIVERED: [],
+  CANCELLED: [],
+};
+
+@Injectable()
+export class OrdersService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly products: ProductsService,
+  ) {}
+
+  async checkout(cartId: string, dto: CheckoutDto) {
+    const cart = await this.prisma.cart.findUnique({
+      where: { id: cartId },
+      include: { lines: { include: { product: true, variant: true } } },
+    });
+    if (!cart || cart.lines.length === 0) throw new BadRequestException("Le panier est vide");
+
+    // §65 / §239 / §240 : une commande invitée crée automatiquement une fiche
+    // client, rattachée automatiquement si l'email/téléphone existe déjà.
+    const customer = await this.resolveCustomer(cart.customerId, dto);
+
+    const shipping = await this.resolveShippingFee(dto.city);
+
+    const lines = cart.lines.map((l) => ({
+      productId: l.productId,
+      variantId: l.variantId,
+      quantity: l.quantity,
+      nameSnapshot: l.product.nameFr,
+      skuSnapshot: l.variant?.sku ?? l.product.sku,
+      costPriceSnapshot: Number(l.variant?.costPrice ?? l.product.costPrice),
+      sellPriceSnapshot: Number(l.variant?.price ?? l.product.promoPrice ?? l.product.price),
+    }));
+    const subtotal = lines.reduce((s, l) => s + l.sellPriceSnapshot * l.quantity, 0);
+
+    let couponDiscount = 0;
+    const coupon = cart.couponCode ? await this.prisma.coupon.findUnique({ where: { code: cart.couponCode } }) : null;
+    if (coupon) {
+      const redemptions = await this.prisma.couponRedemption.count({
+        where: { couponId: coupon.id, customerId: customer.id },
+      });
+      if (redemptions >= coupon.maxUsesPerCustomer) {
+        throw new BadRequestException("Ce coupon a déjà été utilisé");
+      }
+      couponDiscount =
+        coupon.type === "PERCENTAGE"
+          ? Math.round((subtotal * Number(coupon.value)) / 100)
+          : coupon.type === "FIXED_AMOUNT"
+            ? Math.min(Number(coupon.value), subtotal)
+            : 0;
+      if (coupon.type === "FREE_SHIPPING") shipping.fee = 0;
+    }
+
+    // §219 : les points sont calculés sur le montant produits uniquement,
+    // hors livraison et coupons — donc l'application des points se fait
+    // après la remise coupon mais sur le sous-total, pas sur le total livré.
+    let loyaltyDiscount = 0;
+    let pointsToRedeem = 0;
+    if (dto.useLoyaltyPoints) {
+      const account = await this.prisma.loyaltyAccount.findUnique({ where: { customerId: customer.id } });
+      if (account && account.pointsBalance > 0) {
+        const maxDiscount = Math.max(0, subtotal - couponDiscount);
+        const affordable = Math.floor(account.pointsBalance / DEFAULT_LOYALTY_REDEEM_RATE);
+        loyaltyDiscount = Math.min(affordable, maxDiscount);
+        pointsToRedeem = loyaltyDiscount * DEFAULT_LOYALTY_REDEEM_RATE;
+      }
+    }
+
+    const total = Math.max(0, subtotal - couponDiscount - loyaltyDiscount + shipping.fee);
+    const vatAmount = Math.round(total - total / (1 + DEFAULT_VAT_RATE));
+
+    const stockLines: StockLine[] = lines.map((l) => ({
+      productId: l.productId,
+      variantId: l.variantId,
+      quantity: l.quantity,
+    }));
+
+    const order = await this.prisma.$transaction(async (tx) => {
+      // R3 : verrou de ligne pour empêcher la survente en cas de commandes simultanées.
+      await this.products.reserveStock(tx, stockLines);
+
+      const orderNumber = await this.nextOrderNumber(tx);
+
+      const created = await tx.order.create({
+        data: {
+          orderNumber,
+          customerId: customer.id,
+          subtotal,
+          shippingFee: shipping.fee,
+          discount: couponDiscount,
+          loyaltyDiscount,
+          vatRate: DEFAULT_VAT_RATE,
+          vatAmount,
+          total,
+          shippingCity: dto.city,
+          shippingAddress: dto.addressLine,
+          shippingPhone: dto.phone,
+          shippingRuleLabel: shipping.label,
+          couponId: coupon?.id,
+          lines: {
+            create: lines.map((l) => ({
+              productId: l.productId,
+              variantId: l.variantId,
+              productNameSnapshot: l.nameSnapshot,
+              skuSnapshot: l.skuSnapshot,
+              costPriceSnapshot: l.costPriceSnapshot,
+              sellPriceSnapshot: l.sellPriceSnapshot,
+              quantity: l.quantity,
+              lineTotal: l.sellPriceSnapshot * l.quantity,
+            })),
+          },
+          statusHistory: { create: { toStatus: "PENDING" } },
+        },
+        include: { lines: true },
+      });
+
+      if (coupon) {
+        await tx.coupon.update({ where: { id: coupon.id }, data: { usedCount: { increment: 1 } } });
+        await tx.couponRedemption.create({
+          data: { couponId: coupon.id, orderId: created.id, customerId: customer.id },
+        });
+      }
+
+      if (pointsToRedeem > 0) {
+        const account = await tx.loyaltyAccount.findUniqueOrThrow({ where: { customerId: customer.id } });
+        await tx.loyaltyAccount.update({
+          where: { id: account.id },
+          data: { pointsBalance: { decrement: pointsToRedeem } },
+        });
+        await tx.loyaltyTransaction.create({
+          data: { accountId: account.id, type: "REDEEM", points: -pointsToRedeem, orderId: created.id },
+        });
+      }
+
+      await tx.customer.update({
+        where: { id: customer.id },
+        data: {
+          ordersCount: { increment: 1 },
+          totalSpent: { increment: total },
+          lastOrderAt: new Date(),
+          firstOrderAt: customer.firstOrderAt ?? new Date(),
+        },
+      });
+
+      await tx.cart.update({ where: { id: cart.id }, data: { status: "CONVERTED" } });
+
+      return created;
+    });
+
+    // TODO (O3) : déclencher l'email "ORDER_CONFIRMED" une fois le provider email branché.
+    return this.sanitizeForCustomer(order);
+  }
+
+  private async resolveCustomer(existingCustomerId: string | null, dto: CheckoutDto) {
+    if (existingCustomerId) {
+      const existing = await this.prisma.customer.findUnique({ where: { id: existingCustomerId } });
+      if (existing) return existing;
+    }
+    const found = await this.prisma.customer.findFirst({
+      where: { OR: [dto.email ? { email: dto.email } : undefined, { phone: dto.phone }].filter(Boolean) as any },
+    });
+    if (found) {
+      return this.prisma.customer.update({
+        where: { id: found.id },
+        data: { firstName: dto.firstName, lastName: dto.lastName, email: dto.email ?? found.email },
+      });
+    }
+    const created = await this.prisma.customer.create({
+      data: { firstName: dto.firstName, lastName: dto.lastName, email: dto.email, phone: dto.phone },
+    });
+    await this.prisma.loyaltyAccount.create({ data: { customerId: created.id } });
+    await this.prisma.wishlist.create({ data: { customerId: created.id } });
+    return created;
+  }
+
+  /** I7 : la règle ville prime toujours sur la règle globale ; la règle
+   * globale ne s'applique qu'aux villes sans seuil spécifique. */
+  private async resolveShippingFee(cityName: string) {
+    const city = await this.prisma.city.findUnique({ where: { name: cityName }, include: { group: true } });
+    if (!city || !city.active) throw new BadRequestException("Ville de livraison non desservie");
+    const freeFrom = city.freeShippingFrom ?? city.group?.freeShippingFrom ?? DEFAULT_GLOBAL_FREE_SHIPPING_THRESHOLD;
+    return { fee: Number(city.shippingFee), freeFrom: Number(freeFrom), label: `${city.name} — figé à la commande` };
+  }
+
+  private async nextOrderNumber(tx: Prisma.TransactionClient): Promise<string> {
+    const year = new Date().getFullYear();
+    const key = `order_seq_${year}`;
+    // Compteur verrouillé au niveau ligne pour garantir l'unicité même en
+    // cas de commandes concurrentes (même principe que le verrou de stock, R3).
+    const [row] = await tx.$queryRaw<{ value: unknown }[]>`
+      SELECT value FROM "SystemSetting" WHERE key = ${key} FOR UPDATE`;
+    const current = row ? Number((row.value as { n: number }).n) : 0;
+    const next = current + 1;
+    await tx.systemSetting.upsert({
+      where: { key },
+      update: { value: { n: next } },
+      create: { key, value: { n: next } },
+    });
+    return `${ORDER_NUMBER_PREFIX}-${year}-${String(next).padStart(6, "0")}`;
+  }
+
+  // ------------------------------------------------------------------
+
+  /** costPriceSnapshot = marge interne, ne doit jamais atteindre un client (Front). */
+  private sanitizeForCustomer<T extends { lines: { costPriceSnapshot: unknown }[] }>(order: T) {
+    return { ...order, lines: order.lines.map(({ costPriceSnapshot: _omit, ...line }) => line) };
+  }
+
+  async findForCustomer(customerId: string, orderId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { lines: true, statusHistory: { orderBy: { createdAt: "asc" } } },
+    });
+    if (!order || order.customerId !== customerId) throw new NotFoundException("Commande introuvable");
+    return this.sanitizeForCustomer(order);
+  }
+
+  listForCustomer(customerId: string) {
+    return this.prisma.order.findMany({ where: { customerId }, orderBy: { createdAt: "desc" } });
+  }
+
+  listForAdmin(filters: { status?: string; city?: string }) {
+    return this.prisma.order.findMany({
+      where: { status: filters.status as never, shippingCity: filters.city },
+      include: { customer: true },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  async findForAdmin(orderId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        lines: true,
+        customer: true,
+        statusHistory: { include: { staffUser: true }, orderBy: { createdAt: "asc" } },
+      },
+    });
+    if (!order) throw new NotFoundException("Commande introuvable");
+    return order;
+  }
+
+  async updateStatus(orderId: string, dto: UpdateOrderStatusDto, staffUserId: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({ where: { id: orderId }, include: { lines: true } });
+      if (!order) throw new NotFoundException("Commande introuvable");
+
+      if (dto.status === "CANCELLED" && !CANCELLABLE_STATUSES.has(order.status)) {
+        throw new BadRequestException("Cette commande ne peut plus être annulée (déjà expédiée)");
+      }
+      if (dto.status !== "CANCELLED" && !NEXT_STATUS[order.status]?.includes(dto.status)) {
+        throw new BadRequestException(`Transition ${order.status} → ${dto.status} non autorisée`);
+      }
+
+      const stockLines: StockLine[] = order.lines.map((l) => ({
+        productId: l.productId,
+        variantId: l.variantId,
+        quantity: l.quantity,
+      }));
+
+      if (dto.status === "CANCELLED") {
+        await this.products.releaseReservation(tx, stockLines);
+      }
+      if (dto.status === "DELIVERED") {
+        await this.products.deductOnDelivery(tx, stockLines);
+        // §218 : les points de fidélité ne sont crédités qu'à la livraison.
+        const account = await tx.loyaltyAccount.findUnique({ where: { customerId: order.customerId } });
+        if (account) {
+          const base = Number(order.subtotal) - Number(order.discount);
+          const earned = Math.floor(base / 10); // 1 point / 10 DH, cf. Paramètres Fidélité
+          if (earned > 0) {
+            await tx.loyaltyAccount.update({ where: { id: account.id }, data: { pointsBalance: { increment: earned } } });
+            await tx.loyaltyTransaction.create({
+              data: {
+                accountId: account.id,
+                type: "EARN",
+                points: earned,
+                orderId: order.id,
+                expiresAt: new Date(Date.now() + 24 * 30 * 24 * 60 * 60 * 1000),
+              },
+            });
+          }
+        }
+      }
+
+      const timestampField =
+        dto.status === "CONFIRMED"
+          ? "confirmedAt"
+          : dto.status === "SHIPPED"
+            ? "shippedAt"
+            : dto.status === "DELIVERED"
+              ? "deliveredAt"
+              : dto.status === "CANCELLED"
+                ? "cancelledAt"
+                : undefined;
+
+      const updated = await tx.order.update({
+        where: { id: orderId },
+        data: {
+          status: dto.status,
+          ...(timestampField ? { [timestampField]: new Date() } : {}),
+          statusHistory: {
+            create: { fromStatus: order.status, toStatus: dto.status, staffUserId, note: dto.note },
+          },
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          staffUserId,
+          action: "order.status.update",
+          entity: "Order",
+          entityId: orderId,
+          oldValue: { status: order.status },
+          newValue: { status: dto.status },
+        },
+      });
+
+      return updated;
+    });
+  }
+
+  async recordPayment(orderId: string, amount: number) {
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
+    if (!order) throw new NotFoundException("Commande introuvable");
+    const paidAmount = Number(order.paidAmount) + amount;
+    const paymentStatus = paidAmount >= Number(order.total) ? "PAID" : "PARTIAL";
+    return this.prisma.order.update({
+      where: { id: orderId },
+      data: { paidAmount, paymentStatus, paidAt: paymentStatus === "PAID" ? new Date() : order.paidAt },
+    });
+  }
+
+  async assertCustomerOwnsOrder(customerId: string, orderId: string) {
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
+    if (!order || order.customerId !== customerId) throw new ForbiddenException("Accès refusé");
+    return order;
+  }
+}
