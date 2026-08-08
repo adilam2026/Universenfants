@@ -66,6 +66,7 @@ export class BirthdayListService {
         product: {
           id: i.product.id,
           nameFr: i.product.nameFr,
+          nameAr: i.product.nameAr,
           seoUrl: i.product.seoUrl,
           price: i.product.price,
           promoPrice: i.product.promoPrice,

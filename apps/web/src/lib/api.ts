@@ -5,6 +5,8 @@ export interface Category {
   slug: string;
   nameFr: string;
   nameAr: string | null;
+  descriptionFr?: string | null;
+  descriptionAr?: string | null;
   image: string | null;
   productCount: number;
   children: Category[];
@@ -19,6 +21,7 @@ export interface ProductSummary {
   id: string;
   sku: string;
   nameFr: string;
+  nameAr: string | null;
   seoUrl: string;
   price: string;
   promoPrice: string | null;
@@ -28,7 +31,7 @@ export interface ProductSummary {
   available: number;
   images: ProductImage[];
   brand: { name: string; slug: string } | null;
-  category: { nameFr: string; slug: string };
+  category: { nameFr: string; nameAr?: string | null; slug: string };
 }
 
 export interface ProductListResult {
@@ -41,7 +44,9 @@ export interface ProductListResult {
 
 export interface ProductDetail extends ProductSummary {
   shortDescFr: string | null;
+  shortDescAr: string | null;
   longDescFr: string | null;
+  longDescAr: string | null;
   variants: { id: string; label: string; price: string | null; stock: number }[];
   reviews: { id: string; rating: number; comment: string | null; createdAt: string }[];
   avgRating: number | null;

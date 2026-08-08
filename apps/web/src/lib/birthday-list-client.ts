@@ -27,6 +27,7 @@ export interface BirthdayListItem {
   product: {
     id: string;
     nameFr: string;
+    nameAr: string | null;
     seoUrl: string;
     price: string;
     promoPrice: string | null;

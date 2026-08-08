@@ -1,34 +1,39 @@
-import Link from "next/link";
+"use client";
 
-const COLUMNS = [
-  {
-    title: "Boutique",
-    links: [
-      { label: "Catalogue", href: "/recherche" },
-      { label: "Promotions", href: "/categorie/construction" },
-      { label: "Nouveautés", href: "/recherche" },
-    ],
-  },
-  {
-    title: "Aide",
-    links: [
-      { label: "FAQ", href: "/pages/faq" },
-      { label: "Livraison", href: "/pages/livraison" },
-      { label: "Contact", href: "/pages/contact" },
-    ],
-  },
-  {
-    title: "Société",
-    links: [
-      { label: "Qui sommes-nous", href: "/pages/apropos" },
-      { label: "CGV", href: "/pages/cgv" },
-      { label: "Confidentialité (loi 09-08)", href: "/pages/confidentialite" },
-      { label: "Politique de retour", href: "/pages/retour" },
-    ],
-  },
-];
+import { useTranslations } from "next-intl";
+import { Link } from "@/i18n/navigation";
 
 export function SiteFooter() {
+  const t = useTranslations("footer");
+
+  const COLUMNS = [
+    {
+      title: t("shop"),
+      links: [
+        { label: t("catalog"), href: "/recherche" },
+        { label: t("promotions"), href: "/categorie/construction" },
+        { label: t("newArrivals"), href: "/recherche" },
+      ],
+    },
+    {
+      title: t("help"),
+      links: [
+        { label: t("faq"), href: "/pages/faq" },
+        { label: t("shipping"), href: "/pages/livraison" },
+        { label: t("contact"), href: "/pages/contact" },
+      ],
+    },
+    {
+      title: t("company"),
+      links: [
+        { label: t("about"), href: "/pages/apropos" },
+        { label: t("terms"), href: "/pages/cgv" },
+        { label: t("privacy"), href: "/pages/confidentialite" },
+        { label: t("returns"), href: "/pages/retour" },
+      ],
+    },
+  ];
+
   return (
     <footer className="mt-10 bg-brand-primary-strong text-primary-foreground">
       <div className="mx-auto max-w-6xl px-4 md:px-7 py-10 grid grid-cols-2 md:grid-cols-4 gap-8">
@@ -47,7 +52,7 @@ export function SiteFooter() {
           </div>
         ))}
         <div>
-          <h5 className="text-sm font-bold mb-3">Suivez-nous</h5>
+          <h5 className="text-sm font-bold mb-3">{t("followUs")}</h5>
           <ul className="space-y-2 text-sm text-primary-foreground/75">
             <li>Instagram</li>
             <li>Facebook</li>
