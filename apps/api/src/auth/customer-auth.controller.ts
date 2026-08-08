@@ -1,5 +1,9 @@
-import { Body, Controller, Post } from "@nestjs/common";
-import { ApiTags } from "@nestjs/swagger";
+import { Body, Controller, Get, Post, UseGuards } from "@nestjs/common";
+import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
+import { JwtAuthGuard } from "./guards/jwt-auth.guard";
+import { CustomerGuard } from "./guards/customer.guard";
+import { CurrentUser } from "./decorators/current-user.decorator";
+import type { RequestUser } from "./types";
 import { CustomerAuthService } from "./customer-auth.service";
 import { RegisterCustomerDto } from "./dto/register-customer.dto";
 import { LoginDto } from "./dto/login.dto";
@@ -17,5 +21,12 @@ export class CustomerAuthController {
   @Post("login")
   login(@Body() dto: LoginDto) {
     return this.service.login(dto);
+  }
+
+  @Get("me")
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, CustomerGuard)
+  me(@CurrentUser() user: RequestUser) {
+    return this.service.me(user.sub);
   }
 }

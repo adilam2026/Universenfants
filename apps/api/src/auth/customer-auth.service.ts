@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, UnauthorizedException } from "@nestjs/common";
+import { ConflictException, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { PrismaService } from "../prisma/prisma.service";
 import { hashPassword, verifyPassword, detectIdentifierKind } from "./password.util";
@@ -70,6 +70,24 @@ export class CustomerAuthService {
       throw new UnauthorizedException("Identifiants invalides");
     }
     return this.issueTokens(customer.id, customer.email);
+  }
+
+  async me(customerId: string) {
+    const customer = await this.prisma.customer.findUnique({
+      where: { id: customerId },
+      include: { loyaltyAccount: true },
+    });
+    if (!customer) throw new NotFoundException("Client introuvable");
+    return {
+      id: customer.id,
+      firstName: customer.firstName,
+      lastName: customer.lastName,
+      email: customer.email,
+      phone: customer.phone,
+      ordersCount: customer.ordersCount,
+      totalSpent: customer.totalSpent,
+      loyaltyPoints: customer.loyaltyAccount?.pointsBalance ?? 0,
+    };
   }
 
   private issueTokens(customerId: string, email?: string | null) {
