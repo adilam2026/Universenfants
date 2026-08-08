@@ -1,11 +1,12 @@
 import { notFound } from "next/navigation";
-import { Heart, Share2, Star } from "lucide-react";
+import { Share2, Star } from "lucide-react";
 import { getTranslations, getLocale, setRequestLocale } from "next-intl/server";
 import { getProductBySlug, getProducts } from "@/lib/api";
 import { localized } from "@/lib/localized";
 import { ProductCard } from "@/components/product-card";
 import { ProductGallery } from "@/components/product-gallery";
 import { AddToCartButton } from "@/components/add-to-cart-button";
+import { WishlistButton } from "@/components/wishlist-button";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
@@ -75,9 +76,10 @@ export default async function ProductPage({ params }: PageProps<"/[locale]/produ
           )}
 
           <div className="mt-6 flex items-center gap-2.5 fixed inset-x-4 bottom-20 z-30 md:static md:inset-auto bg-card md:bg-transparent rounded-2xl md:rounded-none border md:border-0 border-border p-3 md:p-0 shadow-lg md:shadow-none">
-            <Button variant="outline" size="icon" aria-label={t("favorites")}>
-              <Heart className="size-4" />
-            </Button>
+            <WishlistButton
+              productId={product.id}
+              className="inline-flex size-10 items-center justify-center rounded-full border-[1.5px] border-border bg-transparent text-foreground hover:bg-secondary transition-colors"
+            />
             {product.available <= 0 ? (
               <Button variant="cta" className="flex-1" disabled>
                 {t("unavailable")}

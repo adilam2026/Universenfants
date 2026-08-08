@@ -325,5 +325,13 @@
     "reserveError": "Impossible de réserver ce cadeau",
     "notFound": "Liste introuvable",
     "sharedTitle": "Liste anniversaire de {name}"
+  },
+  "wishlist": {
+    "title": "❤️ Mes favoris",
+    "empty": "Aucun favori pour le moment.",
+    "browseCatalog": "Voir le catalogue",
+    "remove": "Retirer",
+    "unavailable": "Indisponible",
+    "loginRequired": "Connectez-vous pour retrouver vos favoris sur tous vos appareils."
   }
 }

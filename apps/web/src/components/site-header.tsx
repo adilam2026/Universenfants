@@ -2,7 +2,7 @@
 
 import { Suspense, useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
-import { Menu, Search, ShoppingBag, User, X, Gift, Cake, Tag, Mail, Languages } from "lucide-react";
+import { Menu, Search, ShoppingBag, User, X, Gift, Cake, Tag, Mail, Languages, Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCartCount } from "@/hooks/use-cart";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
@@ -38,6 +38,7 @@ export function SiteHeader() {
     { label: t("nav.promotions"), href: "/categorie/construction", icon: Tag, accent: true },
     { label: t("nav.giftAdvisor"), href: "/conseiller-cadeau", icon: Gift, brand: true },
     { label: t("nav.birthdayList"), href: "/liste-anniversaire", icon: Cake, brand: true },
+    { label: t("wishlist.title"), href: "/favoris", icon: Heart },
     { label: t("nav.myAccount"), href: "/compte", icon: User },
     { label: t("nav.contact"), href: "/pages/contact", icon: Mail },
   ];
@@ -83,6 +84,13 @@ export function SiteHeader() {
                 aria-label={t("nav.myAccount")}
               >
                 <User className="size-[18px]" />
+              </Link>
+              <Link
+                href="/favoris"
+                className="hidden md:flex size-9 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground"
+                aria-label={t("wishlist.title")}
+              >
+                <Heart className="size-[18px]" />
               </Link>
               <Link
                 href="/panier"

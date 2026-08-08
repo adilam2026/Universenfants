@@ -2,12 +2,12 @@
 
 import { useTranslations, useLocale } from "next-intl";
 import Image from "next/image";
-import { Heart } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import type { ProductSummary } from "@/lib/api";
 import { localized } from "@/lib/localized";
 import { Badge } from "@/components/ui/badge";
 import { AddToCartButton } from "@/components/add-to-cart-button";
+import { WishlistButton } from "@/components/wishlist-button";
 
 function dh(value: string | number) {
   return `${Number(value).toLocaleString("fr-FR")} DH`;
@@ -28,12 +28,10 @@ export function ProductCard({ product }: { product: ProductSummary }) {
           {lowStock && <Badge variant="warning">{t("lastUnits")}</Badge>}
           {outOfStock && <Badge variant="outline">{t("outOfStockShort")}</Badge>}
         </div>
-        <button
+        <WishlistButton
+          productId={product.id}
           className="absolute right-2 rtl:right-auto rtl:left-2 top-2 flex size-8 items-center justify-center rounded-full bg-card/90 text-muted-foreground shadow-sm hover:text-brand-cta"
-          aria-label={t("favorites")}
-        >
-          <Heart className="size-4" />
-        </button>
+        />
         {product.images[0] ? (
           <Image
             src={product.images[0].url}

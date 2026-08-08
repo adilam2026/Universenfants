@@ -24,6 +24,7 @@ export class WishlistService {
       productId: l.productId,
       addedAt: l.addedAt,
       name: l.product.nameFr,
+      nameAr: l.product.nameAr,
       price: Number(l.product.promoPrice ?? l.product.price),
       image: l.product.images[0]?.url ?? null,
       available: l.product.stock - l.product.reservedStock > 0,
