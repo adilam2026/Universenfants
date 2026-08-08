@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { NextIntlClientProvider, hasLocale } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
@@ -42,7 +43,9 @@ export default async function LocaleLayout({
     <html lang={locale} dir={dir} className={`h-full antialiased ${fontVars}`}>
       <body className="min-h-full flex flex-col font-sans">
         <NextIntlClientProvider>
-          <SiteHeader />
+          <Suspense>
+            <SiteHeader />
+          </Suspense>
           <main className="flex-1 pb-20 md:pb-0">{children}</main>
           <SiteFooter />
         </NextIntlClientProvider>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { Suspense, useState, type FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { KeyRound } from "lucide-react";
@@ -9,6 +9,14 @@ import { Link } from "@/i18n/navigation";
 import { resetPassword } from "@/lib/auth-client";
 
 export default function ResetPasswordPage() {
+  return (
+    <Suspense>
+      <ResetPasswordForm />
+    </Suspense>
+  );
+}
+
+function ResetPasswordForm() {
   const t = useTranslations("account");
   const token = useSearchParams().get("token");
   const [submitting, setSubmitting] = useState(false);

@@ -24,7 +24,7 @@ export function SiteHeader() {
     router.push(trimmed ? `/recherche?q=${encodeURIComponent(trimmed)}` : "/recherche");
   }
 
-  const QUICK_NAV = [
+  const QUICK_NAV: { label: string; href: Parameters<typeof Link>[0]["href"]; strong?: boolean; accent?: boolean }[] = [
     { label: t("nav.allToys"), href: "/recherche", strong: true },
     { label: t("nav.age0to2"), href: "/recherche?ageMin=0&ageMax=2" },
     { label: t("nav.age3to5"), href: "/recherche?ageMin=3&ageMax=5" },
@@ -32,9 +32,15 @@ export function SiteHeader() {
     { label: t("nav.age9to12"), href: "/recherche?ageMin=9&ageMax=12" },
     { label: t("nav.age12plus"), href: "/recherche?ageMin=12" },
     { label: t("nav.promotions"), href: "/categorie/construction", accent: true },
-  ] as const;
+  ];
 
-  const DRAWER_LINKS = [
+  const DRAWER_LINKS: {
+    label: string;
+    href: Parameters<typeof Link>[0]["href"];
+    icon: typeof Cake;
+    brand?: boolean;
+    accent?: boolean;
+  }[] = [
     { label: t("nav.toysByAge"), href: "/recherche", icon: Cake },
     { label: t("nav.toysByUniverse"), href: "/categorie/construction", icon: ShoppingBag },
     { label: t("nav.promotions"), href: "/categorie/construction", icon: Tag, accent: true },
@@ -42,7 +48,7 @@ export function SiteHeader() {
     { label: t("nav.birthdayList"), href: "/liste-anniversaire", icon: Cake, brand: true },
     { label: t("nav.myAccount"), href: "/compte", icon: User },
     { label: t("nav.contact"), href: "/pages/contact", icon: Mail },
-  ] as const;
+  ];
 
   function switchLocale(next: string) {
     router.replace(pathname, { locale: next });
