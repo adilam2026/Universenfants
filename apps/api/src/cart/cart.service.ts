@@ -19,6 +19,13 @@ export class CartService {
     let cart = await this.prisma.cart.findUnique({ where: { ownerToken } });
     if (!cart) {
       cart = await this.prisma.cart.create({ data: { ownerToken, customerId: customerId ?? undefined } });
+    } else if (cart.status !== "ACTIVE") {
+      // Panier déjà commandé/expiré : on repart d'un panier vierge sur le même token.
+      await this.prisma.cartLine.deleteMany({ where: { cartId: cart.id } });
+      cart = await this.prisma.cart.update({
+        where: { id: cart.id },
+        data: { status: "ACTIVE", couponCode: null, shareToken: null, customerId: customerId ?? cart.customerId },
+      });
     } else if (customerId && !cart.customerId) {
       // Rattachement automatique dès qu'un visiteur invité se connecte.
       cart = await this.prisma.cart.update({ where: { id: cart.id }, data: { customerId } });

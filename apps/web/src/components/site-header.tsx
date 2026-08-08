@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Menu, Search, ShoppingBag, User, X, Gift, Cake, Tag, Mail } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useCartCount } from "@/hooks/use-cart";
 
 const QUICK_NAV = [
   { label: "Tous les jouets", href: "/recherche", strong: true },
@@ -27,6 +28,7 @@ const DRAWER_LINKS = [
 
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
+  const cartCount = useCartCount();
 
   return (
     <>
@@ -65,10 +67,15 @@ export function SiteHeader() {
               </Link>
               <Link
                 href="/panier"
-                className="flex size-9 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground"
+                className="relative flex size-9 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground"
                 aria-label="Panier"
               >
                 <ShoppingBag className="size-[18px]" />
+                {cartCount > 0 && (
+                  <span className="absolute top-0.5 right-0.5 flex min-w-[16px] h-4 items-center justify-center rounded-full bg-brand-cta px-1 text-[10px] font-extrabold text-brand-cta-foreground">
+                    {cartCount}
+                  </span>
+                )}
               </Link>
             </nav>
           </div>
@@ -149,10 +156,14 @@ export function SiteHeader() {
           <Link
             key={item.label}
             href={item.href}
-            className="flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-bold text-muted-foreground"
+            className="relative flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-bold text-muted-foreground"
           >
             <item.icon className="size-5" />
-            {item.label}
+            {item.label === "Panier" && cartCount > 0 && (
+              <span className="absolute top-0.5 right-[28%] flex min-w-[14px] h-3.5 items-center justify-center rounded-full bg-brand-cta px-1 text-[9px] font-extrabold text-brand-cta-foreground">
+                {cartCount}
+              </span>
+            )}
           </Link>
         ))}
       </nav>

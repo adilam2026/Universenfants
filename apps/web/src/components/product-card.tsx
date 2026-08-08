@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { Heart, PackagePlus } from "lucide-react";
+import { Heart } from "lucide-react";
 import type { ProductSummary } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
+import { AddToCartButton } from "@/components/add-to-cart-button";
 
 function dh(value: string | number) {
   return `${Number(value).toLocaleString("fr-FR")} DH`;
@@ -41,13 +42,7 @@ export function ProductCard({ product }: { product: ProductSummary }) {
           <span className="text-[11px] text-muted-foreground">
             {outOfStock ? "Rupture" : product.ageMin != null ? `${product.ageMin}-${product.ageMax} ans` : ""}
           </span>
-          <button
-            disabled={outOfStock}
-            className="flex size-8 items-center justify-center rounded-full bg-brand-cta text-brand-cta-foreground disabled:opacity-40"
-            aria-label="Ajouter au panier"
-          >
-            <PackagePlus className="size-4" />
-          </button>
+          <AddToCartButton productId={product.id} disabled={outOfStock} />
         </div>
       </div>
     </div>
