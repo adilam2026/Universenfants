@@ -13,6 +13,12 @@ import { CartModule } from "./cart/cart.module";
 import { WishlistModule } from "./wishlist/wishlist.module";
 import { OrdersModule } from "./orders/orders.module";
 import { BirthdayListModule } from "./birthday-list/birthday-list.module";
+import { CustomersModule } from "./customers/customers.module";
+import { CitiesModule } from "./cities/cities.module";
+import { CouponsModule } from "./marketing/coupons/coupons.module";
+import { PromotionsModule } from "./marketing/promotions/promotions.module";
+import { SettingsModule } from "./settings/settings.module";
+import { AnalyticsModule } from "./analytics/analytics.module";
 
 @Module({
   imports: [
@@ -28,6 +34,12 @@ import { BirthdayListModule } from "./birthday-list/birthday-list.module";
     WishlistModule,
     OrdersModule,
     BirthdayListModule,
+    CustomersModule,
+    CitiesModule,
+    CouponsModule,
+    PromotionsModule,
+    SettingsModule,
+    AnalyticsModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

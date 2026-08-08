@@ -3,9 +3,10 @@ import { OrdersController } from "./orders.controller";
 import { OrdersService } from "./orders.service";
 import { CartModule } from "../cart/cart.module";
 import { ProductsModule } from "../catalog/products/products.module";
+import { SettingsModule } from "../settings/settings.module";
 
 @Module({
-  imports: [CartModule, ProductsModule],
+  imports: [CartModule, ProductsModule, SettingsModule],
   controllers: [OrdersController],
   providers: [OrdersService],
 })

@@ -2,12 +2,8 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import type { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { ProductsService, type StockLine } from "../catalog/products/products.service";
-import {
-  DEFAULT_GLOBAL_FREE_SHIPPING_THRESHOLD,
-  DEFAULT_LOYALTY_REDEEM_RATE,
-  DEFAULT_VAT_RATE,
-  ORDER_NUMBER_PREFIX,
-} from "@universenfants/shared";
+import { SettingsService } from "../settings/settings.service";
+import { ORDER_NUMBER_PREFIX } from "@universenfants/shared";
 import type { CheckoutDto } from "./dto/checkout.dto";
 import type { UpdateOrderStatusDto } from "./dto/update-order-status.dto";
 
@@ -27,9 +23,12 @@ export class OrdersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly products: ProductsService,
+    private readonly settings: SettingsService,
   ) {}
 
   async checkout(cartId: string, dto: CheckoutDto) {
+    const { vatRate, loyaltyRedeemRate, freeShippingThreshold } = await this.settings.get();
+
     const cart = await this.prisma.cart.findUnique({
       where: { id: cartId },
       include: { lines: { include: { product: true, variant: true } } },
@@ -40,7 +39,7 @@ export class OrdersService {
     // client, rattachée automatiquement si l'email/téléphone existe déjà.
     const customer = await this.resolveCustomer(cart.customerId, dto);
 
-    const shipping = await this.resolveShippingFee(dto.city);
+    const shipping = await this.resolveShippingFee(dto.city, freeShippingThreshold);
 
     const lines = cart.lines.map((l) => ({
       productId: l.productId,
@@ -52,6 +51,10 @@ export class OrdersService {
       sellPriceSnapshot: Number(l.variant?.price ?? l.product.promoPrice ?? l.product.price),
     }));
     const subtotal = lines.reduce((s, l) => s + l.sellPriceSnapshot * l.quantity, 0);
+
+    // §236 : livraison offerte dès le seuil de la ville (ou la règle globale
+    // paramétrable) — jusqu'ici calculé mais jamais appliqué au frais réel.
+    if (subtotal >= shipping.freeFrom) shipping.fee = 0;
 
     let couponDiscount = 0;
     const coupon = cart.couponCode ? await this.prisma.coupon.findUnique({ where: { code: cart.couponCode } }) : null;
@@ -80,14 +83,14 @@ export class OrdersService {
       const account = await this.prisma.loyaltyAccount.findUnique({ where: { customerId: customer.id } });
       if (account && account.pointsBalance > 0) {
         const maxDiscount = Math.max(0, subtotal - couponDiscount);
-        const affordable = Math.floor(account.pointsBalance / DEFAULT_LOYALTY_REDEEM_RATE);
+        const affordable = Math.floor(account.pointsBalance / loyaltyRedeemRate);
         loyaltyDiscount = Math.min(affordable, maxDiscount);
-        pointsToRedeem = loyaltyDiscount * DEFAULT_LOYALTY_REDEEM_RATE;
+        pointsToRedeem = loyaltyDiscount * loyaltyRedeemRate;
       }
     }
 
     const total = Math.max(0, subtotal - couponDiscount - loyaltyDiscount + shipping.fee);
-    const vatAmount = Math.round(total - total / (1 + DEFAULT_VAT_RATE));
+    const vatAmount = Math.round(total - total / (1 + vatRate));
 
     const stockLines: StockLine[] = lines.map((l) => ({
       productId: l.productId,
@@ -109,7 +112,7 @@ export class OrdersService {
           shippingFee: shipping.fee,
           discount: couponDiscount,
           loyaltyDiscount,
-          vatRate: DEFAULT_VAT_RATE,
+          vatRate,
           vatAmount,
           total,
           shippingCity: dto.city,
@@ -195,10 +198,10 @@ export class OrdersService {
 
   /** I7 : la règle ville prime toujours sur la règle globale ; la règle
    * globale ne s'applique qu'aux villes sans seuil spécifique. */
-  private async resolveShippingFee(cityName: string) {
+  private async resolveShippingFee(cityName: string, globalFreeShippingThreshold: number) {
     const city = await this.prisma.city.findUnique({ where: { name: cityName }, include: { group: true } });
     if (!city || !city.active) throw new BadRequestException("Ville de livraison non desservie");
-    const freeFrom = city.freeShippingFrom ?? city.group?.freeShippingFrom ?? DEFAULT_GLOBAL_FREE_SHIPPING_THRESHOLD;
+    const freeFrom = city.freeShippingFrom ?? city.group?.freeShippingFrom ?? globalFreeShippingThreshold;
     return { fee: Number(city.shippingFee), freeFrom: Number(freeFrom), label: `${city.name} — figé à la commande` };
   }
 

@@ -1,9 +1,31 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import type { Prisma, PrismaClient } from "@prisma/client";
+import * as XLSX from "xlsx";
 import { PrismaService } from "../../prisma/prisma.service";
 import type { QueryProductsDto } from "./dto/query-products.dto";
 import type { UpsertProductDto } from "./dto/upsert-product.dto";
 import type { AdjustStockDto } from "./dto/adjust-stock.dto";
+
+interface ImportRow {
+  SKU?: unknown;
+  Nom?: unknown;
+  Catégorie?: unknown;
+  Marque?: unknown;
+  Prix?: unknown;
+  "Prix de revient"?: unknown;
+  Stock?: unknown;
+  "URL SEO"?: unknown;
+  "Âge min"?: unknown;
+  "Âge max"?: unknown;
+  Statut?: unknown;
+}
+
+interface ImportRowResult {
+  row: number;
+  sku: string;
+  status: "created" | "updated" | "error";
+  message?: string;
+}
 
 /** Une commande transitant par cette interface pour réserver/libérer/décrémenter du stock. */
 export interface StockLine {
@@ -120,6 +142,87 @@ export class ProductsService {
     });
     if (!product) throw new NotFoundException("Produit introuvable");
     return product;
+  }
+
+  /** Import Excel produits en masse — upsert par SKU, une ligne = un produit. */
+  async importFromExcel(buffer: Buffer): Promise<{ results: ImportRowResult[]; created: number; updated: number; errors: number }> {
+    const workbook = XLSX.read(buffer, { type: "buffer" });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json<ImportRow>(sheet, { defval: undefined });
+
+    const [categories, brands] = await Promise.all([
+      this.prisma.category.findMany({ select: { id: true, slug: true } }),
+      this.prisma.brand.findMany({ select: { id: true, name: true } }),
+    ]);
+    const categoryBySlug = new Map(categories.map((c) => [c.slug, c.id]));
+    const brandByName = new Map(brands.map((b) => [b.name.toLowerCase(), b.id]));
+
+    const results: ImportRowResult[] = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const rowNumber = i + 2; // +1 pour l'en-tête, +1 pour l'index 1-based
+      const sku = String(row.SKU ?? "").trim();
+
+      try {
+        if (!sku) throw new Error("SKU manquant");
+        const nameFr = String(row.Nom ?? "").trim();
+        if (!nameFr) throw new Error("Nom manquant");
+        const categorySlug = String(row["Catégorie"] ?? "").trim();
+        const categoryId = categoryBySlug.get(categorySlug);
+        if (!categoryId) throw new Error(`Catégorie "${categorySlug}" introuvable`);
+        const price = Number(row.Prix);
+        if (!Number.isFinite(price) || price < 0) throw new Error("Prix invalide");
+        const costPrice = Number(row["Prix de revient"]);
+        if (!Number.isFinite(costPrice) || costPrice < 0) throw new Error("Prix de revient invalide");
+        const seoUrl = String(row["URL SEO"] ?? "").trim();
+        if (!seoUrl) throw new Error("URL SEO manquante");
+
+        const brandName = row.Marque ? String(row.Marque).trim() : undefined;
+        const brandId = brandName ? brandByName.get(brandName.toLowerCase()) : undefined;
+        if (brandName && !brandId) throw new Error(`Marque "${brandName}" introuvable`);
+
+        const stock = row.Stock !== undefined ? Number(row.Stock) : undefined;
+        const ageMin = row["Âge min"] !== undefined ? Number(row["Âge min"]) : undefined;
+        const ageMax = row["Âge max"] !== undefined ? Number(row["Âge max"]) : undefined;
+        const status = row.Statut ? String(row.Statut).trim().toUpperCase() : undefined;
+        if (status && !["DRAFT", "ACTIVE", "INACTIVE", "ARCHIVED"].includes(status)) {
+          throw new Error(`Statut "${status}" invalide`);
+        }
+
+        const data = {
+          sku,
+          nameFr,
+          categoryId,
+          brandId,
+          price,
+          costPrice,
+          seoUrl,
+          stock,
+          ageMin,
+          ageMax,
+          status: status as UpsertProductDto["status"],
+        };
+
+        const existing = await this.prisma.product.findUnique({ where: { sku } });
+        if (existing) {
+          await this.prisma.product.update({ where: { id: existing.id }, data });
+          results.push({ row: rowNumber, sku, status: "updated" });
+        } else {
+          await this.prisma.product.create({ data });
+          results.push({ row: rowNumber, sku, status: "created" });
+        }
+      } catch (err) {
+        results.push({ row: rowNumber, sku: sku || "?", status: "error", message: err instanceof Error ? err.message : "Erreur inconnue" });
+      }
+    }
+
+    return {
+      results,
+      created: results.filter((r) => r.status === "created").length,
+      updated: results.filter((r) => r.status === "updated").length,
+      errors: results.filter((r) => r.status === "error").length,
+    };
   }
 
   async create(dto: UpsertProductDto) {

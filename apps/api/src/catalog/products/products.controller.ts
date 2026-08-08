@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Headers, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Get, Headers, Param, Patch, Post, Query, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
 import { ApiTags } from "@nestjs/swagger";
 import { PermissionCode } from "@universenfants/shared";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
@@ -46,6 +47,15 @@ export class ProductsController {
   @RequirePermissions(PermissionCode.PRODUCT_CREATE)
   create(@Body() dto: UpsertProductDto) {
     return this.service.create(dto);
+  }
+
+  @Post("import")
+  @UseGuards(JwtAuthGuard, StaffGuard, PermissionsGuard)
+  @RequirePermissions(PermissionCode.PRODUCT_CREATE)
+  @UseInterceptors(FileInterceptor("file", { limits: { fileSize: 5 * 1024 * 1024 } }))
+  importExcel(@UploadedFile() file?: Express.Multer.File) {
+    if (!file) throw new BadRequestException("Fichier requis");
+    return this.service.importFromExcel(file.buffer);
   }
 
   @Patch(":id")
