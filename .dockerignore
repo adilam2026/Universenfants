@@ -1,0 +1,10 @@
+**/node_modules
+**/.next
+**/dist
+**/.turbo
+**/.git
+**/*.tsbuildinfo
+apps/api/uploads
+apps/api/.mail-outbox
+**/.env
+**/.env.local
