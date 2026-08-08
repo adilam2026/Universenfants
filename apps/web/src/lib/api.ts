@@ -57,7 +57,10 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
     headers: { "Content-Type": "application/json", ...init?.headers },
-    cache: "no-store",
+    // Catalogue public (produits, catégories) : revalidation courte plutôt
+    // qu'une requête réseau à chaque rendu — le stock/prix affiché peut
+    // avoir jusqu'à 60s de retard, acceptable pour du contenu de navigation.
+    next: { revalidate: 60 },
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
