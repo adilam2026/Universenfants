@@ -193,7 +193,9 @@
     "submit": "Confirmer ma commande — {total}",
     "submitting": "Validation en cours…",
     "empty": "Votre panier est vide.",
-    "loading": "Chargement…"
+    "loading": "Chargement…",
+    "useLoyaltyPoints": "Utiliser mes {n} points fidélité (≈ {amount} de réduction)",
+    "loyaltyDiscountApplied": "Réduction fidélité"
   },
   "confirmation": {
     "title": "Merci, votre commande est confirmée !",

@@ -193,7 +193,9 @@
     "submit": "تأكيد طلبي — {total}",
     "submitting": "جارٍ التأكيد…",
     "empty": "سلتك فارغة.",
-    "loading": "جارٍ التحميل…"
+    "loading": "جارٍ التحميل…",
+    "useLoyaltyPoints": "استخدام نقاطي ({n} نقطة، ≈ {amount} خصم)",
+    "loyaltyDiscountApplied": "خصم نقاط الولاء"
   },
   "confirmation": {
     "title": "شكراً لك، تم تأكيد طلبك!",

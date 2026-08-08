@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useTranslations } from "next-intl";
 import { useCart, broadcastCartUpdate } from "@/hooks/use-cart";
 import { checkout } from "@/lib/cart-client";
+import { isLoggedIn, me, type CustomerProfile } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "@/i18n/navigation";
 
@@ -19,6 +20,12 @@ export default function CheckoutPage() {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [profile, setProfile] = useState<CustomerProfile | null>(null);
+  const [useLoyaltyPoints, setUseLoyaltyPoints] = useState(false);
+
+  useEffect(() => {
+    if (isLoggedIn()) me().then(setProfile).catch(() => undefined);
+  }, []);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -34,6 +41,7 @@ export default function CheckoutPage() {
         city: String(form.get("city")),
         addressLine: String(form.get("addressLine")),
         comment: String(form.get("comment") || "") || undefined,
+        useLoyaltyPoints: useLoyaltyPoints || undefined,
       });
       broadcastCartUpdate();
       router.push(`/commande/confirmation?orderNumber=${order.orderNumber}&total=${order.total}`);
@@ -49,7 +57,10 @@ export default function CheckoutPage() {
   }
 
   const shipping = cart.subtotal >= 300 ? 0 : 25;
-  const total = Math.max(0, cart.subtotal - cart.discount + shipping);
+  const maxLoyaltyDiscount = Math.max(0, cart.subtotal - cart.discount);
+  const loyaltyDiscount =
+    useLoyaltyPoints && profile ? Math.min(Math.floor(profile.loyaltyPoints / 10), maxLoyaltyDiscount) : 0;
+  const total = Math.max(0, cart.subtotal - cart.discount - loyaltyDiscount + shipping);
 
   return (
     <div className="mx-auto max-w-3xl px-4 md:px-7 py-4">
@@ -97,6 +108,23 @@ export default function CheckoutPage() {
               </div>
             ))}
           </div>
+          {profile && profile.loyaltyPoints > 0 && (
+            <label className="flex items-center gap-2.5 text-sm rounded-xl bg-secondary p-3 mt-3.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={useLoyaltyPoints}
+                onChange={(e) => setUseLoyaltyPoints(e.target.checked)}
+                className="size-4"
+              />
+              {t("useLoyaltyPoints", { n: profile.loyaltyPoints, amount: dh(Math.round(profile.loyaltyPoints / 10)) })}
+            </label>
+          )}
+          {loyaltyDiscount > 0 && (
+            <div className="flex justify-between text-sm text-brand-success mt-2.5">
+              <span>{t("loyaltyDiscountApplied")}</span>
+              <span>-{dh(loyaltyDiscount)}</span>
+            </div>
+          )}
           <div className="flex justify-between font-extrabold text-lg pt-3 mt-3 border-t border-border">
             <span>{t("total")}</span>
             <span>{dh(total)}</span>
