@@ -19,6 +19,7 @@ import { CouponsModule } from "./marketing/coupons/coupons.module";
 import { PromotionsModule } from "./marketing/promotions/promotions.module";
 import { SettingsModule } from "./settings/settings.module";
 import { AnalyticsModule } from "./analytics/analytics.module";
+import { ReviewsModule } from "./reviews/reviews.module";
 import { SearchModule } from "./search/search.module";
 import { StorageModule } from "./storage/storage.module";
 import { EmailModule } from "./email/email.module";
@@ -46,6 +47,7 @@ import { EmailModule } from "./email/email.module";
     PromotionsModule,
     SettingsModule,
     AnalyticsModule,
+    ReviewsModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

@@ -7,6 +7,7 @@ import { ProductCard } from "@/components/product-card";
 import { ProductGallery } from "@/components/product-gallery";
 import { AddToCartButton } from "@/components/add-to-cart-button";
 import { WishlistButton } from "@/components/wishlist-button";
+import { WriteReviewForm } from "@/components/write-review-form";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
@@ -95,6 +96,29 @@ export default async function ProductPage({ params }: PageProps<"/[locale]/produ
           </Button>
         </div>
       </div>
+
+      <section className="mt-12 grid md:grid-cols-2 gap-8">
+        <div>
+          <h2 className="font-display text-xl font-extrabold mb-3.5">{t("reviewsTitle")}</h2>
+          {product.reviews.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t("noReviews")}</p>
+          ) : (
+            <div className="flex flex-col gap-3.5">
+              {product.reviews.map((r) => (
+                <div key={r.id} className="rounded-2xl border border-border bg-card p-3.5">
+                  <div className="flex items-center gap-1 text-brand-highlight">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <Star key={i} className="size-3.5" fill={i < r.rating ? "currentColor" : "none"} />
+                    ))}
+                  </div>
+                  {r.comment && <p className="text-sm mt-1.5">{r.comment}</p>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <WriteReviewForm productId={product.id} />
+      </section>
 
       {similar.items.length > 0 && (
         <section className="mt-12">

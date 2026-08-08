@@ -11,6 +11,7 @@ import {
   Users,
   Tag,
   Ticket,
+  Star,
   Truck,
   LineChart,
   Settings,
@@ -43,6 +44,7 @@ const NAV = [
     items: [
       { href: "/promotions", label: "Promotions", icon: Tag },
       { href: "/coupons", label: "Coupons", icon: Ticket },
+      { href: "/avis", label: "Avis", icon: Star },
     ],
   },
   {

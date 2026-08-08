@@ -137,7 +137,15 @@
     "favorites": "المفضلة",
     "similar": "قد يعجبك أيضاً",
     "promo": "عرض",
-    "lastUnits": "آخر القطع"
+    "lastUnits": "آخر القطع",
+    "reviewsTitle": "آراء العملاء",
+    "noReviews": "لا توجد آراء بعد.",
+    "writeReview": "أضف رأيك",
+    "reviewPlaceholder": "رأيك حول هذا المنتج (اختياري)",
+    "submitReview": "نشر رأيي",
+    "ratingStars": "{n} نجوم",
+    "alreadyReviewed": "شكراً، لقد سبق أن أضفت رأياً حول هذا المنتج.",
+    "reviewSubmitted": "شكراً! تم إرسال رأيك وسيُنشر بعد المراجعة."
   },
   "cart": {
     "title": "🛍 سلتي",

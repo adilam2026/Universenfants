@@ -137,7 +137,15 @@
     "favorites": "Favoris",
     "similar": "Vous aimerez aussi",
     "promo": "PROMO",
-    "lastUnits": "DERNIÈRES PIÈCES"
+    "lastUnits": "DERNIÈRES PIÈCES",
+    "reviewsTitle": "Avis clients",
+    "noReviews": "Aucun avis pour le moment.",
+    "writeReview": "Laisser un avis",
+    "reviewPlaceholder": "Votre avis sur ce produit (optionnel)",
+    "submitReview": "Publier mon avis",
+    "ratingStars": "{n} étoile(s)",
+    "alreadyReviewed": "Merci, vous avez déjà laissé un avis pour ce produit.",
+    "reviewSubmitted": "Merci ! Votre avis a été envoyé et sera publié après modération."
   },
   "cart": {
     "title": "🛍 Mon panier",
