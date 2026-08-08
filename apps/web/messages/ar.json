@@ -281,7 +281,12 @@
     "free": "مجاني",
     "totalTtc": "المجموع شامل الضريبة",
     "vatIncluded": "شامل ضريبة القيمة المضافة 20%: {amount}",
-    "shippingInfo": "التوصيل: {address}، {city} · {phone}"
+    "shippingInfo": "التوصيل: {address}، {city} · {phone}",
+    "cancelOrder": "إلغاء طلبي",
+    "cancelConfirm": "تأكيد الإلغاء؟",
+    "cancelling": "جارٍ الإلغاء…",
+    "cancelSuccess": "تم إلغاء طلبك.",
+    "cancelError": "لا يمكن إلغاء هذا الطلب."
   },
   "giftAdvisor": {
     "title": "مستشار الهدايا",

@@ -133,3 +133,7 @@ export interface OrderDetail extends OrderSummary {
 export function getMyOrder(id: string) {
   return authFetch<OrderDetail>(`/orders/${id}`);
 }
+
+export function cancelMyOrder(id: string) {
+  return authFetch<OrderDetail>(`/orders/${id}/cancel`, { method: "PATCH" });
+}

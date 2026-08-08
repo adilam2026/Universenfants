@@ -5,7 +5,8 @@ import { useTranslations } from "next-intl";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link } from "@/i18n/navigation";
-import { isLoggedIn, getMyOrder, type OrderDetail } from "@/lib/auth-client";
+import { isLoggedIn, getMyOrder, cancelMyOrder, type OrderDetail } from "@/lib/auth-client";
+import { Button } from "@/components/ui/button";
 
 function dh(value: string | number) {
   return `${Number(value).toLocaleString("fr-FR")} DH`;
@@ -25,6 +26,21 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+
+  async function handleCancel() {
+    if (!window.confirm(t("cancelConfirm"))) return;
+    setCancelling(true);
+    setCancelError(null);
+    try {
+      setOrder(await cancelMyOrder(id));
+    } catch {
+      setCancelError(t("cancelError"));
+    } finally {
+      setCancelling(false);
+    }
+  }
 
   useEffect(() => {
     if (!isLoggedIn()) {
@@ -118,6 +134,15 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       <div className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground">
         {t("shippingInfo", { address: order.shippingAddress, city: order.shippingCity, phone: order.shippingPhone })}
       </div>
+
+      {["PENDING", "CONFIRMED", "PREPARING"].includes(order.status) && (
+        <div className="mt-4">
+          {cancelError && <p className="text-sm text-destructive mb-2">{cancelError}</p>}
+          <Button variant="outline" onClick={handleCancel} disabled={cancelling}>
+            {cancelling ? t("cancelling") : t("cancelOrder")}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

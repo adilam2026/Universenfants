@@ -251,6 +251,39 @@ export class OrdersService {
     return this.prisma.order.findMany({ where: { customerId }, orderBy: { createdAt: "desc" } });
   }
 
+  /** §74 / §193 : le client peut annuler lui-même tant que la commande n'a pas été expédiée. */
+  async cancelByCustomer(customerId: string, orderId: string) {
+    const order = await this.prisma.order.findUnique({ where: { id: orderId }, include: { lines: true, customer: true } });
+    if (!order || order.customerId !== customerId) throw new NotFoundException("Commande introuvable");
+    if (!CANCELLABLE_STATUSES.has(order.status)) {
+      throw new BadRequestException("Cette commande ne peut plus être annulée (déjà expédiée)");
+    }
+
+    const stockLines: StockLine[] = order.lines.map((l) => ({
+      productId: l.productId,
+      variantId: l.variantId,
+      quantity: l.quantity,
+    }));
+
+    await this.prisma.$transaction(async (tx) => {
+      await this.products.releaseReservation(tx, stockLines);
+      await tx.order.update({
+        where: { id: orderId },
+        data: {
+          status: "CANCELLED",
+          cancelledAt: new Date(),
+          statusHistory: {
+            create: { fromStatus: order.status, toStatus: "CANCELLED", note: "Annulée par le client" },
+          },
+        },
+      });
+    });
+
+    if (order.customer.email) void this.email.sendOrderStatusChanged(order.customer.email, order.orderNumber, "CANCELLED");
+
+    return this.findForCustomer(customerId, orderId);
+  }
+
   listForAdmin(filters: { status?: string; city?: string }) {
     return this.prisma.order.findMany({
       where: { status: filters.status as never, shippingCity: filters.city },

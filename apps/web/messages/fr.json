@@ -281,7 +281,12 @@
     "free": "Offerte",
     "totalTtc": "Total TTC",
     "vatIncluded": "dont TVA 20% incluse : {amount}",
-    "shippingInfo": "Livraison : {address}, {city} · {phone}"
+    "shippingInfo": "Livraison : {address}, {city} · {phone}",
+    "cancelOrder": "Annuler ma commande",
+    "cancelConfirm": "Confirmer l'annulation ?",
+    "cancelling": "Annulation…",
+    "cancelSuccess": "Votre commande a été annulée.",
+    "cancelError": "Impossible d'annuler cette commande."
   },
   "giftAdvisor": {
     "title": "Conseiller Cadeau",

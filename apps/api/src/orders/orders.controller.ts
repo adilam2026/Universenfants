@@ -48,6 +48,13 @@ export class OrdersController {
     return this.service.findForCustomer(user.sub, id);
   }
 
+  @Patch(":id/cancel")
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, CustomerGuard)
+  cancelMyOrder(@CurrentUser() user: RequestUser, @Param("id") id: string) {
+    return this.service.cancelByCustomer(user.sub, id);
+  }
+
   @Get("admin/list")
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, StaffGuard, PermissionsGuard)
