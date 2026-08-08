@@ -7,6 +7,8 @@ import type { RequestUser } from "./types";
 import { CustomerAuthService } from "./customer-auth.service";
 import { RegisterCustomerDto } from "./dto/register-customer.dto";
 import { LoginDto } from "./dto/login.dto";
+import { ForgotPasswordDto } from "./dto/forgot-password.dto";
+import { ResetPasswordDto } from "./dto/reset-password.dto";
 
 @ApiTags("auth-customer")
 @Controller("auth/customer")
@@ -21,6 +23,16 @@ export class CustomerAuthController {
   @Post("login")
   login(@Body() dto: LoginDto) {
     return this.service.login(dto);
+  }
+
+  @Post("forgot-password")
+  forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.service.forgotPassword(dto);
+  }
+
+  @Post("reset-password")
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.service.resetPassword(dto);
   }
 
   @Get("me")

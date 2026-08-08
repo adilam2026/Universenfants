@@ -66,6 +66,20 @@ export function logout() {
   clearCustomerToken();
 }
 
+export function forgotPassword(email: string) {
+  return authFetch<{ ok: true }>("/auth/customer/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export function resetPassword(token: string, password: string) {
+  return authFetch<{ ok: true }>("/auth/customer/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ token, password }),
+  });
+}
+
 export function isLoggedIn() {
   return Boolean(getCustomerToken());
 }

@@ -1,16 +1,23 @@
 import { ConflictException, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
+import { randomBytes } from "node:crypto";
 import { PrismaService } from "../prisma/prisma.service";
+import { EmailService } from "../email/email.service";
 import { hashPassword, verifyPassword, detectIdentifierKind } from "./password.util";
 import type { RegisterCustomerDto } from "./dto/register-customer.dto";
 import type { LoginDto } from "./dto/login.dto";
+import type { ForgotPasswordDto } from "./dto/forgot-password.dto";
+import type { ResetPasswordDto } from "./dto/reset-password.dto";
 import type { JwtPayload } from "./types";
+
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
 
 @Injectable()
 export class CustomerAuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
+    private readonly email: EmailService,
   ) {}
 
   async register(dto: RegisterCustomerDto) {
@@ -58,6 +65,8 @@ export class CustomerAuthService {
       create: { customerId: customer.id },
     });
 
+    if (customer.email) void this.email.sendAccountCreated(customer.email, customer.firstName);
+
     return this.issueTokens(customer.id, customer.email);
   }
 
@@ -88,6 +97,35 @@ export class CustomerAuthService {
       totalSpent: customer.totalSpent,
       loyaltyPoints: customer.loyaltyAccount?.pointsBalance ?? 0,
     };
+  }
+
+  /** Réponse volontairement identique que l'email existe ou non, pour ne pas
+   * révéler quels emails sont enregistrés (énumération de comptes). */
+  async forgotPassword(dto: ForgotPasswordDto) {
+    const customer = await this.prisma.customer.findFirst({ where: { email: dto.email, passwordHash: { not: null } } });
+    if (customer?.email) {
+      const token = randomBytes(32).toString("hex");
+      await this.prisma.customer.update({
+        where: { id: customer.id },
+        data: { passwordResetToken: token, passwordResetExpiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS) },
+      });
+      const resetUrl = `${process.env.WEB_PUBLIC_URL ?? "http://localhost:3000"}/fr/mot-de-passe/reinitialiser?token=${token}`;
+      void this.email.sendPasswordReset(customer.email, resetUrl);
+    }
+    return { ok: true };
+  }
+
+  async resetPassword(dto: ResetPasswordDto) {
+    const customer = await this.prisma.customer.findFirst({ where: { passwordResetToken: dto.token } });
+    if (!customer || !customer.passwordResetExpiresAt || customer.passwordResetExpiresAt < new Date()) {
+      throw new UnauthorizedException("Lien de réinitialisation invalide ou expiré");
+    }
+    const passwordHash = await hashPassword(dto.password);
+    await this.prisma.customer.update({
+      where: { id: customer.id },
+      data: { passwordHash, passwordResetToken: null, passwordResetExpiresAt: null },
+    });
+    return { ok: true };
   }
 
   private issueTokens(customerId: string, email?: string | null) {

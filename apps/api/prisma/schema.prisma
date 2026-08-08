@@ -279,6 +279,9 @@ model Customer {
   emailConsent Boolean @default(false)
   smsConsent   Boolean @default(false)
 
+  passwordResetToken     String?   @unique
+  passwordResetExpiresAt DateTime?
+
   firstOrderAt DateTime?
   lastOrderAt  DateTime?
   ordersCount  Int       @default(0)

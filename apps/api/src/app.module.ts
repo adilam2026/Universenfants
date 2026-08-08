@@ -21,6 +21,7 @@ import { SettingsModule } from "./settings/settings.module";
 import { AnalyticsModule } from "./analytics/analytics.module";
 import { SearchModule } from "./search/search.module";
 import { StorageModule } from "./storage/storage.module";
+import { EmailModule } from "./email/email.module";
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { StorageModule } from "./storage/storage.module";
     RedisModule,
     SearchModule,
     StorageModule,
+    EmailModule,
     AuthModule,
     CategoriesModule,
     BrandsModule,

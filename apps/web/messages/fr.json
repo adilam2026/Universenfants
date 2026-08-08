@@ -224,7 +224,20 @@
     "personalInfo": "Informations personnelles",
     "fullName": "Nom complet",
     "logout": "Se déconnecter",
-    "loading": "Chargement…"
+    "loading": "Chargement…",
+    "forgotPassword": "Mot de passe oublié ?",
+    "forgotPasswordTitle": "Mot de passe oublié",
+    "forgotPasswordSubtitle": "Indiquez votre email, nous vous enverrons un lien de réinitialisation.",
+    "sendResetLink": "Envoyer le lien",
+    "resetLinkSent": "Si un compte existe avec cet email, un lien de réinitialisation vient de vous être envoyé.",
+    "backToLogin": "Retour à la connexion",
+    "resetPasswordTitle": "Réinitialiser le mot de passe",
+    "resetPasswordSubtitle": "Choisissez un nouveau mot de passe.",
+    "newPassword": "Nouveau mot de passe",
+    "submitReset": "Réinitialiser",
+    "resetSuccess": "Votre mot de passe a été réinitialisé avec succès.",
+    "resetSuccessCta": "Se connecter",
+    "invalidToken": "Ce lien de réinitialisation est invalide ou a expiré."
   },
   "orders": {
     "title": "📦 Mes commandes",

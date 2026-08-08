@@ -169,6 +169,11 @@ function AuthForm({ onSuccess }: { onSuccess: (profile: CustomerProfile) => void
           </>
         )}
         <Field label={t("password")} name="password" type="password" required />
+        {mode === "login" && (
+          <Link href="/mot-de-passe/oublie" className="text-xs font-bold text-primary -mt-2 self-end">
+            {t("forgotPassword")}
+          </Link>
+        )}
 
         {error && <p className="text-sm text-destructive">{error}</p>}
 

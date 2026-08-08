@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { ProductsService, type StockLine } from "../catalog/products/products.service";
 import { SettingsService } from "../settings/settings.service";
+import { EmailService } from "../email/email.service";
 import { ORDER_NUMBER_PREFIX } from "@universenfants/shared";
 import type { CheckoutDto } from "./dto/checkout.dto";
 import type { UpdateOrderStatusDto } from "./dto/update-order-status.dto";
@@ -24,6 +25,7 @@ export class OrdersService {
     private readonly prisma: PrismaService,
     private readonly products: ProductsService,
     private readonly settings: SettingsService,
+    private readonly email: EmailService,
   ) {}
 
   async checkout(cartId: string, dto: CheckoutDto) {
@@ -170,7 +172,14 @@ export class OrdersService {
       return created;
     });
 
-    // TODO (O3) : déclencher l'email "ORDER_CONFIRMED" une fois le provider email branché.
+    if (customer.email) {
+      void this.email.sendOrderConfirmed(
+        customer.email,
+        order.orderNumber,
+        order.lines.map((l) => ({ name: l.productNameSnapshot, quantity: l.quantity, lineTotal: Number(l.lineTotal) })),
+        Number(order.total),
+      );
+    }
     return this.sanitizeForCustomer(order);
   }
 
@@ -264,8 +273,8 @@ export class OrdersService {
   }
 
   async updateStatus(orderId: string, dto: UpdateOrderStatusDto, staffUserId: string) {
-    return this.prisma.$transaction(async (tx) => {
-      const order = await tx.order.findUnique({ where: { id: orderId }, include: { lines: true } });
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({ where: { id: orderId }, include: { lines: true, customer: true } });
       if (!order) throw new NotFoundException("Commande introuvable");
 
       if (dto.status === "CANCELLED" && !CANCELLABLE_STATUSES.has(order.status)) {
@@ -339,8 +348,14 @@ export class OrdersService {
         },
       });
 
-      return updated;
+      return { updated, customerEmail: order.customer.email, orderNumber: order.orderNumber };
     });
+
+    if (updated.customerEmail) {
+      void this.email.sendOrderStatusChanged(updated.customerEmail, updated.orderNumber, dto.status);
+    }
+
+    return updated.updated;
   }
 
   async recordPayment(orderId: string, amount: number) {
