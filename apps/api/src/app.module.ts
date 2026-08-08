@@ -19,6 +19,7 @@ import { CouponsModule } from "./marketing/coupons/coupons.module";
 import { PromotionsModule } from "./marketing/promotions/promotions.module";
 import { SettingsModule } from "./settings/settings.module";
 import { AnalyticsModule } from "./analytics/analytics.module";
+import { SearchModule } from "./search/search.module";
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { AnalyticsModule } from "./analytics/analytics.module";
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
     PrismaModule,
     RedisModule,
+    SearchModule,
     AuthModule,
     CategoriesModule,
     BrandsModule,

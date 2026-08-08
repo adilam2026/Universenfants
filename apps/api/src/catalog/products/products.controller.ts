@@ -58,6 +58,13 @@ export class ProductsController {
     return this.service.importFromExcel(file.buffer);
   }
 
+  @Post("admin/reindex-search")
+  @UseGuards(JwtAuthGuard, StaffGuard, PermissionsGuard)
+  @RequirePermissions(PermissionCode.PRODUCT_READ)
+  reindexSearch() {
+    return this.service.reindexSearch();
+  }
+
   @Patch(":id")
   @UseGuards(JwtAuthGuard, StaffGuard, PermissionsGuard)
   @RequirePermissions(PermissionCode.PRODUCT_UPDATE)

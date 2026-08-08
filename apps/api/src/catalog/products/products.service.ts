@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from "@nestjs/comm
 import type { Prisma, PrismaClient } from "@prisma/client";
 import * as XLSX from "xlsx";
 import { PrismaService } from "../../prisma/prisma.service";
+import { SearchService, type ProductSearchDoc } from "../../search/search.service";
 import type { QueryProductsDto } from "./dto/query-products.dto";
 import type { UpsertProductDto } from "./dto/upsert-product.dto";
 import type { AdjustStockDto } from "./dto/adjust-stock.dto";
@@ -39,7 +40,10 @@ type Tx = PrismaClient | Prisma.TransactionClient;
 
 @Injectable()
 export class ProductsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly search: SearchService,
+  ) {}
 
   async list(query: QueryProductsDto) {
     const page = query.page ?? 1;
@@ -48,7 +52,6 @@ export class ProductsService {
     const where: Prisma.ProductWhereInput = { status: "ACTIVE" };
     if (query.category) where.category = { slug: query.category };
     if (query.brand) where.brand = { slug: query.brand };
-    if (query.q) where.nameFr = { contains: query.q, mode: "insensitive" };
     if (query.ageMin !== undefined) where.ageMax = { gte: query.ageMin };
     if (query.ageMax !== undefined) where.ageMin = { lte: query.ageMax };
     if (query.promoOnly) where.promoPrice = { not: null };
@@ -60,6 +63,18 @@ export class ProductsService {
       };
     }
 
+    // Recherche plein texte, tolérante aux fautes de frappe, via Meilisearch —
+    // repli sur un filtre `contains` Postgres si le moteur est indisponible.
+    let rankedIds: string[] | null = null;
+    if (query.q) {
+      rankedIds = await this.search.searchProductIds(query.q);
+      if (rankedIds) {
+        where.id = { in: rankedIds.length > 0 ? rankedIds : ["__none__"] };
+      } else {
+        where.nameFr = { contains: query.q, mode: "insensitive" };
+      }
+    }
+
     const orderBy: Prisma.ProductOrderByWithRelationInput =
       query.sort === "price_asc"
         ? { price: "asc" }
@@ -67,21 +82,32 @@ export class ProductsService {
           ? { price: "desc" }
           : query.sort === "newest"
             ? { createdAt: "desc" }
-            : { createdAt: "desc" }; // "relevance"/"bestsellers" affinés une fois Meilisearch branché
+            : { createdAt: "desc" }; // "bestsellers" affiné une fois les stats de vente branchées à l'index
+
+    const useRelevanceOrder = rankedIds && rankedIds.length > 0 && (!query.sort || query.sort === "relevance");
 
     const [items, total] = await this.prisma.$transaction([
       this.prisma.product.findMany({
         where,
-        orderBy,
-        skip: (page - 1) * limit,
-        take: limit,
+        ...(useRelevanceOrder ? {} : { orderBy }),
+        skip: useRelevanceOrder ? 0 : (page - 1) * limit,
+        take: useRelevanceOrder ? undefined : limit,
         include: { images: { orderBy: { order: "asc" }, take: 1 }, brand: true, category: true },
       }),
       this.prisma.product.count({ where }),
     ]);
 
+    // Meilisearch a déjà classé par pertinence — Postgres ne garantit pas l'ordre
+    // d'un `id IN (...)`, donc on ré-applique le classement puis on pagine.
+    let ranked = items;
+    if (useRelevanceOrder) {
+      const order = new Map(rankedIds!.map((id, i) => [id, i]));
+      ranked = [...items].sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
+      ranked = ranked.slice((page - 1) * limit, (page - 1) * limit + limit);
+    }
+
     return {
-      items: items.map((p) => this.toPublicShape(p)),
+      items: ranked.map((p) => this.toPublicShape(p)),
       total,
       page,
       limit,
@@ -217,6 +243,10 @@ export class ProductsService {
       }
     }
 
+    if (results.some((r) => r.status !== "error")) {
+      await this.reindexSearch();
+    }
+
     return {
       results,
       created: results.filter((r) => r.status === "created").length,
@@ -226,7 +256,9 @@ export class ProductsService {
   }
 
   async create(dto: UpsertProductDto) {
-    return this.prisma.product.create({ data: dto });
+    const created = await this.prisma.product.create({ data: dto });
+    await this.syncToSearch(created.id);
+    return created;
   }
 
   async update(id: string, dto: UpsertProductDto, staffUserId: string) {
@@ -248,13 +280,58 @@ export class ProductsService {
         },
       });
     }
+    await this.syncToSearch(id);
     return updated;
   }
 
   async archive(id: string) {
     const found = await this.prisma.product.findUnique({ where: { id } });
     if (!found) throw new NotFoundException("Produit introuvable");
-    return this.prisma.product.update({ where: { id }, data: { status: "ARCHIVED" } });
+    const archived = await this.prisma.product.update({ where: { id }, data: { status: "ARCHIVED" } });
+    await this.search.removeProduct(id);
+    return archived;
+  }
+
+  private toSearchDoc(
+    product: Prisma.ProductGetPayload<{ include: { category: true; brand: true } }>,
+  ): ProductSearchDoc {
+    return {
+      id: product.id,
+      nameFr: product.nameFr,
+      nameAr: product.nameAr,
+      sku: product.sku,
+      shortDescFr: product.shortDescFr,
+      categorySlug: product.category.slug,
+      categoryNameFr: product.category.nameFr,
+      brandName: product.brand?.name ?? null,
+      price: Number(product.price),
+      promoPrice: product.promoPrice ? Number(product.promoPrice) : null,
+      ageMin: product.ageMin,
+      ageMax: product.ageMax,
+      status: product.status,
+      createdAt: product.createdAt.getTime(),
+      bestsellerScore: 0,
+    };
+  }
+
+  private async syncToSearch(id: string) {
+    const product = await this.prisma.product.findUnique({ where: { id }, include: { category: true, brand: true } });
+    if (!product) return;
+    if (product.status !== "ACTIVE") {
+      await this.search.removeProduct(id);
+      return;
+    }
+    await this.search.indexProduct(this.toSearchDoc(product));
+  }
+
+  /** Reconstruit l'index Meilisearch depuis Postgres — après un import en masse ou en maintenance. */
+  async reindexSearch() {
+    const products = await this.prisma.product.findMany({
+      where: { status: "ACTIVE" },
+      include: { category: true, brand: true },
+    });
+    await this.search.indexProducts(products.map((p) => this.toSearchDoc(p)));
+    return { indexed: products.length };
   }
 
   async adjustStock(productId: string, dto: AdjustStockDto, staffUserId: string) {

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { useTranslations, useLocale } from "next-intl";
+import { useSearchParams } from "next/navigation";
 import { Menu, Search, ShoppingBag, User, X, Gift, Cake, Tag, Mail, Languages } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCartCount } from "@/hooks/use-cart";
@@ -12,8 +13,16 @@ export function SiteHeader() {
   const locale = useLocale();
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState(searchParams.get("q") ?? "");
   const cartCount = useCartCount();
+
+  function handleSearchSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const trimmed = query.trim();
+    router.push(trimmed ? `/recherche?q=${encodeURIComponent(trimmed)}` : "/recherche");
+  }
 
   const QUICK_NAV = [
     { label: t("nav.allToys"), href: "/recherche", strong: true },
@@ -58,14 +67,16 @@ export function SiteHeader() {
             <Link href="/" className="hidden md:flex items-center font-display font-extrabold text-xl text-primary shrink-0">
               Univers<span className="text-brand-cta">Enfants</span>
             </Link>
-            <div className="relative flex-1">
+            <form onSubmit={handleSearchSubmit} className="relative flex-1">
               <Search className="absolute left-3.5 rtl:left-auto rtl:right-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
               <input
                 type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
                 placeholder={t("nav.searchPlaceholder")}
                 className="w-full rounded-full border-2 border-border bg-background py-3 pl-10 pr-4 rtl:pl-4 rtl:pr-10 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
               />
-            </div>
+            </form>
             <nav className="flex items-center gap-1 shrink-0">
               <button
                 onClick={() => switchLocale(locale === "fr" ? "ar" : "fr")}
