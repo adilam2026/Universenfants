@@ -12,6 +12,7 @@ import { ProductsModule } from "./catalog/products/products.module";
 import { CartModule } from "./cart/cart.module";
 import { WishlistModule } from "./wishlist/wishlist.module";
 import { OrdersModule } from "./orders/orders.module";
+import { BirthdayListModule } from "./birthday-list/birthday-list.module";
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { OrdersModule } from "./orders/orders.module";
     CartModule,
     WishlistModule,
     OrdersModule,
+    BirthdayListModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
