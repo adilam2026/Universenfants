@@ -40,7 +40,8 @@ export default async function ProductPage({ params }: PageProps<"/[locale]/produ
 
         <div>
           <p className="text-xs font-bold uppercase text-muted-foreground">
-            {product.brand?.name} · {t("sku")} {product.sku}
+            {product.brand?.name ? `${product.brand.name} · ` : ""}
+            {t("sku")} {product.sku}
           </p>
           <h1 className="font-display text-2xl font-extrabold mt-1">{name}</h1>
           <div className="flex items-center gap-1 mt-2 text-brand-highlight">
@@ -73,7 +74,7 @@ export default async function ProductPage({ params }: PageProps<"/[locale]/produ
             </p>
           )}
 
-          <div className="mt-6 flex items-center gap-2.5 sticky bottom-20 md:static bg-card md:bg-transparent rounded-2xl md:rounded-none border md:border-0 border-border p-3 md:p-0 shadow-lg md:shadow-none">
+          <div className="mt-6 flex items-center gap-2.5 fixed inset-x-4 bottom-20 z-30 md:static md:inset-auto bg-card md:bg-transparent rounded-2xl md:rounded-none border md:border-0 border-border p-3 md:p-0 shadow-lg md:shadow-none">
             <Button variant="outline" size="icon" aria-label={t("favorites")}>
               <Heart className="size-4" />
             </Button>

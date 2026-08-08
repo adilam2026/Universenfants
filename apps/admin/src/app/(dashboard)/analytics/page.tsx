@@ -8,6 +8,15 @@ function dh(value: number) {
   return `${value.toLocaleString("fr-FR")} DH`;
 }
 
+const STATUS_LABEL: Record<string, string> = {
+  PENDING: "En attente",
+  CONFIRMED: "Confirmée",
+  PREPARING: "En préparation",
+  SHIPPED: "Expédiée",
+  DELIVERED: "Livrée",
+  CANCELLED: "Annulée",
+};
+
 export default function AnalyticsPage() {
   const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
 
@@ -73,7 +82,7 @@ export default function AnalyticsPage() {
             <CardContent className="flex flex-col gap-2 text-sm">
               {Object.entries(summary.ordersByStatus).map(([status, count]) => (
                 <div key={status} className="flex justify-between">
-                  <span className="text-muted-foreground">{status}</span>
+                  <span className="text-muted-foreground">{STATUS_LABEL[status] ?? status}</span>
                   <span className="font-bold">{count}</span>
                 </div>
               ))}

@@ -70,7 +70,7 @@ export function SiteHeader() {
             >
               <Menu className="size-5" />
             </button>
-            <Link href="/" className="hidden md:flex items-center font-display font-extrabold text-xl text-primary shrink-0">
+            <Link href="/" dir="ltr" className="hidden md:flex items-center font-display font-extrabold text-xl text-primary shrink-0">
               Univers<span className="text-brand-cta">Enfants</span>
             </Link>
             <form onSubmit={handleSearchSubmit} className="relative flex-1">
@@ -148,7 +148,7 @@ export function SiteHeader() {
         )}
       >
         <div className="flex items-center justify-between border-b border-border p-4">
-          <span className="font-display font-extrabold text-lg text-primary">
+          <span dir="ltr" className="font-display font-extrabold text-lg text-primary">
             Univers<span className="text-brand-cta">Enfants</span>
           </span>
           <button
