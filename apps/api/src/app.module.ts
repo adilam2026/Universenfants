@@ -20,6 +20,7 @@ import { PromotionsModule } from "./marketing/promotions/promotions.module";
 import { SettingsModule } from "./settings/settings.module";
 import { AnalyticsModule } from "./analytics/analytics.module";
 import { ReviewsModule } from "./reviews/reviews.module";
+import { LandingPagesModule } from "./landing-pages/landing-pages.module";
 import { SearchModule } from "./search/search.module";
 import { StorageModule } from "./storage/storage.module";
 import { EmailModule } from "./email/email.module";
@@ -48,6 +49,7 @@ import { EmailModule } from "./email/email.module";
     SettingsModule,
     AnalyticsModule,
     ReviewsModule,
+    LandingPagesModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

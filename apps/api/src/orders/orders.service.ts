@@ -183,7 +183,10 @@ export class OrdersService {
     return this.sanitizeForCustomer(order);
   }
 
-  private async resolveCustomer(existingCustomerId: string | null, dto: CheckoutDto) {
+  private async resolveCustomer(
+    existingCustomerId: string | null,
+    dto: Pick<CheckoutDto, "firstName" | "lastName" | "phone" | "email">,
+  ) {
     if (existingCustomerId) {
       const existing = await this.prisma.customer.findUnique({ where: { id: existingCustomerId } });
       if (existing) return existing;
@@ -389,6 +392,82 @@ export class OrdersService {
     }
 
     return updated.updated;
+  }
+
+  /** §11/§12 (module Landing Pages) : commande ultra-rapide sans compte ni
+   * panier — toujours enregistrée dans le système de commandes existant
+   * (§14 : pas de circuit parallèle), juste avec landingPageId renseigné. */
+  async quickOrderFromLandingPage(landingPage: {
+    id: string;
+    productId: string;
+    displayPrice: unknown;
+  }, dto: { name: string; phone: string; city: string; quantity?: number; addressLine?: string }) {
+    const { vatRate, freeShippingThreshold } = await this.settings.get();
+
+    const product = await this.prisma.product.findUnique({ where: { id: landingPage.productId } });
+    if (!product || product.status !== "ACTIVE") throw new BadRequestException("Produit indisponible");
+
+    const quantity = dto.quantity ?? 1;
+    const unitPrice = Number(landingPage.displayPrice ?? product.promoPrice ?? product.price);
+    const subtotal = unitPrice * quantity;
+
+    const customer = await this.resolveCustomer(null, { firstName: dto.name, lastName: "", phone: dto.phone });
+    const shipping = await this.resolveShippingFee(dto.city, freeShippingThreshold);
+    if (subtotal >= shipping.freeFrom) shipping.fee = 0;
+
+    const total = subtotal + shipping.fee;
+    const vatAmount = Math.round(total - total / (1 + vatRate));
+
+    const stockLines: StockLine[] = [{ productId: product.id, variantId: null, quantity }];
+
+    const order = await this.prisma.$transaction(async (tx) => {
+      await this.products.reserveStock(tx, stockLines);
+      const orderNumber = await this.nextOrderNumber(tx);
+
+      const created = await tx.order.create({
+        data: {
+          orderNumber,
+          customerId: customer.id,
+          landingPageId: landingPage.id,
+          subtotal,
+          shippingFee: shipping.fee,
+          vatRate,
+          vatAmount,
+          total,
+          shippingCity: dto.city,
+          shippingAddress: dto.addressLine ?? "",
+          shippingPhone: dto.phone,
+          shippingRuleLabel: shipping.label,
+          lines: {
+            create: {
+              productId: product.id,
+              productNameSnapshot: product.nameFr,
+              skuSnapshot: product.sku,
+              costPriceSnapshot: Number(product.costPrice),
+              sellPriceSnapshot: unitPrice,
+              quantity,
+              lineTotal: subtotal,
+            },
+          },
+          statusHistory: { create: { toStatus: "PENDING", note: "Commande rapide — Landing Page" } },
+        },
+        include: { lines: true },
+      });
+
+      await tx.customer.update({
+        where: { id: customer.id },
+        data: {
+          ordersCount: { increment: 1 },
+          totalSpent: { increment: total },
+          lastOrderAt: new Date(),
+          firstOrderAt: customer.firstOrderAt ?? new Date(),
+        },
+      });
+
+      return created;
+    });
+
+    return { orderNumber: order.orderNumber, total: order.total };
   }
 
   async recordPayment(orderId: string, amount: number) {

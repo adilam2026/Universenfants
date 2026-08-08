@@ -1,0 +1,11 @@
+import { Module } from "@nestjs/common";
+import { LandingPagesService } from "./landing-pages.service";
+import { LandingPagesController } from "./landing-pages.controller";
+import { OrdersModule } from "../orders/orders.module";
+
+@Module({
+  imports: [OrdersModule],
+  providers: [LandingPagesService],
+  controllers: [LandingPagesController],
+})
+export class LandingPagesModule {}

@@ -38,6 +38,12 @@ enum ProductStatus {
   ARCHIVED
 }
 
+enum LandingPageStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
 enum CouponType {
   PERCENTAGE
   FIXED_AMOUNT
@@ -188,6 +194,7 @@ model Product {
   wishlistLines      WishlistLine[]
   views              ProductView[]
   reviews            Review[]
+  landingPages       LandingPage[]
   stockMovements     StockMovement[]
   upsellsAsMain      Upsell[]           @relation("UpsellMain")
   upsellsAsSuggested Upsell[]           @relation("UpsellSuggested")
@@ -431,6 +438,11 @@ model Order {
   couponId String?
   coupon   Coupon? @relation(fields: [couponId], references: [id])
 
+  // §14 (module Landing Pages) : traçabilité de la source d'une commande —
+  // null = boutique classique, sinon commande passée depuis une landing page.
+  landingPageId String?
+  landingPage   LandingPage? @relation(fields: [landingPageId], references: [id])
+
   lines               OrderLine[]
   statusHistory       OrderStatusHistory[]
   stockMovements      StockMovement[]
@@ -483,6 +495,59 @@ model OrderStatusHistory {
   createdAt   DateTime     @default(now())
 
   @@index([orderId])
+}
+
+// =========================================================================
+// LANDING PAGES MARKETING — pages de vente dédiées à une campagne, séparées
+// du parcours catalogue classique mais réutilisant produits/clients/commandes.
+// =========================================================================
+
+model LandingPage {
+  id     String            @id @default(cuid())
+  slug   String            @unique
+  name   String
+  status LandingPageStatus @default(DRAFT)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  template String // ex: "single-product", "viral", "seasonal", "storytelling", "facebook-ads", "tiktok-ads", "flash-promo"
+  theme    String // ex: "universenfants", "premium", "promo-flash", "minimalist"
+
+  // Blocs de la page, ordonnés, chacun { type, ...config } — voir
+  // apps/web/src/lib/landing-blocks.ts et apps/admin pour les types gérés.
+  blocks Json
+
+  // Prix affichés spécifiques à la campagne ; à défaut, ceux du produit.
+  displayPrice   Decimal? @db.Decimal(10, 2)
+  compareAtPrice Decimal? @db.Decimal(10, 2)
+
+  primaryColor   String?
+  secondaryColor String?
+  ctaColor       String?
+  ctaLabel       String?
+
+  countdownEnabled Boolean   @default(false)
+  countdownStartAt DateTime?
+  countdownEndAt   DateTime?
+
+  // §11/§12 : commande minimale, sans compte ni panier.
+  requireAddress Boolean @default(false)
+
+  // §13 : message de succès affiché immédiatement après la commande.
+  successPhone    String?
+  successWhatsapp String?
+  successHours    String?
+
+  visits Int @default(0)
+
+  orders Order[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([productId])
 }
 
 // =========================================================================

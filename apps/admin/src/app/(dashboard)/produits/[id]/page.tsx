@@ -1,9 +1,12 @@
 "use client";
 
 import { use, useEffect, useState } from "react";
+import Link from "next/link";
+import { Rocket } from "lucide-react";
 import { ProductForm } from "@/components/product-form";
 import { StockAdjustCard } from "@/components/stock-adjust-card";
 import { ProductImagesCard } from "@/components/product-images-card";
+import { Button } from "@/components/ui/button";
 import { getAdminProduct, type AdminProduct } from "@/lib/products";
 
 export default function EditProductPage({ params }: { params: Promise<{ id: string }> }) {
@@ -32,10 +35,17 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
           />
           <ProductForm product={product} />
         </div>
-        <StockAdjustCard
-          product={product}
-          onAdjusted={(newStock) => setProduct((prev) => (prev ? { ...prev, stock: newStock } : prev))}
-        />
+        <div className="flex flex-col gap-5">
+          <Button asChild variant="outline" className="w-full">
+            <Link href={`/landing-pages/nouveau?productId=${product.id}`}>
+              <Rocket className="size-4" /> Créer une Landing Page
+            </Link>
+          </Button>
+          <StockAdjustCard
+            product={product}
+            onAdjusted={(newStock) => setProduct((prev) => (prev ? { ...prev, stock: newStock } : prev))}
+          />
+        </div>
       </div>
     </div>
   );

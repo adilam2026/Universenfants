@@ -9,5 +9,6 @@ import { SettingsModule } from "../settings/settings.module";
   imports: [CartModule, ProductsModule, SettingsModule],
   controllers: [OrdersController],
   providers: [OrdersService],
+  exports: [OrdersService],
 })
 export class OrdersModule {}

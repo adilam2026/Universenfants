@@ -20,7 +20,11 @@ async function bootstrap() {
   // Derrière un reverse proxy (Vercel/Nginx) : requis pour que le throttler
   // et les logs voient la vraie IP client plutôt que celle du proxy.
   app.set("trust proxy", 1);
-  app.use(helmet());
+  // Cette API est délibérément consommée depuis deux origines distinctes
+  // (apps/web et apps/admin, chacune sur son propre domaine/port) — le
+  // policy "same-origin" par défaut de Helmet casse silencieusement tout
+  // <img>/<video> pointant directement vers /uploads/* depuis ces origines.
+  app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
   app.use(compression());
 
   // Repli local pour les images produit quand R2 n'est pas configuré (voir StorageModule).

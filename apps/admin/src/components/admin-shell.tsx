@@ -12,6 +12,7 @@ import {
   Tag,
   Ticket,
   Star,
+  Rocket,
   Truck,
   LineChart,
   Settings,
@@ -45,6 +46,7 @@ const NAV = [
       { href: "/promotions", label: "Promotions", icon: Tag },
       { href: "/coupons", label: "Coupons", icon: Ticket },
       { href: "/avis", label: "Avis", icon: Star },
+      { href: "/landing-pages", label: "Landing Pages", icon: Rocket },
     ],
   },
   {
