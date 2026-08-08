@@ -7,6 +7,7 @@ import {
   Logger,
 } from "@nestjs/common";
 import type { Request, Response } from "express";
+import * as Sentry from "@sentry/node";
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -23,6 +24,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     if (!isHttp) {
       this.logger.error(exception instanceof Error ? exception.stack : exception);
+      Sentry.captureException(exception);
     }
 
     response.status(status).json({
