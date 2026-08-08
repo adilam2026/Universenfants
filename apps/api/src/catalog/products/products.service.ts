@@ -112,6 +112,16 @@ export class ProductsService {
     return query.lowStock ? items.filter((p) => p.stock <= p.alertThreshold) : items;
   }
 
+  /** Contrairement à findBySlug (public), n'importe quel statut est renvoyé — nécessaire pour éditer un brouillon. */
+  async findByIdForAdmin(id: string) {
+    const product = await this.prisma.product.findUnique({
+      where: { id },
+      include: { brand: true, category: true, images: { orderBy: { order: "asc" } }, variants: true },
+    });
+    if (!product) throw new NotFoundException("Produit introuvable");
+    return product;
+  }
+
   async create(dto: UpsertProductDto) {
     return this.prisma.product.create({ data: dto });
   }

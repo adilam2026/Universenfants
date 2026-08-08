@@ -29,6 +29,13 @@ export class ProductsController {
     return this.service.listForAdmin({ category, status, lowStock: lowStock === "true" });
   }
 
+  @Get("admin/:id")
+  @UseGuards(JwtAuthGuard, StaffGuard, PermissionsGuard)
+  @RequirePermissions(PermissionCode.PRODUCT_READ)
+  byIdForAdmin(@Param("id") id: string) {
+    return this.service.findByIdForAdmin(id);
+  }
+
   @Get(":slug")
   bySlug(@Param("slug") slug: string, @Headers("x-session-id") sessionId?: string) {
     return this.service.findBySlug(slug, sessionId);

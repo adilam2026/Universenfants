@@ -1,0 +1,139 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ===================================================================
+   UniversEnfants Back-Office — même palette que le Front (validée),
+   sans les formes décoratives (organic blobs) réservées au Front.
+   =================================================================== */
+:root {
+  --radius: 0.625rem;
+
+  --background: #f5f2fb;
+  --foreground: #362a46;
+
+  --card: #ffffff;
+  --card-foreground: #362a46;
+  --popover: #ffffff;
+  --popover-foreground: #362a46;
+
+  --primary: #8172d6;
+  --primary-foreground: #ffffff;
+
+  --secondary: #efeafa;
+  --secondary-foreground: #362a46;
+  --muted: #efeafa;
+  --muted-foreground: #766a8c;
+  --accent: #efeafa;
+  --accent-foreground: #362a46;
+
+  --destructive: #e2707d;
+  --destructive-foreground: #ffffff;
+
+  --border: #e8e1f5;
+  --input: #e8e1f5;
+  --ring: #8172d6;
+
+  --brand-primary-strong: #5b4cae;
+  --brand-primary-soft: #eae5fa;
+  --brand-cta: #ff8fa3;
+  --brand-cta-foreground: #ffffff;
+  --brand-cta-hover: #e56e85;
+  --brand-cta-soft: #ffe3e9;
+  --brand-highlight: #ffcf6b;
+  --brand-highlight-foreground: #5c4300;
+  --brand-highlight-soft: #fff3d9;
+  --brand-success: #4fae72;
+  --brand-success-soft: #e2f4e8;
+  --brand-warning: #d98a3d;
+  --brand-warning-soft: #fbeddb;
+}
+
+.dark {
+  --background: #241c36;
+  --foreground: #f4effc;
+
+  --card: #2e2442;
+  --card-foreground: #f4effc;
+  --popover: #2e2442;
+  --popover-foreground: #f4effc;
+
+  --primary: #b6a9f2;
+  --primary-foreground: #231a3d;
+
+  --secondary: #382c4f;
+  --secondary-foreground: #f4effc;
+  --muted: #382c4f;
+  --muted-foreground: #cbc0e0;
+  --accent: #382c4f;
+  --accent-foreground: #f4effc;
+
+  --destructive: #f0a0ac;
+  --destructive-foreground: #2e1620;
+
+  --border: #4a3c64;
+  --input: #4a3c64;
+  --ring: #b6a9f2;
+
+  --brand-primary-strong: #d2c7fa;
+  --brand-primary-soft: #3d3160;
+  --brand-cta: #ffaab9;
+  --brand-cta-foreground: #2e1620;
+  --brand-cta-hover: #ffc3ce;
+  --brand-cta-soft: #4a2c38;
+  --brand-highlight: #ffda8c;
+  --brand-highlight-foreground: #3a2900;
+  --brand-highlight-soft: #4a3a17;
+  --brand-success: #79cf9b;
+  --brand-success-soft: #1f3e2c;
+  --brand-warning: #efb870;
+  --brand-warning-soft: #463217;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-brand-primary-strong: var(--brand-primary-strong);
+  --color-brand-primary-soft: var(--brand-primary-soft);
+  --color-brand-cta: var(--brand-cta);
+  --color-brand-cta-foreground: var(--brand-cta-foreground);
+  --color-brand-cta-hover: var(--brand-cta-hover);
+  --color-brand-cta-soft: var(--brand-cta-soft);
+  --color-brand-highlight: var(--brand-highlight);
+  --color-brand-highlight-foreground: var(--brand-highlight-foreground);
+  --color-brand-highlight-soft: var(--brand-highlight-soft);
+  --color-brand-success: var(--brand-success);
+  --color-brand-success-soft: var(--brand-success-soft);
+  --color-brand-warning: var(--brand-warning);
+  --color-brand-warning-soft: var(--brand-warning-soft);
+
+  --font-sans: var(--font-family-sans);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}

@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { IsIn, IsOptional, IsString } from "class-validator";
+import { IsIn, IsNumber, IsOptional, IsString, Min } from "class-validator";
 
 export class UpdateOrderStatusDto {
   @ApiProperty({ enum: ["CONFIRMED", "PREPARING", "SHIPPED", "DELIVERED", "CANCELLED"] })
@@ -10,5 +10,5 @@ export class UpdateOrderStatusDto {
 }
 
 export class RecordPaymentDto {
-  @ApiProperty() amount!: number;
+  @ApiProperty() @IsNumber() @Min(0.01) amount!: number;
 }
