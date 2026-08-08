@@ -1,0 +1,776 @@
+// UniversEnfants — schéma de données
+// Traduit le modèle métier validé (CDC Parties 4, 9, 10) en schéma Prisma / PostgreSQL.
+// Arbitrages appliqués : pas d'entité BonAchat (I5, fidélité = points directs),
+// pas de champ "autoriser vente en rupture" (I6), TVA modélisée sur Order (O2).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =========================================================================
+// ENUMS
+// =========================================================================
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  PARTIAL
+}
+
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum CouponType {
+  PERCENTAGE
+  FIXED_AMOUNT
+  FREE_SHIPPING
+}
+
+enum PromotionType {
+  PERCENTAGE
+  FIXED_AMOUNT
+}
+
+enum PromotionScope {
+  CATEGORY
+  BRAND
+  STORE
+}
+
+enum StatusPeriod {
+  DRAFT
+  SCHEDULED
+  ACTIVE
+  ENDED
+}
+
+enum LoyaltyTransactionType {
+  EARN
+  REDEEM
+  CANCEL
+  EXPIRE
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum StockMovementReason {
+  SUPPLIER_RECEIPT
+  INVENTORY_CORRECTION
+  ORDER_CANCELLATION
+  ORDER_DELIVERED_DEDUCTION
+  RETURN
+  RESERVATION
+  RESERVATION_RELEASE
+}
+
+enum CartStatus {
+  ACTIVE
+  CONVERTED
+  EXPIRED
+}
+
+enum TargetGender {
+  BOY
+  GIRL
+  UNISEX
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+}
+
+// =========================================================================
+// CATALOGUE
+// =========================================================================
+
+model Category {
+  id              String        @id @default(cuid())
+  parentId        String?
+  parent          Category?     @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children        Category[]    @relation("CategoryTree")
+  nameFr          String
+  nameAr          String?
+  descriptionFr   String?
+  descriptionAr   String?
+  image           String?
+  banner          String?
+  slug            String        @unique
+  order           Int           @default(0)
+  metaTitle       String?
+  metaDescription String?
+  status          ProductStatus @default(ACTIVE)
+  products        Product[]
+  promotions      Promotion[]
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([parentId])
+}
+
+model Brand {
+  id          String        @id @default(cuid())
+  name        String        @unique
+  slug        String        @unique
+  logo        String?
+  description String?
+  website     String?
+  status      ProductStatus @default(ACTIVE)
+  products    Product[]
+  promotions  Promotion[]
+  createdAt   DateTime      @default(now())
+}
+
+model Product {
+  id          String  @id @default(cuid())
+  sku         String  @unique
+  barcode     String?
+  nameFr      String
+  nameAr      String?
+  shortDescFr String?
+  shortDescAr String?
+  longDescFr  String?
+  longDescAr  String?
+
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+  brandId    String?
+  brand      Brand?   @relation(fields: [brandId], references: [id])
+
+  ageMin       Int?
+  ageMax       Int?
+  targetGender TargetGender @default(UNISEX)
+
+  price        Decimal   @db.Decimal(10, 2)
+  promoPrice   Decimal?  @db.Decimal(10, 2)
+  promoStartAt DateTime?
+  promoEndAt   DateTime?
+  costPrice    Decimal   @db.Decimal(10, 2) // jamais exposé au Front (marge = donnée interne)
+
+  // Le stock est géré au niveau variante quand il y en a (§2 Partie 4) ; ces
+  // champs servent aux produits sans variante.
+  stock          Int @default(0)
+  reservedStock  Int @default(0)
+  alertThreshold Int @default(5)
+
+  seoUrl          String  @unique
+  metaTitle       String?
+  metaDescription String?
+
+  status ProductStatus @default(DRAFT)
+
+  images             ProductImage[]
+  variants           ProductVariant[]
+  orderLines         OrderLine[]
+  cartLines          CartLine[]
+  wishlistLines      WishlistLine[]
+  views              ProductView[]
+  reviews            Review[]
+  stockMovements     StockMovement[]
+  upsellsAsMain      Upsell[]           @relation("UpsellMain")
+  upsellsAsSuggested Upsell[]           @relation("UpsellSuggested")
+  bundleItems        BundleItem[]
+  birthdayItems      BirthdayListItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([categoryId])
+  @@index([brandId])
+  @@index([status])
+}
+
+model ProductImage {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([productId])
+}
+
+// Le stock doit être géré au niveau variante (⚠️ Partie 4 §2)
+model ProductVariant {
+  id            String   @id @default(cuid())
+  productId     String
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sku           String   @unique
+  label         String // ex. "Rouge", "Grand modèle"
+  price         Decimal? @db.Decimal(10, 2) // null = hérite du prix produit
+  costPrice     Decimal? @db.Decimal(10, 2)
+  stock         Int      @default(0)
+  reservedStock Int      @default(0)
+  image         String?
+
+  orderLines     OrderLine[]
+  cartLines      CartLine[]
+  stockMovements StockMovement[]
+
+  @@index([productId])
+}
+
+model StockMovement {
+  id            String              @id @default(cuid())
+  productId     String
+  product       Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId     String?
+  variant       ProductVariant?     @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  previousStock Int
+  newStock      Int
+  reason        StockMovementReason
+  orderId       String?
+  order         Order?              @relation(fields: [orderId], references: [id])
+  staffUserId   String?
+  staffUser     StaffUser?          @relation(fields: [staffUserId], references: [id])
+  createdAt     DateTime            @default(now())
+
+  @@index([productId])
+  @@index([variantId])
+}
+
+model Media {
+  id           String     @id @default(cuid())
+  type         MediaType  @default(IMAGE)
+  filename     String
+  url          String
+  size         Int
+  uploadedById String?
+  uploadedBy   StaffUser? @relation(fields: [uploadedById], references: [id])
+  createdAt    DateTime   @default(now())
+}
+
+// =========================================================================
+// CLIENTS
+// =========================================================================
+
+model Customer {
+  id           String  @id @default(cuid())
+  email        String? @unique
+  phone        String? @unique
+  passwordHash String? // null pour un client invité (§65)
+  firstName    String?
+  lastName     String?
+  emailConsent Boolean @default(false)
+  smsConsent   Boolean @default(false)
+
+  firstOrderAt DateTime?
+  lastOrderAt  DateTime?
+  ordersCount  Int       @default(0)
+  totalSpent   Decimal   @default(0) @db.Decimal(12, 2)
+
+  addresses         Address[]
+  orders            Order[]
+  carts             Cart[]
+  wishlist          Wishlist?
+  reviews           Review[]
+  loyaltyAccount    LoyaltyAccount?
+  birthdayLists     BirthdayList[]
+  productViews      ProductView[]
+  couponRedemptions CouponRedemption[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+  @@index([phone])
+}
+
+model Address {
+  id          String   @id @default(cuid())
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  label       String? // "Maison", "Bureau"
+  city        String
+  addressLine String
+  complement  String?
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([customerId])
+}
+
+// =========================================================================
+// PANIER / WISHLIST / CONSULTATION
+// =========================================================================
+
+model Cart {
+  id           String            @id @default(cuid())
+  ownerToken   String            @unique // cookie de session, permet le panier invité
+  customerId   String?
+  customer     Customer?         @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  status       CartStatus        @default(ACTIVE)
+  shareToken   String?           @unique // lien de partage (panier collaboratif §149, §211-217)
+  couponCode   String?
+  lines        CartLine[]
+  participants CartParticipant[]
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  expiresAt    DateTime? // §216 expiration après 90 jours d'inactivité
+
+  @@index([customerId])
+}
+
+model CartLine {
+  id        String          @id @default(cuid())
+  cartId    String
+  cart      Cart            @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product         @relation(fields: [productId], references: [id])
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id])
+  quantity  Int             @default(1)
+  createdAt DateTime        @default(now())
+
+  @@index([cartId])
+}
+
+// Participants d'un panier partagé (§12 Partie 4) — le créateur est le
+// propriétaire (Cart.customerId ou ownerToken), les autres sont invités par email.
+model CartParticipant {
+  id         String    @id @default(cuid())
+  cartId     String
+  cart       Cart      @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  email      String
+  invitedAt  DateTime  @default(now())
+  lastSeenAt DateTime?
+
+  @@index([cartId])
+}
+
+model Wishlist {
+  id         String         @id @default(cuid())
+  customerId String         @unique
+  customer   Customer       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  lines      WishlistLine[]
+  createdAt  DateTime       @default(now())
+}
+
+model WishlistLine {
+  id         String    @id @default(cuid())
+  wishlistId String
+  wishlist   Wishlist  @relation(fields: [wishlistId], references: [id], onDelete: Cascade)
+  productId  String
+  product    Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  addedAt    DateTime  @default(now())
+  removedAt  DateTime? // conservé pour analytics (§210) plutôt que supprimé
+
+  @@index([wishlistId])
+  @@index([productId])
+}
+
+// Table faite pour être volumineuse et agrégée a posteriori (§15 Partie 4 / BO-15)
+model ProductView {
+  id         String    @id @default(cuid())
+  productId  String
+  product    Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  sessionId  String
+  viewedAt   DateTime  @default(now())
+
+  @@index([productId, viewedAt])
+}
+
+// =========================================================================
+// COMMANDES
+// =========================================================================
+
+model Order {
+  id          String   @id @default(cuid())
+  orderNumber String   @unique // format UE-2026-000001 (§238)
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id])
+
+  subtotal        Decimal @db.Decimal(10, 2)
+  shippingFee     Decimal @db.Decimal(10, 2)
+  discount        Decimal @default(0) @db.Decimal(10, 2)
+  loyaltyDiscount Decimal @default(0) @db.Decimal(10, 2)
+  vatRate         Decimal @default(0.20) @db.Decimal(4, 3) // (O2) prix TTC
+  vatAmount       Decimal @db.Decimal(10, 2)
+  total           Decimal @db.Decimal(10, 2)
+
+  shippingCity      String
+  shippingAddress   String
+  shippingPhone     String
+  shippingRuleLabel String? // libellé de la règle de frais appliquée, figée (§236)
+
+  status        OrderStatus   @default(PENDING)
+  paymentStatus PaymentStatus @default(PENDING)
+  paidAmount    Decimal       @default(0) @db.Decimal(10, 2)
+  paidAt        DateTime?
+
+  couponId String?
+  coupon   Coupon? @relation(fields: [couponId], references: [id])
+
+  lines               OrderLine[]
+  statusHistory       OrderStatusHistory[]
+  stockMovements      StockMovement[]
+  loyaltyTransactions LoyaltyTransaction[]
+  couponRedemption    CouponRedemption?
+
+  createdAt   DateTime  @default(now())
+  confirmedAt DateTime?
+  shippedAt   DateTime?
+  deliveredAt DateTime?
+  cancelledAt DateTime?
+
+  @@index([customerId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ⚠️ Le prix d'achat ET le prix de vente sont figés dans la ligne pour
+// calculer la marge historique même si le produit change de prix ensuite (§9 Partie 4).
+model OrderLine {
+  id        String          @id @default(cuid())
+  orderId   String
+  order     Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product         @relation(fields: [productId], references: [id])
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id])
+
+  productNameSnapshot String
+  skuSnapshot         String
+  costPriceSnapshot   Decimal @db.Decimal(10, 2)
+  sellPriceSnapshot   Decimal @db.Decimal(10, 2)
+
+  quantity  Int
+  lineTotal Decimal @db.Decimal(10, 2)
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model OrderStatusHistory {
+  id          String       @id @default(cuid())
+  orderId     String
+  order       Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  fromStatus  OrderStatus?
+  toStatus    OrderStatus
+  staffUserId String?
+  staffUser   StaffUser?   @relation(fields: [staffUserId], references: [id])
+  note        String?
+  createdAt   DateTime     @default(now())
+
+  @@index([orderId])
+}
+
+// =========================================================================
+// MARKETING
+// =========================================================================
+
+model Coupon {
+  id                 String             @id @default(cuid())
+  code               String             @unique
+  type               CouponType
+  value              Decimal            @db.Decimal(10, 2) // % ou montant selon `type`
+  startAt            DateTime
+  endAt              DateTime
+  maxUses            Int?
+  maxUsesPerCustomer Int                @default(1)
+  minCartAmount      Decimal            @default(0) @db.Decimal(10, 2)
+  usedCount          Int                @default(0)
+  status             StatusPeriod       @default(ACTIVE)
+  orders             Order[]
+  redemptions        CouponRedemption[]
+  createdAt          DateTime           @default(now())
+
+  @@index([code])
+}
+
+model CouponRedemption {
+  id         String   @id @default(cuid())
+  couponId   String
+  coupon     Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  orderId    String   @unique
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+  createdAt  DateTime @default(now())
+
+  @@index([couponId, customerId])
+}
+
+model Promotion {
+  id         String         @id @default(cuid())
+  name       String
+  type       PromotionType
+  value      Decimal        @db.Decimal(10, 2)
+  scope      PromotionScope
+  categoryId String?
+  category   Category?      @relation(fields: [categoryId], references: [id])
+  brandId    String?
+  brand      Brand?         @relation(fields: [brandId], references: [id])
+  startAt    DateTime
+  endAt      DateTime
+  status     StatusPeriod   @default(SCHEDULED)
+  createdAt  DateTime       @default(now())
+}
+
+model Bundle {
+  id          String       @id @default(cuid())
+  name        String
+  bundlePrice Decimal      @db.Decimal(10, 2)
+  startAt     DateTime?
+  endAt       DateTime?
+  status      StatusPeriod @default(ACTIVE)
+  items       BundleItem[]
+  createdAt   DateTime     @default(now())
+}
+
+model BundleItem {
+  id        String  @id @default(cuid())
+  bundleId  String
+  bundle    Bundle  @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Int     @default(1)
+
+  @@index([bundleId])
+}
+
+model Upsell {
+  id                 String  @id @default(cuid())
+  mainProductId      String
+  mainProduct        Product @relation("UpsellMain", fields: [mainProductId], references: [id], onDelete: Cascade)
+  suggestedProductId String
+  suggestedProduct   Product @relation("UpsellSuggested", fields: [suggestedProductId], references: [id], onDelete: Cascade)
+  order              Int     @default(0)
+
+  @@unique([mainProductId, suggestedProductId])
+}
+
+model HeroBanner {
+  id           String       @id @default(cuid())
+  titleFr      String
+  titleAr      String?
+  subtitleFr   String?
+  subtitleAr   String?
+  imageDesktop String
+  imageMobile  String
+  link         String?
+  order        Int          @default(0)
+  startAt      DateTime?
+  endAt        DateTime?
+  status       StatusPeriod @default(ACTIVE)
+  createdAt    DateTime     @default(now())
+}
+
+model Review {
+  id         String       @id @default(cuid())
+  productId  String
+  product    Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  customerId String
+  customer   Customer     @relation(fields: [customerId], references: [id])
+  rating     Int // 1 à 5 (§235)
+  comment    String?
+  status     ReviewStatus @default(PENDING) // modération avant publication (§234)
+  adminReply String?
+  createdAt  DateTime     @default(now())
+
+  @@unique([productId, customerId]) // seuls les acheteurs vérifiés publient (§233), un avis par produit
+  @@index([productId])
+}
+
+// =========================================================================
+// FIDÉLITÉ (points directement utilisables, pas d'entité BonAchat — I5)
+// =========================================================================
+
+model LoyaltyAccount {
+  id            String               @id @default(cuid())
+  customerId    String               @unique
+  customer      Customer             @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  pointsBalance Int                  @default(0)
+  transactions  LoyaltyTransaction[]
+  updatedAt     DateTime             @updatedAt
+}
+
+model LoyaltyTransaction {
+  id        String                 @id @default(cuid())
+  accountId String
+  account   LoyaltyAccount         @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  type      LoyaltyTransactionType
+  points    Int // positif (EARN) ou négatif (REDEEM/CANCEL/EXPIRE)
+  orderId   String?
+  order     Order?                 @relation(fields: [orderId], references: [id])
+  reason    String?
+  createdAt DateTime               @default(now())
+  expiresAt DateTime? // §224, 24 mois par défaut
+
+  @@index([accountId])
+}
+
+// =========================================================================
+// LIVRAISON
+// =========================================================================
+
+model City {
+  id               String     @id @default(cuid())
+  name             String     @unique
+  shippingFee      Decimal    @db.Decimal(10, 2)
+  freeShippingFrom Decimal?   @db.Decimal(10, 2) // prioritaire sur la règle globale (I7)
+  groupId          String?
+  group            CityGroup? @relation(fields: [groupId], references: [id])
+  active           Boolean    @default(true)
+  createdAt        DateTime   @default(now())
+}
+
+model CityGroup {
+  id               String   @id @default(cuid())
+  name             String   @unique
+  shippingFee      Decimal  @db.Decimal(10, 2)
+  freeShippingFrom Decimal? @db.Decimal(10, 2)
+  cities           City[]
+}
+
+// =========================================================================
+// LISTE ANNIVERSAIRE
+// =========================================================================
+
+model BirthdayList {
+  id         String             @id @default(cuid())
+  customerId String
+  customer   Customer           @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  childName  String
+  eventDate  DateTime
+  message    String?
+  shareToken String             @unique
+  status     StatusPeriod       @default(ACTIVE)
+  items      BirthdayListItem[]
+  createdAt  DateTime           @default(now())
+
+  @@index([customerId])
+}
+
+// La réservation ne doit jamais révéler l'identité du réservant aux autres
+// visiteurs (§232) — reservedByToken n'est donc jamais exposé publiquement par l'API.
+model BirthdayListItem {
+  id              String       @id @default(cuid())
+  listId          String
+  list            BirthdayList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  productId       String
+  product         Product      @relation(fields: [productId], references: [id])
+  reserved        Boolean      @default(false)
+  reservedByToken String? // identifiant anonyme du visiteur, jamais retourné par l'API publique
+  reservedAt      DateTime?
+
+  @@index([listId])
+}
+
+// =========================================================================
+// ADMINISTRATION / RBAC / AUDIT (Partie 9)
+// =========================================================================
+
+model StaffUser {
+  id           String    @id @default(cuid())
+  name         String
+  email        String    @unique
+  passwordHash String
+  roleId       String
+  role         Role      @relation(fields: [roleId], references: [id])
+  active       Boolean   @default(true)
+  lastLoginAt  DateTime?
+
+  extraPermissions   StaffUserPermission[]
+  auditLogs          AuditLog[]
+  uploadedMedia      Media[]
+  orderStatusChanges OrderStatusHistory[]
+  stockMovements     StockMovement[]
+
+  createdAt DateTime @default(now())
+
+  @@index([roleId])
+}
+
+model Role {
+  id          String           @id @default(cuid())
+  code        String           @unique // SUPER_ADMIN, CATALOG_MANAGER, ORDERS_MANAGER, MARKETING_MANAGER, STOCK_MANAGER, ANALYTICS_MANAGER, CUSTOMER_SERVICE, READ_ONLY
+  name        String
+  permissions RolePermission[]
+  staffUsers  StaffUser[]
+}
+
+model Permission {
+  id          String                @id @default(cuid())
+  code        String                @unique // ex. "product.update" (§180)
+  description String
+  roles       RolePermission[]
+  staffGrants StaffUserPermission[]
+}
+
+model RolePermission {
+  roleId       String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+// Permissions additionnelles OU restrictions explicites au-delà du rôle (§171)
+model StaffUserPermission {
+  staffUserId  String
+  staffUser    StaffUser  @relation(fields: [staffUserId], references: [id], onDelete: Cascade)
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  granted      Boolean // true = accès supplémentaire, false = restriction explicite
+
+  @@id([staffUserId, permissionId])
+}
+
+model AuditLog {
+  id          String     @id @default(cuid())
+  staffUserId String?
+  staffUser   StaffUser? @relation(fields: [staffUserId], references: [id])
+  action      String // ex. "product.price.update"
+  entity      String
+  entityId    String
+  oldValue    Json?
+  newValue    Json?
+  ipAddress   String?
+  createdAt   DateTime   @default(now())
+
+  @@index([entity, entityId])
+  @@index([staffUserId])
+}
+
+model SystemSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+model EmailTemplate {
+  id      String  @id @default(cuid())
+  trigger String  @unique // ACCOUNT_CREATED, ORDER_CONFIRMED, PASSWORD_RESET, CART_ABANDONED,
+  // WISHLIST_BACK_IN_STOCK, WISHLIST_PRICE_DROP, ORDER_SHIPPED, ORDER_DELIVERED (O3)
+  name    String
+  subject String
+  active  Boolean @default(true)
+}
