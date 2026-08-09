@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from "@nestjs/comm
 import { PrismaService } from "../prisma/prisma.service";
 import { OrdersService } from "../orders/orders.service";
 import { PricingService } from "../catalog/pricing/pricing.service";
+import { runCatchingDuplicate } from "../common/prisma-errors.util";
 import type { UpsertLandingPageDto } from "./dto/upsert-landing-page.dto";
 import type { QuickOrderDto } from "./dto/quick-order.dto";
 
@@ -30,14 +31,24 @@ export class LandingPagesService {
 
   async create(dto: UpsertLandingPageDto) {
     await this.assertSlugAvailable(dto.slug);
-    return this.prisma.landingPage.create({ data: this.toData(dto) });
+    // assertSlugAvailable reste une vérification rapide pour l'UX, mais ne
+    // protège pas seule contre deux créations concurrentes sur le même slug
+    // (TOCTOU) — le catch de la contrainte unique en dessous est la garantie
+    // réelle, comme pour categories/brands/products/cities/coupons.
+    return runCatchingDuplicate(
+      () => this.prisma.landingPage.create({ data: this.toData(dto) }),
+      "Cette URL de landing page est déjà utilisée",
+    );
   }
 
   async update(id: string, dto: UpsertLandingPageDto) {
     await this.assertSlugAvailable(dto.slug, id);
     const page = await this.prisma.landingPage.findUnique({ where: { id } });
     if (!page) throw new NotFoundException("Landing page introuvable");
-    return this.prisma.landingPage.update({ where: { id }, data: this.toData(dto) });
+    return runCatchingDuplicate(
+      () => this.prisma.landingPage.update({ where: { id }, data: this.toData(dto) }),
+      "Cette URL de landing page est déjà utilisée",
+    );
   }
 
   async duplicate(id: string) {

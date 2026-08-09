@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
+import { runCatchingDuplicate } from "../../common/prisma-errors.util";
 import type { UpsertCategoryDto } from "./dto/upsert-category.dto";
 
 @Injectable()
@@ -42,12 +43,15 @@ export class CategoriesService {
   }
 
   async create(dto: UpsertCategoryDto) {
-    return this.prisma.category.create({ data: dto });
+    return runCatchingDuplicate(() => this.prisma.category.create({ data: dto }), "Cette URL de catégorie (slug) est déjà utilisée");
   }
 
   async update(id: string, dto: UpsertCategoryDto) {
     await this.ensureExists(id);
-    return this.prisma.category.update({ where: { id }, data: dto });
+    return runCatchingDuplicate(
+      () => this.prisma.category.update({ where: { id }, data: dto }),
+      "Cette URL de catégorie (slug) est déjà utilisée",
+    );
   }
 
   async archive(id: string) {

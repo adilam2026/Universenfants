@@ -5,6 +5,7 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { SearchService, type ProductSearchDoc } from "../../search/search.service";
 import { ImageService } from "../../storage/image.service";
 import { PricingService, type ActivePromotions } from "../pricing/pricing.service";
+import { runCatchingDuplicate } from "../../common/prisma-errors.util";
 import type { QueryProductsDto } from "./dto/query-products.dto";
 import type { UpsertProductDto } from "./dto/upsert-product.dto";
 import type { AdjustStockDto } from "./dto/adjust-stock.dto";
@@ -310,7 +311,10 @@ export class ProductsService {
   }
 
   async create(dto: UpsertProductDto) {
-    const created = await this.prisma.product.create({ data: dto });
+    const created = await runCatchingDuplicate(
+      () => this.prisma.product.create({ data: dto }),
+      "Un produit avec ce SKU ou cette URL SEO existe déjà",
+    );
     await this.syncToSearch(created.id);
     return created;
   }
@@ -319,7 +323,10 @@ export class ProductsService {
     const existing = await this.prisma.product.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException("Produit introuvable");
 
-    const updated = await this.prisma.product.update({ where: { id }, data: dto });
+    const updated = await runCatchingDuplicate(
+      () => this.prisma.product.update({ where: { id }, data: dto }),
+      "Un produit avec ce SKU ou cette URL SEO existe déjà",
+    );
 
     // §183 — toute modification de prix doit être auditée avec ancienne/nouvelle valeur.
     if (Number(existing.price) !== Number(dto.price)) {
@@ -556,14 +563,20 @@ export class ProductsService {
   async addVariant(productId: string, dto: UpsertVariantDto) {
     const product = await this.prisma.product.findUnique({ where: { id: productId } });
     if (!product) throw new NotFoundException("Produit introuvable");
-    await this.prisma.productVariant.create({ data: { productId, ...dto } });
+    await runCatchingDuplicate(
+      () => this.prisma.productVariant.create({ data: { productId, ...dto } }),
+      "Une variante avec ce SKU existe déjà",
+    );
     return this.prisma.productVariant.findMany({ where: { productId } });
   }
 
   async updateVariant(productId: string, variantId: string, dto: UpsertVariantDto) {
     const variant = await this.prisma.productVariant.findFirst({ where: { id: variantId, productId } });
     if (!variant) throw new NotFoundException("Variante introuvable");
-    await this.prisma.productVariant.update({ where: { id: variantId }, data: dto });
+    await runCatchingDuplicate(
+      () => this.prisma.productVariant.update({ where: { id: variantId }, data: dto }),
+      "Une variante avec ce SKU existe déjà",
+    );
     return this.prisma.productVariant.findMany({ where: { productId } });
   }
 
