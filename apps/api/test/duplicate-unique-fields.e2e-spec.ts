@@ -25,6 +25,7 @@ describe("Duplicate unique fields return a friendly 400 (e2e)", () => {
   let landingPages: LandingPagesService;
 
   let categoryId: string;
+  let staffUserId: string;
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
@@ -37,6 +38,10 @@ describe("Duplicate unique fields return a friendly 400 (e2e)", () => {
     products = app.get(ProductsService);
     cities = app.get(CitiesService);
     landingPages = app.get(LandingPagesService);
+
+    const staff = await prisma.staffUser.findFirst();
+    if (!staff) throw new Error("Aucun staff en base — lancer prisma:seed avant ce test");
+    staffUserId = staff.id;
 
     const category = await prisma.category.create({
       data: { nameFr: "Test doublons", slug: `test-duplicates-${Date.now()}` },
@@ -105,8 +110,9 @@ describe("Duplicate unique fields return a friendly 400 (e2e)", () => {
 
   it("rejects a duplicate city name with a friendly 400", async () => {
     const name = `Ville Doublon ${Date.now()}`;
-    await cities.create({ name, shippingFee: 20 } as never);
-    await expect(cities.create({ name, shippingFee: 30 } as never)).rejects.toThrow(/existe déjà/);
+    await cities.create({ name, shippingFee: 20 } as never, staffUserId);
+    await expect(cities.create({ name, shippingFee: 30 } as never, staffUserId)).rejects.toThrow(/existe déjà/);
+    await prisma.auditLog.deleteMany({ where: { entity: "City", entityId: (await prisma.city.findUniqueOrThrow({ where: { name } })).id } });
     await prisma.city.delete({ where: { name } });
   });
 

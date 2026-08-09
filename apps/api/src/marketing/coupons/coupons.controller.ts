@@ -5,6 +5,8 @@ import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { StaffGuard } from "../../auth/guards/staff.guard";
 import { PermissionsGuard } from "../../auth/guards/permissions.guard";
 import { RequirePermissions } from "../../auth/decorators/require-permissions.decorator";
+import { CurrentUser } from "../../auth/decorators/current-user.decorator";
+import type { RequestUser } from "../../auth/types";
 import { CouponsService } from "./coupons.service";
 import { UpsertCouponDto } from "./dto/upsert-coupon.dto";
 
@@ -23,13 +25,13 @@ export class CouponsController {
 
   @Post()
   @RequirePermissions(PermissionCode.COUPON_CREATE)
-  create(@Body() dto: UpsertCouponDto) {
-    return this.service.create(dto);
+  create(@Body() dto: UpsertCouponDto, @CurrentUser() user: RequestUser) {
+    return this.service.create(dto, user.sub);
   }
 
   @Patch(":id")
   @RequirePermissions(PermissionCode.COUPON_UPDATE)
-  update(@Param("id") id: string, @Body() dto: UpsertCouponDto) {
-    return this.service.update(id, dto);
+  update(@Param("id") id: string, @Body() dto: UpsertCouponDto, @CurrentUser() user: RequestUser) {
+    return this.service.update(id, dto, user.sub);
   }
 }

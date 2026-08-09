@@ -5,6 +5,8 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { StaffGuard } from "../auth/guards/staff.guard";
 import { PermissionsGuard } from "../auth/guards/permissions.guard";
 import { RequirePermissions } from "../auth/decorators/require-permissions.decorator";
+import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import type { RequestUser } from "../auth/types";
 import { CitiesService } from "./cities.service";
 import { UpsertCityDto } from "./dto/upsert-city.dto";
 
@@ -23,13 +25,13 @@ export class CitiesController {
 
   @Post()
   @RequirePermissions(PermissionCode.SHIPPING_UPDATE)
-  create(@Body() dto: UpsertCityDto) {
-    return this.service.create(dto);
+  create(@Body() dto: UpsertCityDto, @CurrentUser() user: RequestUser) {
+    return this.service.create(dto, user.sub);
   }
 
   @Patch(":id")
   @RequirePermissions(PermissionCode.SHIPPING_UPDATE)
-  update(@Param("id") id: string, @Body() dto: UpsertCityDto) {
-    return this.service.update(id, dto);
+  update(@Param("id") id: string, @Body() dto: UpsertCityDto, @CurrentUser() user: RequestUser) {
+    return this.service.update(id, dto, user.sub);
   }
 }

@@ -1,10 +1,14 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
+import { AuditLogService } from "../../common/audit-log.service";
 import type { UpsertPromotionDto } from "./dto/upsert-promotion.dto";
 
 @Injectable()
 export class PromotionsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLog: AuditLogService,
+  ) {}
 
   list() {
     return this.prisma.promotion.findMany({
@@ -33,40 +37,53 @@ export class PromotionsService {
     }
   }
 
-  async create(dto: UpsertPromotionDto) {
+  async create(dto: UpsertPromotionDto, staffUserId: string) {
     await this.assertConsistentScope(dto);
-    return this.prisma.promotion.create({
-      data: {
-        name: dto.name,
-        type: dto.type,
-        value: dto.value,
-        scope: dto.scope,
-        categoryId: dto.scope === "CATEGORY" ? dto.categoryId : undefined,
-        brandId: dto.scope === "BRAND" ? dto.brandId : undefined,
-        startAt: new Date(dto.startAt),
-        endAt: new Date(dto.endAt),
-        status: dto.status ?? "SCHEDULED",
-      },
+    const data = {
+      name: dto.name,
+      type: dto.type,
+      value: dto.value,
+      scope: dto.scope,
+      categoryId: dto.scope === "CATEGORY" ? dto.categoryId : undefined,
+      brandId: dto.scope === "BRAND" ? dto.brandId : undefined,
+      startAt: new Date(dto.startAt),
+      endAt: new Date(dto.endAt),
+      status: dto.status ?? "SCHEDULED",
+    };
+    // Écriture atomique avec sa trace d'audit (impact direct sur les prix
+    // affichés/facturés) : soit les deux persistent, soit aucune.
+    return this.prisma.$transaction(async (tx) => {
+      const created = await tx.promotion.create({ data });
+      await this.auditLog.record(
+        { staffUserId, action: "promotion.create", entity: "Promotion", entityId: created.id, newValue: data },
+        tx,
+      );
+      return created;
     });
   }
 
-  async update(id: string, dto: UpsertPromotionDto) {
+  async update(id: string, dto: UpsertPromotionDto, staffUserId: string) {
     const existing = await this.prisma.promotion.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException("Promotion introuvable");
     await this.assertConsistentScope(dto);
-    return this.prisma.promotion.update({
-      where: { id },
-      data: {
-        name: dto.name,
-        type: dto.type,
-        value: dto.value,
-        scope: dto.scope,
-        categoryId: dto.scope === "CATEGORY" ? dto.categoryId : null,
-        brandId: dto.scope === "BRAND" ? dto.brandId : null,
-        startAt: new Date(dto.startAt),
-        endAt: new Date(dto.endAt),
-        status: dto.status ?? existing.status,
-      },
+    const data = {
+      name: dto.name,
+      type: dto.type,
+      value: dto.value,
+      scope: dto.scope,
+      categoryId: dto.scope === "CATEGORY" ? dto.categoryId : null,
+      brandId: dto.scope === "BRAND" ? dto.brandId : null,
+      startAt: new Date(dto.startAt),
+      endAt: new Date(dto.endAt),
+      status: dto.status ?? existing.status,
+    };
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.promotion.update({ where: { id }, data });
+      await this.auditLog.record(
+        { staffUserId, action: "promotion.update", entity: "Promotion", entityId: id, oldValue: existing, newValue: data },
+        tx,
+      );
+      return updated;
     });
   }
 }

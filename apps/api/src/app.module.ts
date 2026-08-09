@@ -4,6 +4,7 @@ import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import { APP_GUARD } from "@nestjs/core";
 import type Redis from "ioredis";
 import { PrismaModule } from "./prisma/prisma.module";
+import { AuditLogModule } from "./common/audit-log.module";
 import { RedisModule, REDIS_CLIENT } from "./redis/redis.module";
 import { ResilientThrottlerStorageService } from "./redis/resilient-throttler-storage.service";
 import { HealthController } from "./health/health.controller";
@@ -43,6 +44,7 @@ import { EmailModule } from "./email/email.module";
       }),
     }),
     PrismaModule,
+    AuditLogModule,
     RedisModule,
     SearchModule,
     StorageModule,

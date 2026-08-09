@@ -1,11 +1,15 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
+import { AuditLogService } from "../../common/audit-log.service";
 import type { UpsertCouponDto } from "./dto/upsert-coupon.dto";
 
 @Injectable()
 export class CouponsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLog: AuditLogService,
+  ) {}
 
   list() {
     return this.prisma.coupon.findMany({ orderBy: { createdAt: "desc" } });
@@ -21,21 +25,30 @@ export class CouponsService {
     }
   }
 
-  async create(dto: UpsertCouponDto) {
+  async create(dto: UpsertCouponDto, staffUserId: string) {
     this.assertValidValue(dto);
+    const data = {
+      code: dto.code.toUpperCase(),
+      type: dto.type,
+      value: dto.value,
+      startAt: new Date(dto.startAt),
+      endAt: new Date(dto.endAt),
+      maxUses: dto.maxUses,
+      maxUsesPerCustomer: dto.maxUsesPerCustomer ?? 1,
+      minCartAmount: dto.minCartAmount ?? 0,
+      status: dto.status ?? "ACTIVE",
+    };
     try {
-      return await this.prisma.coupon.create({
-        data: {
-          code: dto.code.toUpperCase(),
-          type: dto.type,
-          value: dto.value,
-          startAt: new Date(dto.startAt),
-          endAt: new Date(dto.endAt),
-          maxUses: dto.maxUses,
-          maxUsesPerCustomer: dto.maxUsesPerCustomer ?? 1,
-          minCartAmount: dto.minCartAmount ?? 0,
-          status: dto.status ?? "ACTIVE",
-        },
+      // Écriture atomique avec sa trace d'audit (§ Back-Office — impact direct
+      // sur les remises accordées aux clients) : soit les deux persistent,
+      // soit aucune, plutôt que deux écritures indépendantes pouvant diverger.
+      return await this.prisma.$transaction(async (tx) => {
+        const created = await tx.coupon.create({ data });
+        await this.auditLog.record(
+          { staffUserId, action: "coupon.create", entity: "Coupon", entityId: created.id, newValue: data },
+          tx,
+        );
+        return created;
       });
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
@@ -45,24 +58,29 @@ export class CouponsService {
     }
   }
 
-  async update(id: string, dto: UpsertCouponDto) {
+  async update(id: string, dto: UpsertCouponDto, staffUserId: string) {
     const existing = await this.prisma.coupon.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException("Coupon introuvable");
     this.assertValidValue(dto);
+    const data = {
+      code: dto.code.toUpperCase(),
+      type: dto.type,
+      value: dto.value,
+      startAt: new Date(dto.startAt),
+      endAt: new Date(dto.endAt),
+      maxUses: dto.maxUses,
+      maxUsesPerCustomer: dto.maxUsesPerCustomer ?? 1,
+      minCartAmount: dto.minCartAmount ?? 0,
+      status: dto.status ?? existing.status,
+    };
     try {
-      return await this.prisma.coupon.update({
-        where: { id },
-        data: {
-          code: dto.code.toUpperCase(),
-          type: dto.type,
-          value: dto.value,
-          startAt: new Date(dto.startAt),
-          endAt: new Date(dto.endAt),
-          maxUses: dto.maxUses,
-          maxUsesPerCustomer: dto.maxUsesPerCustomer ?? 1,
-          minCartAmount: dto.minCartAmount ?? 0,
-          status: dto.status ?? existing.status,
-        },
+      return await this.prisma.$transaction(async (tx) => {
+        const updated = await tx.coupon.update({ where: { id }, data });
+        await this.auditLog.record(
+          { staffUserId, action: "coupon.update", entity: "Coupon", entityId: id, oldValue: existing, newValue: data },
+          tx,
+        );
+        return updated;
       });
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {

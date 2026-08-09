@@ -5,6 +5,8 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { StaffGuard } from "../auth/guards/staff.guard";
 import { PermissionsGuard } from "../auth/guards/permissions.guard";
 import { RequirePermissions } from "../auth/decorators/require-permissions.decorator";
+import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import type { RequestUser } from "../auth/types";
 import { SettingsService } from "./settings.service";
 import { UpdateSettingsDto } from "./dto/update-settings.dto";
 
@@ -22,7 +24,7 @@ export class SettingsController {
   }
 
   @Put()
-  update(@Body() dto: UpdateSettingsDto) {
-    return this.service.update(dto);
+  update(@Body() dto: UpdateSettingsDto, @CurrentUser() user: RequestUser) {
+    return this.service.update(dto, user.sub);
   }
 }

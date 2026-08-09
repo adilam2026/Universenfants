@@ -262,18 +262,14 @@ export class OrdersService {
       const existing = await this.prisma.customer.findUnique({ where: { id: existingCustomerId } });
       if (existing) return existing;
     }
-    const found = await this.prisma.customer.findFirst({
-      where: { OR: [dto.email ? { email: dto.email } : undefined, { phone: dto.phone }].filter(Boolean) as any },
-    });
-    if (found) {
-      // Rattachement automatique (§65/§239/§240), mais SANS jamais écraser
-      // l'identité du client existant avec ce qu'un invité non authentifié a
-      // simplement tapé au formulaire : sinon, connaître le téléphone d'un
-      // client réel suffisait à réassigner son email (dto.email arbitraire)
-      // sur sa fiche, puis à recevoir à sa place le lien de réinitialisation
-      // de mot de passe — prise de contrôle de compte sans authentification.
-      return found;
-    }
+    // Le téléphone seul n'est jamais une preuve d'identité : un checkout
+    // invité ne rattache automatiquement la commande à un compte existant
+    // (§65/§240) que sur correspondance EXACTE d'email — jamais sur le seul
+    // téléphone, trivialement connu/deviné pour un tiers (colis, partage,
+    // liste de contacts) contrairement à un email exact.
+    const found = dto.email ? await this.prisma.customer.findUnique({ where: { email: dto.email } }) : null;
+    if (found) return found;
+
     try {
       const created = await this.prisma.customer.create({
         data: { firstName: dto.firstName, lastName: dto.lastName, email: dto.email, phone: dto.phone },
@@ -282,18 +278,36 @@ export class OrdersService {
       await this.prisma.wishlist.create({ data: { customerId: created.id } });
       return created;
     } catch (err) {
-      // Deux checkouts invités concurrents avec le même email/téléphone (deux
-      // onglets, retry réseau) peuvent tous deux avoir vu "aucun client
-      // trouvé" avant qu'aucun n'ait committé — le second create() percute
-      // alors la contrainte unique sur Customer.email. Plutôt que de faire
-      // échouer une commande par ailleurs légitime, on relit le client que
-      // l'autre requête vient de créer et on s'y rattache.
-      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
-        const winner = await this.prisma.customer.findFirst({
-          where: { OR: [dto.email ? { email: dto.email } : undefined, { phone: dto.phone }].filter(Boolean) as any },
-        });
+      if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== "P2002") throw err;
+
+      const target = err.meta?.target;
+      const conflictFields = Array.isArray(target) ? target : typeof target === "string" ? [target] : [];
+
+      if (dto.email && conflictFields.includes("email")) {
+        // Deux checkouts invités concurrents avec le même email (deux
+        // onglets, retry réseau) ont tous deux vu "aucun client trouvé"
+        // avant qu'aucun n'ait committé — le second create() percute la
+        // contrainte unique. Même email = même preuve d'identité : on relit
+        // le client que l'autre requête vient de créer et on s'y rattache.
+        const winner = await this.prisma.customer.findUnique({ where: { email: dto.email } });
         if (winner) return winner;
       }
+
+      if (conflictFields.includes("phone")) {
+        // Le téléphone appartient déjà à un AUTRE client (ou une requête
+        // invité concurrente au même numéro) — comme il ne prouve rien à lui
+        // seul, on ne rattache jamais cette commande à ce compte tiers : la
+        // fiche cliente de CETTE commande est créée sans le téléphone en
+        // conflit. Le numéro réel reste capturé sur la commande elle-même
+        // (Order.shippingPhone), donc rien n'est perdu pour la livraison.
+        const createdWithoutPhone = await this.prisma.customer.create({
+          data: { firstName: dto.firstName, lastName: dto.lastName, email: dto.email },
+        });
+        await this.prisma.loyaltyAccount.create({ data: { customerId: createdWithoutPhone.id } });
+        await this.prisma.wishlist.create({ data: { customerId: createdWithoutPhone.id } });
+        return createdWithoutPhone;
+      }
+
       throw err;
     }
   }

@@ -6,17 +6,16 @@ import { CustomerAuthService } from "../src/auth/customer-auth.service";
 import { CartService } from "../src/cart/cart.service";
 import { OrdersService } from "../src/orders/orders.service";
 
-// orders.service.ts#resolveCustomer rattache automatiquement une commande
-// invité à un client existant trouvé par email OU téléphone (§65/§239/§240).
-// Avant ce correctif, ce rattachement écrasait aussi l'identité du client
-// existant (firstName/lastName/email) avec ce que l'invité avait tapé —
-// un attaquant connaissant seulement le TÉLÉPHONE d'un vrai client pouvait
-// donc réassigner son EMAIL vers une adresse qu'il contrôle en passant une
-// simple commande invité, puis recevoir à sa place le lien de
-// réinitialisation de mot de passe de ce compte : prise de contrôle de
-// compte sans authentification. Ce test reproduit l'attaque et vérifie
-// qu'elle échoue désormais (l'email du client existant reste inchangé).
-describe("Guest checkout cannot hijack an existing customer's identity (e2e)", () => {
+// orders.service.ts#resolveCustomer décide si une commande invité se rattache
+// automatiquement à un client existant (§65/§239/§240). Un téléphone seul
+// n'est jamais une preuve d'identité (décision produit explicite) : ce
+// rattachement n'a plus lieu QUE sur correspondance EXACTE d'email, jamais
+// sur le seul téléphone — trivialement plus facile à connaître/deviner pour
+// un tiers (colis, partage, liste de contacts) qu'un email exact. Avant ce
+// correctif (et le précédent sur l'écrasement d'identité), connaître
+// seulement le téléphone d'un vrai client suffisait à faire attacher une
+// commande d'un inconnu à son compte, voire à réassigner son email.
+describe("Guest checkout never attaches to an existing account by phone alone (e2e)", () => {
   let app: INestApplicationContext;
   let prisma: PrismaService;
   let customerAuth: CustomerAuthService;
@@ -25,6 +24,7 @@ describe("Guest checkout cannot hijack an existing customer's identity (e2e)", (
 
   let categoryId: string;
   let productId: string;
+  const createdCustomerIds: string[] = [];
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
@@ -60,16 +60,34 @@ describe("Guest checkout cannot hijack an existing customer's identity (e2e)", (
   }, 30_000);
 
   afterAll(async () => {
+    await prisma.orderLine.deleteMany({ where: { order: { customerId: { in: createdCustomerIds } } } });
+    await prisma.order.deleteMany({ where: { customerId: { in: createdCustomerIds } } });
+    await prisma.refreshToken.deleteMany({ where: { subjectId: { in: createdCustomerIds } } });
+    await prisma.loyaltyAccount.deleteMany({ where: { customerId: { in: createdCustomerIds } } });
+    await prisma.wishlist.deleteMany({ where: { customerId: { in: createdCustomerIds } } });
+    await prisma.customer.deleteMany({ where: { id: { in: createdCustomerIds } } });
     await prisma.cartLine.deleteMany({ where: { productId } });
     await prisma.product.delete({ where: { id: productId } });
     await prisma.category.delete({ where: { id: categoryId } });
     await app.close();
   }, 30_000);
 
-  it("does not let a guest checkout reassign an existing customer's email by matching on phone", async () => {
+  async function checkoutAsGuest(overrides: { phone: string; email?: string }) {
+    const cart = await cartService.resolveCart(crypto.randomUUID(), null);
+    await cartService.addLine(cart.id, { productId, quantity: 1 });
+    return ordersService.checkout(cart.id, {
+      firstName: "Invité",
+      lastName: "Test",
+      city: "Casablanca",
+      addressLine: "1 rue du test",
+      ...overrides,
+    });
+  }
+
+  it("never attaches a guest order to an existing customer by phone match alone, and never touches their identity", async () => {
     const victimPhone = `06${Date.now().toString().slice(-8)}`;
     const victimEmail = `victim-${Date.now()}@example.com`;
-    const attackerEmail = `attacker-${Date.now()}@example.com`;
+    const strangerEmail = `stranger-${Date.now()}@example.com`;
 
     await customerAuth.register({
       firstName: "Victime",
@@ -78,36 +96,52 @@ describe("Guest checkout cannot hijack an existing customer's identity (e2e)", (
       phone: victimPhone,
       password: "VictimPass123!",
     });
-    const victim = await prisma.customer.findFirst({ where: { phone: victimPhone } });
-    expect(victim?.email).toBe(victimEmail);
+    const victim = await prisma.customer.findUniqueOrThrow({ where: { email: victimEmail } });
+    createdCustomerIds.push(victim.id);
 
-    // "Attaquant" : commande invité en connaissant seulement le téléphone de
-    // la victime, avec SA PROPRE adresse email dans le formulaire.
-    const cart = await cartService.resolveCart(crypto.randomUUID(), null);
-    await cartService.addLine(cart.id, { productId, quantity: 1 });
-    await ordersService.checkout(cart.id, {
-      firstName: "Attaquant",
-      lastName: "Malveillant",
-      phone: victimPhone,
-      email: attackerEmail,
-      city: "Casablanca",
-      addressLine: "1 rue de l'attaquant",
-    });
+    // Un inconnu passe une commande invité en connaissant seulement le
+    // téléphone de la victime, avec sa propre adresse email.
+    const order = await checkoutAsGuest({ phone: victimPhone, email: strangerEmail });
 
-    const victimAfter = await prisma.customer.findUnique({ where: { id: victim!.id } });
-    expect(victimAfter?.email).toBe(victimEmail); // toujours l'email de la victime, pas celui de l'attaquant
-    expect(victimAfter?.firstName).toBe("Victime"); // le nom de la victime n'a pas été écrasé non plus
+    const victimAfter = await prisma.customer.findUnique({ where: { id: victim.id } });
+    expect(victimAfter?.email).toBe(victimEmail);
+    expect(victimAfter?.firstName).toBe("Victime");
+    // Aucune commande de l'inconnu n'apparaît dans l'historique de la victime.
+    const victimOrders = await prisma.order.findMany({ where: { customerId: victim.id } });
+    expect(victimOrders).toHaveLength(0);
 
-    // La commande de l'attaquant est bien rattachée au même client (comportement
-    // de rattachement automatique préservé), mais sans corrompre son identité.
-    const orders = await prisma.order.findMany({ where: { customerId: victim!.id } });
-    expect(orders.length).toBeGreaterThan(0);
+    // La commande de l'inconnu a bien été créée, mais sur une fiche cliente
+    // SÉPARÉE — jamais celle de la victime.
+    expect(order.customerId).not.toBe(victim.id);
+    createdCustomerIds.push(order.customerId);
+    const stranger = await prisma.customer.findUnique({ where: { id: order.customerId } });
+    // Le téléphone en conflit n'a pas été volé à la victime : la nouvelle
+    // fiche n'a simplement pas ce numéro (conservé uniquement sur la
+    // commande elle-même, shippingPhone).
+    expect(stranger?.phone).toBeNull();
+    expect(order.shippingPhone).toBe(victimPhone);
+  });
 
-    await prisma.orderLine.deleteMany({ where: { order: { customerId: victim!.id } } });
-    await prisma.order.deleteMany({ where: { customerId: victim!.id } });
-    await prisma.refreshToken.deleteMany({ where: { subjectId: victim!.id } });
-    await prisma.loyaltyAccount.deleteMany({ where: { customerId: victim!.id } });
-    await prisma.wishlist.deleteMany({ where: { customerId: victim!.id } });
-    await prisma.customer.delete({ where: { id: victim!.id } });
+  it("still attaches to an existing passwordless guest record when the email matches exactly", async () => {
+    const email = `legit-guest-${Date.now()}@example.com`;
+    const firstOrder = await checkoutAsGuest({ phone: `07${Math.random().toString().slice(2, 10)}`, email });
+    createdCustomerIds.push(firstOrder.customerId);
+
+    // Même client, deuxième commande, même email — doit se rattacher à la
+    // même fiche (comportement métier voulu, préservé).
+    const secondOrder = await checkoutAsGuest({ phone: `08${Math.random().toString().slice(2, 10)}`, email });
+    expect(secondOrder.customerId).toBe(firstOrder.customerId);
+  });
+
+  it("creates independent customer records for two different guests who happen to share a phone number", async () => {
+    const sharedPhone = `09${Math.random().toString().slice(2, 10)}`;
+    const orderA = await checkoutAsGuest({ phone: sharedPhone, email: `guest-a-${Date.now()}@example.com` });
+    createdCustomerIds.push(orderA.customerId);
+    const orderB = await checkoutAsGuest({ phone: sharedPhone, email: `guest-b-${Date.now()}@example.com` });
+    createdCustomerIds.push(orderB.customerId);
+
+    expect(orderA.customerId).not.toBe(orderB.customerId);
+    expect(orderA.shippingPhone).toBe(sharedPhone);
+    expect(orderB.shippingPhone).toBe(sharedPhone);
   });
 });

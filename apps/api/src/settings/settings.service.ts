@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
+import { AuditLogService } from "../common/audit-log.service";
 import {
   DEFAULT_VAT_RATE,
   DEFAULT_LOYALTY_REDEEM_RATE,
@@ -21,7 +22,10 @@ const DEFAULTS = {
 
 @Injectable()
 export class SettingsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLog: AuditLogService,
+  ) {}
 
   async get() {
     const rows = await this.prisma.systemSetting.findMany({
@@ -35,24 +39,39 @@ export class SettingsService {
     };
   }
 
-  async update(dto: UpdateSettingsDto) {
-    await this.prisma.$transaction([
-      this.prisma.systemSetting.upsert({
+  async update(dto: UpdateSettingsDto, staffUserId: string) {
+    const before = await this.get();
+    await this.prisma.$transaction(async (tx) => {
+      await tx.systemSetting.upsert({
         where: { key: KEYS.vatRate },
         update: { value: dto.vatRate },
         create: { key: KEYS.vatRate, value: dto.vatRate },
-      }),
-      this.prisma.systemSetting.upsert({
+      });
+      await tx.systemSetting.upsert({
         where: { key: KEYS.loyaltyRedeemRate },
         update: { value: dto.loyaltyRedeemRate },
         create: { key: KEYS.loyaltyRedeemRate, value: dto.loyaltyRedeemRate },
-      }),
-      this.prisma.systemSetting.upsert({
+      });
+      await tx.systemSetting.upsert({
         where: { key: KEYS.freeShippingThreshold },
         update: { value: dto.freeShippingThreshold },
         create: { key: KEYS.freeShippingThreshold, value: dto.freeShippingThreshold },
-      }),
-    ]);
+      });
+      // Paramètres globaux (TVA, taux de conversion fidélité, seuil de
+      // livraison offerte) : impact direct et immédiat sur tous les prix
+      // affichés/facturés — trace d'audit atomique avec l'écriture elle-même.
+      await this.auditLog.record(
+        {
+          staffUserId,
+          action: "settings.update",
+          entity: "SystemSetting",
+          entityId: "global",
+          oldValue: before,
+          newValue: dto,
+        },
+        tx,
+      );
+    });
     return this.get();
   }
 }
