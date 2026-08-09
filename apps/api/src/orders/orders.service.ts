@@ -13,6 +13,16 @@ import type { UpdateOrderStatusDto } from "./dto/update-order-status.dto";
 // §74 : l'annulation n'est autorisée qu'avant expédition.
 const CANCELLABLE_STATUSES = new Set(["PENDING", "CONFIRMED", "PREPARING"]);
 
+// Les valeurs par défaut de Prisma (maxWait 2s, timeout 5s) suffisent en
+// usage normal, mais checkout()/updateStatus() tiennent désormais des
+// verrous SELECT ... FOR UPDATE (panier, stock, coupon, points fidélité) —
+// sous forte contention sur un même produit (promotion, pic de trafic), la
+// file d'attente pour ces verrous peut dépasser 5s sans qu'aucune requête ne
+// soit réellement bloquée à tort. Généreux mais borné : un vrai blocage
+// (deadlock, bug) échoue toujours, juste plus tard qu'avec les valeurs par
+// défaut.
+const HIGH_CONTENTION_TX_OPTIONS = { maxWait: 5_000, timeout: 10_000 };
+
 @Injectable()
 export class OrdersService {
   constructor(
@@ -199,7 +209,7 @@ export class OrdersService {
       await tx.cart.update({ where: { id: cart.id }, data: { status: "CONVERTED" } });
 
       return created;
-    });
+    }, HIGH_CONTENTION_TX_OPTIONS);
 
     if (customer.email) {
       void this.email.sendOrderConfirmed(
@@ -334,7 +344,7 @@ export class OrdersService {
       });
 
       return order;
-    });
+    }, HIGH_CONTENTION_TX_OPTIONS);
 
     if (order.customer.email) void this.email.sendOrderStatusChanged(order.customer.email, order.orderNumber, "CANCELLED");
 
@@ -451,7 +461,7 @@ export class OrdersService {
       });
 
       return { updated, customerEmail: order.customer.email, orderNumber: order.orderNumber };
-    });
+    }, HIGH_CONTENTION_TX_OPTIONS);
 
     if (updated.customerEmail) {
       void this.email.sendOrderStatusChanged(updated.customerEmail, updated.orderNumber, dto.status);
@@ -531,7 +541,7 @@ export class OrdersService {
       });
 
       return created;
-    });
+    }, HIGH_CONTENTION_TX_OPTIONS);
 
     return { orderNumber: order.orderNumber, total: order.total };
   }
@@ -554,7 +564,7 @@ export class OrdersService {
         where: { id: orderId },
         data: { paidAmount, paymentStatus, paidAt: paymentStatus === "PAID" ? new Date() : order.paidAt },
       });
-    });
+    }, HIGH_CONTENTION_TX_OPTIONS);
   }
 
   async assertCustomerOwnsOrder(customerId: string, orderId: string) {

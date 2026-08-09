@@ -366,6 +366,11 @@ export class ProductsService {
   }
 
   async adjustStock(productId: string, dto: AdjustStockDto, staffUserId: string) {
+    // Timeout généreux mais borné (au lieu des valeurs par défaut de Prisma,
+    // maxWait 2s / timeout 5s) : sous forte contention sur le même produit
+    // (checkout et ajustement Back-Office concurrents lors d'une promotion),
+    // la file d'attente pour le verrou de ligne peut dépasser 5s sans qu'il
+    // y ait de blocage réel.
     return this.prisma.$transaction(async (tx) => {
       if (dto.variantId) {
         const [variant] = await tx.$queryRaw<{ id: string; stock: number }[]>`
@@ -397,7 +402,7 @@ export class ProductsService {
         data: { productId, previousStock: product.stock, newStock, reason: dto.reason, staffUserId },
       });
       return { stock: newStock };
-    });
+    }, { maxWait: 5_000, timeout: 10_000 });
   }
 
   // ------------------------------------------------------------------
