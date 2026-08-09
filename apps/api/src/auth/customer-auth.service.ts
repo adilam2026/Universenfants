@@ -1,17 +1,22 @@
-import { ConflictException, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { randomBytes } from "node:crypto";
 import { PrismaService } from "../prisma/prisma.service";
 import { EmailService } from "../email/email.service";
+import { runCatchingDuplicate } from "../common/prisma-errors.util";
 import { hashPassword, verifyPassword, detectIdentifierKind } from "./password.util";
 import { hashRefreshToken } from "./refresh-token.util";
 import type { RegisterCustomerDto } from "./dto/register-customer.dto";
 import type { LoginDto } from "./dto/login.dto";
 import type { ForgotPasswordDto } from "./dto/forgot-password.dto";
 import type { ResetPasswordDto } from "./dto/reset-password.dto";
+import type { UpdateProfileDto } from "./dto/update-profile.dto";
+import type { RequestEmailChangeDto } from "./dto/request-email-change.dto";
+import type { ConfirmEmailChangeDto } from "./dto/confirm-email-change.dto";
 import type { JwtPayload } from "./types";
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
+const EMAIL_CHANGE_TOKEN_TTL_MS = 60 * 60 * 1000;
 
 @Injectable()
 export class CustomerAuthService {
@@ -163,10 +168,92 @@ export class CustomerAuthService {
       lastName: customer.lastName,
       email: customer.email,
       phone: customer.phone,
+      // Permet au Front d'afficher "confirmation en attente pour X" plutôt
+      // que de laisser le client demander un nouveau changement sans savoir
+      // qu'un lien est déjà parti vers sa boîte mail.
+      pendingEmail: customer.pendingEmail,
       ordersCount: customer.ordersCount,
       totalSpent: customer.totalSpent,
       loyaltyPoints: customer.loyaltyAccount?.pointsBalance ?? 0,
     };
+  }
+
+  /** Prénom/nom : modification immédiate. Téléphone : ré-authentification
+   * requise (voir UpdateProfileDto#password) car il double comme identifiant
+   * de connexion (detectIdentifierKind) — le modifier a le même poids
+   * sécurité qu'un changement d'email. Ne touche jamais à l'email : voir
+   * requestEmailChange/confirmEmailChange pour ce flux séparé, avec
+   * vérification obligatoire par lien envoyé à la nouvelle adresse. */
+  async updateProfile(customerId: string, dto: UpdateProfileDto) {
+    const customer = await this.prisma.customer.findUnique({ where: { id: customerId } });
+    if (!customer) throw new NotFoundException("Client introuvable");
+
+    const phoneChanging = dto.phone !== undefined && dto.phone !== customer.phone;
+    if (phoneChanging) {
+      if (!dto.password || !customer.passwordHash || !(await verifyPassword(customer.passwordHash, dto.password))) {
+        throw new UnauthorizedException("Mot de passe incorrect");
+      }
+    }
+
+    await runCatchingDuplicate(
+      () =>
+        this.prisma.customer.update({
+          where: { id: customerId },
+          data: {
+            ...(dto.firstName !== undefined ? { firstName: dto.firstName } : {}),
+            ...(dto.lastName !== undefined ? { lastName: dto.lastName } : {}),
+            ...(phoneChanging ? { phone: dto.phone } : {}),
+          },
+        }),
+      "Ce numéro de téléphone est déjà utilisé par un autre compte",
+    );
+    return this.me(customerId);
+  }
+
+  /** L'email ne change qu'après confirmation du lien envoyé à la NOUVELLE
+   * adresse (confirmEmailChange) — jamais immédiatement, pour ne pas laisser
+   * une session compromise rediriger silencieusement les futurs liens de
+   * réinitialisation de mot de passe vers une adresse non vérifiée. */
+  async requestEmailChange(customerId: string, dto: RequestEmailChangeDto) {
+    const customer = await this.prisma.customer.findUnique({ where: { id: customerId } });
+    if (!customer) throw new NotFoundException("Client introuvable");
+    if (!customer.passwordHash || !(await verifyPassword(customer.passwordHash, dto.password))) {
+      throw new UnauthorizedException("Mot de passe incorrect");
+    }
+    if (dto.newEmail === customer.email) {
+      throw new BadRequestException("C'est déjà votre adresse email actuelle");
+    }
+    const taken = await this.prisma.customer.findUnique({ where: { email: dto.newEmail } });
+    if (taken && taken.id !== customerId) {
+      throw new ConflictException("Cette adresse email est déjà utilisée par un autre compte");
+    }
+
+    const token = randomBytes(32).toString("hex");
+    await this.prisma.customer.update({
+      where: { id: customerId },
+      data: { pendingEmail: dto.newEmail, emailChangeToken: token, emailChangeExpiresAt: new Date(Date.now() + EMAIL_CHANGE_TOKEN_TTL_MS) },
+    });
+    const confirmUrl = `${process.env.WEB_PUBLIC_URL ?? "http://localhost:3000"}/fr/compte/confirmer-email?token=${token}`;
+    void this.email.sendEmailChangeConfirmation(dto.newEmail, confirmUrl);
+    return { ok: true };
+  }
+
+  async confirmEmailChange(dto: ConfirmEmailChangeDto) {
+    const customer = await this.prisma.customer.findFirst({ where: { emailChangeToken: dto.token } });
+    if (!customer || !customer.pendingEmail || !customer.emailChangeExpiresAt || customer.emailChangeExpiresAt < new Date()) {
+      throw new UnauthorizedException("Lien de confirmation invalide ou expiré");
+    }
+    // Re-vérifié au moment de la confirmation (pas seulement à la demande) :
+    // quelqu'un d'autre a pu revendiquer cette adresse entre-temps.
+    const updated = await runCatchingDuplicate(
+      () =>
+        this.prisma.customer.update({
+          where: { id: customer.id },
+          data: { email: customer.pendingEmail, pendingEmail: null, emailChangeToken: null, emailChangeExpiresAt: null },
+        }),
+      "Cette adresse email est déjà utilisée par un autre compte",
+    );
+    return { ok: true, email: updated.email };
   }
 
   /** Réponse volontairement identique que l'email existe ou non, pour ne pas

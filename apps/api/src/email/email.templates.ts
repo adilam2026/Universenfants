@@ -59,6 +59,17 @@ export function passwordResetEmail(resetUrl: string) {
   return { subject, html };
 }
 
+export function emailChangeConfirmationEmail(confirmUrl: string, newEmail: string) {
+  const subject = "Confirmez votre nouvelle adresse email";
+  const html = baseLayout(
+    subject,
+    `<h1 style="font-size:20px;margin:0 0 12px;">Confirmez votre nouvelle adresse</h1>
+     <p style="font-size:14px;line-height:1.6;">Vous avez demandé à utiliser <strong>${escapeHtml(newEmail)}</strong> comme adresse email pour votre compte UniversEnfants. Ce lien est valable 1 heure. Votre adresse actuelle reste active tant que vous n'avez pas confirmé. Si vous n'êtes pas à l'origine de cette demande, ignorez cet email.</p>
+     ${button(confirmUrl, "Confirmer ma nouvelle adresse")}`,
+  );
+  return { subject, html };
+}
+
 export interface OrderEmailLine {
   name: string;
   quantity: number;

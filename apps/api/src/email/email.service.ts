@@ -4,6 +4,7 @@ import { join } from "node:path";
 import nodemailer, { type Transporter } from "nodemailer";
 import {
   accountCreatedEmail,
+  emailChangeConfirmationEmail,
   orderConfirmedEmail,
   orderStatusChangedEmail,
   passwordResetEmail,
@@ -63,6 +64,11 @@ export class EmailService implements OnModuleInit {
 
   sendPasswordReset(to: string, resetUrl: string) {
     const { subject, html } = passwordResetEmail(resetUrl);
+    return this.send(to, subject, html);
+  }
+
+  sendEmailChangeConfirmation(to: string, confirmUrl: string) {
+    const { subject, html } = emailChangeConfirmationEmail(confirmUrl, to);
     return this.send(to, subject, html);
   }
 

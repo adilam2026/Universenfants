@@ -294,6 +294,16 @@ model Customer {
   passwordResetToken     String?   @unique
   passwordResetExpiresAt DateTime?
 
+  // Changement d'email en libre-service (espace client) : l'email en base
+  // ne change qu'après confirmation via le lien envoyé à la NOUVELLE
+  // adresse — jamais immédiatement, pour ne pas permettre à quelqu'un
+  // d'accès à une session active de rediriger silencieusement les futurs
+  // emails de réinitialisation de mot de passe vers une adresse qu'il ne
+  // contrôle pas forcément encore.
+  pendingEmail         String?
+  emailChangeToken     String?   @unique
+  emailChangeExpiresAt DateTime?
+
   firstOrderAt DateTime?
   lastOrderAt  DateTime?
   ordersCount  Int       @default(0)

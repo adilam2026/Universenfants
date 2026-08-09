@@ -27,6 +27,7 @@ export interface CustomerProfile {
   lastName: string;
   email: string | null;
   phone: string | null;
+  pendingEmail: string | null;
   ordersCount: number;
   totalSpent: string;
   loyaltyPoints: number;
@@ -127,6 +128,31 @@ export function isLoggedIn() {
 
 export function me() {
   return authFetch<CustomerProfile>("/auth/customer/me");
+}
+
+export interface UpdateProfilePayload {
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  password?: string;
+}
+
+export function updateProfile(payload: UpdateProfilePayload) {
+  return authFetch<CustomerProfile>("/auth/customer/me", { method: "PATCH", body: JSON.stringify(payload) });
+}
+
+export function requestEmailChange(newEmail: string, password: string) {
+  return authFetch<{ ok: true }>("/auth/customer/me/email/request-change", {
+    method: "POST",
+    body: JSON.stringify({ newEmail, password }),
+  });
+}
+
+export function confirmEmailChange(token: string) {
+  return authFetch<{ ok: true; email: string }>("/auth/customer/me/email/confirm-change", {
+    method: "POST",
+    body: JSON.stringify({ token }),
+  });
 }
 
 export interface OrderSummary {
