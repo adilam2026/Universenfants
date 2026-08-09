@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import { Share2, Star } from "lucide-react";
 import { getTranslations, getLocale, setRequestLocale } from "next-intl/server";
 import { getProductBySlug, getProducts } from "@/lib/api";
@@ -8,6 +9,24 @@ import { ProductGallery } from "@/components/product-gallery";
 import { ProductPurchasePanel } from "@/components/product-purchase-panel";
 import { WriteReviewForm } from "@/components/write-review-form";
 import { Button } from "@/components/ui/button";
+
+// Sans generateMetadata, chaque fiche produit héritait du titre/description
+// générique du site (layout.tsx) — un problème de fond pour le SEO d'un
+// site e-commerce, où chaque page produit doit pouvoir se distinguer dans
+// les résultats de recherche.
+export async function generateMetadata({ params }: PageProps<"/[locale]/produit/[slug]">): Promise<Metadata> {
+  const { locale, slug } = await params;
+  const product = await getProductBySlug(slug).catch(() => null);
+  if (!product) return {};
+  const name = localized(product.nameFr, product.nameAr, locale);
+  const description = localized(product.shortDescFr ?? "", product.shortDescAr, locale) || undefined;
+  const image = product.images[0]?.url;
+  return {
+    title: name,
+    description,
+    openGraph: { title: name, description, images: image ? [image] : undefined },
+  };
+}
 
 export default async function ProductPage({ params }: PageProps<"/[locale]/produit/[slug]">) {
   const { locale, slug } = await params;

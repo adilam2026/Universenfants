@@ -1,9 +1,26 @@
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import { getTranslations, getLocale, setRequestLocale } from "next-intl/server";
 import { getCategoryTree, getProducts } from "@/lib/api";
 import { localized } from "@/lib/localized";
 import { ProductCard } from "@/components/product-card";
 import { FilterSidebar, SortSelect, MobileFilterButton } from "@/components/product-filters";
+
+// Sans generateMetadata, chaque page catégorie héritait du titre/description
+// générique du site (layout.tsx) au lieu d'un titre distinctif par univers
+// de jouets — même lacune SEO que les fiches produit (voir produit/[slug]).
+export async function generateMetadata({ params }: PageProps<"/[locale]/categorie/[slug]">): Promise<Metadata> {
+  const { locale, slug } = await params;
+  const categories = await getCategoryTree().catch(() => []);
+  const current = categories.find((c) => c.slug === slug);
+  if (!current) return {};
+  const name = localized(current.nameFr, current.nameAr, locale);
+  const description =
+    locale === "ar"
+      ? `اكتشف تشكيلتنا من ${name} للأطفال — التوصيل في جميع أنحاء المغرب.`
+      : `Découvrez notre sélection de ${name.toLowerCase()} pour enfants — livraison partout au Maroc.`;
+  return { title: name, description, openGraph: { title: name, description } };
+}
 
 export default async function CategoryPage({
   params,
