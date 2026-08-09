@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Star, Check, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -23,9 +23,17 @@ export default function ReviewsPage() {
   const [reviews, setReviews] = useState<AdminReview[] | null>(null);
   const [filter, setFilter] = useState("PENDING");
   const [error, setError] = useState<string | null>(null);
+  // Changer rapidement de filtre (ou modérer un avis juste après avoir
+  // changé de filtre) peut mettre plusieurs requêtes en vol — sans ce garde,
+  // une réponse plus lente arrivant après une réponse plus récente écraserait
+  // la liste avec des résultats qui ne correspondent plus au filtre affiché.
+  const requestIdRef = useRef(0);
 
   function refresh() {
-    listReviews(filter || undefined).then(setReviews);
+    const requestId = ++requestIdRef.current;
+    listReviews(filter || undefined).then((result) => {
+      if (requestIdRef.current === requestId) setReviews(result);
+    });
   }
   useEffect(refresh, [filter]);
 

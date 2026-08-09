@@ -33,7 +33,17 @@ export default function OrdersListPage() {
   const [status, setStatus] = useState("");
 
   useEffect(() => {
-    listAdminOrders({ status: status || undefined }).then(setOrders);
+    // Changer rapidement de filtre déclenche plusieurs requêtes en vol — sans
+    // ce garde, une réponse plus lente pour un ancien filtre peut arriver
+    // après une réponse plus récente et écraser la liste avec des résultats
+    // qui ne correspondent plus au filtre affiché.
+    let cancelled = false;
+    listAdminOrders({ status: status || undefined }).then((result) => {
+      if (!cancelled) setOrders(result);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [status]);
 
   return (

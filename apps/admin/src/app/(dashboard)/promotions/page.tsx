@@ -16,6 +16,7 @@ export default function PromotionsPage() {
   const [categories, setCategories] = useState<AdminCategory[]>([]);
   const [brands, setBrands] = useState<AdminBrand[]>([]);
   const [scope, setScope] = useState<"CATEGORY" | "BRAND" | "STORE">("STORE");
+  const [type, setType] = useState<"PERCENTAGE" | "FIXED_AMOUNT">("PERCENTAGE");
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
 
@@ -85,14 +86,20 @@ export default function PromotionsPage() {
             </div>
             <div className="flex flex-col gap-1.5">
               <Label>Type</Label>
-              <select name="type" required className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <select
+                name="type"
+                required
+                value={type}
+                onChange={(e) => setType(e.target.value as typeof type)}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
                 <option value="PERCENTAGE">% </option>
                 <option value="FIXED_AMOUNT">Montant fixe</option>
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
               <Label>Valeur</Label>
-              <Input name="value" type="number" step="0.01" min={0} required />
+              <Input name="value" type="number" step="0.01" min={0} max={type === "PERCENTAGE" ? 100 : undefined} required />
             </div>
             <div className="flex flex-col gap-1.5">
               <Label>Portée</Label>

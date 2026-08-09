@@ -18,6 +18,7 @@ const TYPE_LABEL: Record<string, string> = {
 
 export default function CouponsPage() {
   const [coupons, setCoupons] = useState<AdminCoupon[] | null>(null);
+  const [type, setType] = useState<AdminCoupon["type"]>("PERCENTAGE");
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
 
@@ -80,7 +81,13 @@ export default function CouponsPage() {
             </div>
             <div className="flex flex-col gap-1.5">
               <Label>Type</Label>
-              <select name="type" required className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <select
+                name="type"
+                required
+                value={type}
+                onChange={(e) => setType(e.target.value as typeof type)}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
                 <option value="PERCENTAGE">% du panier</option>
                 <option value="FIXED_AMOUNT">Montant fixe</option>
                 <option value="FREE_SHIPPING">Livraison offerte</option>
@@ -88,7 +95,7 @@ export default function CouponsPage() {
             </div>
             <div className="flex flex-col gap-1.5">
               <Label>Valeur</Label>
-              <Input name="value" type="number" step="0.01" min={0} required />
+              <Input name="value" type="number" step="0.01" min={0} max={type === "PERCENTAGE" ? 100 : undefined} required />
             </div>
             <div className="flex flex-col gap-1.5">
               <Label>Panier min (DH)</Label>
