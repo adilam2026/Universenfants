@@ -59,4 +59,30 @@ export class AuditLogService {
       },
     });
   }
+
+  /** Le journal était écrit mais jamais lu — aucun endpoint, aucune page
+   * admin. Pagination + filtres de base (entité, action, auteur) pour rester
+   * exploitable une fois le volume réel accumulé. */
+  async list(query: { entity?: string; action?: string; staffUserId?: string; page?: number; limit?: number }) {
+    const page = query.page ?? 1;
+    const limit = Math.min(query.limit ?? 50, 200);
+    const where: Prisma.AuditLogWhereInput = {
+      ...(query.entity ? { entity: query.entity } : {}),
+      ...(query.action ? { action: { contains: query.action, mode: "insensitive" } } : {}),
+      ...(query.staffUserId ? { staffUserId: query.staffUserId } : {}),
+    };
+
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.auditLog.findMany({
+        where,
+        include: { staffUser: { select: { id: true, name: true, email: true } } },
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.auditLog.count({ where }),
+    ]);
+
+    return { items, total, page, limit };
+  }
 }

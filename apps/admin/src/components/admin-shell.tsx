@@ -17,6 +17,7 @@ import {
   LineChart,
   Settings,
   LogOut,
+  ScrollText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { staffLogout, getStaffToken } from "@/lib/api-client";
@@ -73,7 +74,10 @@ const NAV: { group: string; items: NavItem[] }[] = [
   },
   {
     group: "Administration",
-    items: [{ href: "/parametres", label: "Paramètres", icon: Settings, permission: null }],
+    items: [
+      { href: "/parametres", label: "Paramètres", icon: Settings, permission: null },
+      { href: "/audit-logs", label: "Journal d'audit", icon: ScrollText, permission: "user.manage" },
+    ],
   },
 ];
 
