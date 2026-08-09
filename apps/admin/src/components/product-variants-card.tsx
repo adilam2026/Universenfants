@@ -14,7 +14,7 @@ import {
   type VariantPayload,
 } from "@/lib/products";
 
-const emptyForm: VariantPayload = { sku: "", label: "", price: undefined, stock: 0 };
+const emptyForm: VariantPayload = { sku: "", label: "", price: undefined, costPrice: undefined, stock: 0 };
 
 export function ProductVariantsCard({
   productId,
@@ -41,6 +41,7 @@ export function ProductVariantsCard({
       sku: v.sku,
       label: v.label,
       price: v.price ? Number(v.price) : undefined,
+      costPrice: v.costPrice ? Number(v.costPrice) : undefined,
       stock: v.stock,
       image: v.image ?? undefined,
     });
@@ -99,6 +100,7 @@ export function ProductVariantsCard({
               <span className="text-xs text-muted-foreground">
                 SKU {v.sku} · Stock {v.stock}
                 {v.price && <> · {Number(v.price).toFixed(2)} DH</>}
+                {v.costPrice && <> · coût {Number(v.costPrice).toFixed(2)} DH</>}
               </span>
             </div>
             <div className="flex gap-1">
@@ -135,6 +137,16 @@ export function ProductVariantsCard({
                   step="0.01"
                   value={form.price ?? ""}
                   onChange={(e) => setForm({ ...form, price: e.target.value ? Number(e.target.value) : undefined })}
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label className="text-xs">Coût d&apos;achat (vide = coût produit)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={form.costPrice ?? ""}
+                  onChange={(e) => setForm({ ...form, costPrice: e.target.value ? Number(e.target.value) : undefined })}
                 />
               </div>
               <div className="flex flex-col gap-1">
