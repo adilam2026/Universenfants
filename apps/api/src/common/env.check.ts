@@ -27,6 +27,13 @@ export function assertRequiredEnv() {
     throw new Error(`Secrets de développement détectés en production : ${usingPlaceholder.join(", ")}`);
   }
 
+  // Deux secrets distincts sont une protection en profondeur : même si un
+  // access token (courte durée de vie) fuitait, il ne doit pas pouvoir être
+  // rejoué comme refresh token (30 jours) signé avec la même clé.
+  if (process.env.JWT_ACCESS_SECRET === process.env.JWT_REFRESH_SECRET) {
+    throw new Error("JWT_ACCESS_SECRET et JWT_REFRESH_SECRET doivent être deux valeurs distinctes");
+  }
+
   if (!process.env.SENTRY_DSN) {
     Logger.warn("SENTRY_DSN non défini — les erreurs ne seront pas remontées à Sentry en production", "Bootstrap");
   }
