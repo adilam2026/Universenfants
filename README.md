@@ -64,6 +64,14 @@ pnpm dev
 | `pnpm lint`           | Lint de tout le monorepo                                   |
 | `pnpm db:migrate`     | `prisma migrate dev` (développement, interactif)            |
 | `pnpm db:seed`        | Rejoue le jeu de données de démonstration                  |
+| `./scripts/generate-secrets.sh` | Génère des secrets JWT forts pour la production   |
+| `./scripts/backup-db.sh`        | Sauvegarde la base Postgres (pg_dump)             |
+| `./scripts/restore-db.sh`       | Restaure une sauvegarde (destructif, confirmation requise) |
+| `./scripts/smoke-test.sh`       | Vérifie un déploiement (santé API, pages clés)    |
+
+`.github/workflows/ci.yml` lance lint/typecheck sur chaque PR, plus un build
+complet (API + boutique + Back-Office contre une base de données jetable)
+pour détecter tout ce qui casserait un déploiement réel.
 
 ## Déploiement
 

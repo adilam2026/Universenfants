@@ -90,3 +90,12 @@ supplémentaire n'est nécessaire pour l'exclure des moteurs de recherche.
 - [ ] Upload d'une image produit et vérifier qu'elle s'affiche bien depuis R2 (pas de repli disque local en production)
 - [ ] Recherche boutique : vérifier que Meilisearch répond (sinon repli Postgres actif — vérifier les logs API)
 - [ ] `/api/docs` (Swagger) doit renvoyer 404 en production (désactivé volontairement, voir `src/main.ts`)
+
+La partie vérifiable de cette checklist est automatisée :
+`./scripts/smoke-test.sh <api_url> <web_url> <admin_url>`.
+
+## Après le déploiement
+
+Voir [OPERATIONS.md](./OPERATIONS.md) pour les procédures courantes une fois
+en production : sauvegarde/restauration de la base, rotation des secrets
+JWT, diagnostic rapide.
