@@ -63,7 +63,26 @@ export class OrdersService {
     if (subtotal >= shipping.freeFrom) shipping.fee = 0;
 
     let couponDiscount = 0;
-    const coupon = cart.couponCode ? await this.prisma.coupon.findUnique({ where: { code: cart.couponCode } }) : null;
+    const rawCoupon = cart.couponCode ? await this.prisma.coupon.findUnique({ where: { code: cart.couponCode } }) : null;
+    // cart.service.ts#applyCoupon valide statut/dates/montant minimum au
+    // moment où le coupon est attaché au panier, mais rien ne les
+    // re-vérifie ensuite — un coupon peut expirer, être désactivé par un
+    // admin, ou le panier peut passer sous le montant minimum (article
+    // retiré) entre l'application et le checkout, potentiellement bien plus
+    // tard. Sans cette re-validation, le checkout applique une remise qui
+    // n'est plus valide au moment de l'achat.
+    const now = new Date();
+    const coupon =
+      rawCoupon &&
+      rawCoupon.status === "ACTIVE" &&
+      rawCoupon.startAt <= now &&
+      rawCoupon.endAt >= now &&
+      subtotal >= Number(rawCoupon.minCartAmount)
+        ? rawCoupon
+        : null;
+    if (rawCoupon && !coupon) {
+      throw new BadRequestException("Ce coupon n'est plus valide, merci de le retirer du panier");
+    }
     if (coupon) {
       const redemptions = await this.prisma.couponRedemption.count({
         where: { couponId: coupon.id, customerId: customer.id },
