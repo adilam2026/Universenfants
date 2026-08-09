@@ -117,6 +117,12 @@ jobs:
           pnpm --filter @universenfants/api prisma:deploy
           pnpm db:seed
 
+      # Vraies transactions concurrentes contre la vraie base (postgres du
+      # service ci-dessus) — ces bugs de race condition ne sont pas
+      # détectables par des tests unitaires sur mocks.
+      - name: Integration tests (checkout concurrency)
+        run: pnpm --filter @universenfants/api test:e2e
+
       - name: Build API
         run: pnpm --filter @universenfants/api build
 

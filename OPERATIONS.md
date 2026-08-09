@@ -71,11 +71,36 @@ n'affiche que les transitions valides à chaque étape.
 ## CI
 
 `.github/workflows/ci.yml` tourne sur chaque push/PR :
-- `checks` : install, lint, typecheck sur tout le monorepo.
-- `build` : migre + seed une base Postgres jetable, démarre l'API, puis
-  construit la boutique et le Back-Office contre cette instance vivante
-  (nécessaire car `next build` appelle l'API pour générer les pages
+- `checks` : install, lint, typecheck, tests unitaires (`pnpm test`, sur
+  mocks/fonctions pures — pas de base de données requise) sur tout le
+  monorepo.
+- `build` : migre + seed une base Postgres jetable, lance les tests
+  d'intégration (`pnpm --filter @universenfants/api test:e2e` — vraies
+  transactions concurrentes contre la vraie base, cf. ci-dessous), démarre
+  l'API, puis construit la boutique et le Back-Office contre cette instance
+  vivante (nécessaire car `next build` appelle l'API pour générer les pages
   statiques — un build contre une API éteinte échoue).
+
+### Tests d'intégration (concurrence)
+
+`apps/api/test/checkout-concurrency.e2e-spec.ts` vérifie, avec de vraies
+requêtes concurrentes (`Promise.allSettled`, pas séquentielles) contre une
+vraie base Postgres, que :
+- un double-clic ou un retry client ne crée jamais deux commandes à partir
+  du même panier ;
+- deux commandes simultanées sur le même produit ne survendent jamais le
+  stock ;
+- un coupon à usage limité n'est jamais redeemé au-delà de sa limite
+  globale (`maxUses`), même sous charge concurrente.
+
+Ces bugs ne sont pas détectables par des tests unitaires sur mocks — ils
+nécessitent une vraie base avec de vrais verrous de ligne (`SELECT ... FOR
+UPDATE`). Lancer en local :
+
+```bash
+# Nécessite Postgres/Redis/Meilisearch démarrés et .env configuré
+pnpm --filter @universenfants/api test:e2e
+```
 
 ## Diagnostic rapide
 

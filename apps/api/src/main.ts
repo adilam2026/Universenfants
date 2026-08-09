@@ -10,6 +10,7 @@ import compression from "compression";
 import { AppModule } from "./app.module";
 import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
 import { assertRequiredEnv } from "./common/env.check";
+import { requestIdMiddleware } from "./common/middleware/request-id.middleware";
 
 async function bootstrap() {
   assertRequiredEnv();
@@ -32,6 +33,9 @@ async function bootstrap() {
   // <img>/<video> pointant directement vers /uploads/* depuis ces origines.
   app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
   app.use(compression());
+  // En premier dans la chaîne : tout middleware/log/erreur en aval doit
+  // pouvoir lire req.id pour corréler les lignes d'une même requête.
+  app.use(requestIdMiddleware);
 
   // Repli local pour les images produit quand R2 n'est pas configuré (voir StorageModule).
   // __dirname (pas process.cwd()) pour rester correct quel que soit le répertoire de lancement.
