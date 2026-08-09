@@ -41,16 +41,17 @@ export class WishlistService {
 
   async add(customerId: string, productId: string) {
     const wishlist = await this.getOrCreate(customerId);
-    const existing = await this.prisma.wishlistLine.findFirst({
-      where: { wishlistId: wishlist.id, productId },
+    // upsert plutôt que findFirst()+create()/update() : deux ajouts
+    // concurrents pour le même produit (double-clic sur le cœur, retry
+    // réseau) passaient auparavant tous les deux le findFirst() avant
+    // qu'aucun n'ait committé, créant chacun leur propre ligne — le produit
+    // apparaissait alors deux fois dans la wishlist. upsert s'appuie sur la
+    // contrainte unique (wishlistId, productId) pour rester atomique.
+    await this.prisma.wishlistLine.upsert({
+      where: { wishlistId_productId: { wishlistId: wishlist.id, productId } },
+      update: { removedAt: null },
+      create: { wishlistId: wishlist.id, productId },
     });
-    if (existing) {
-      if (existing.removedAt) {
-        await this.prisma.wishlistLine.update({ where: { id: existing.id }, data: { removedAt: null } });
-      }
-    } else {
-      await this.prisma.wishlistLine.create({ data: { wishlistId: wishlist.id, productId } });
-    }
     return this.list(customerId);
   }
 

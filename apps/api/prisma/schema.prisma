@@ -395,6 +395,11 @@ model WishlistLine {
   addedAt    DateTime  @default(now())
   removedAt  DateTime? // conservé pour analytics (§210) plutôt que supprimé
 
+  // Sans cette contrainte, deux appels add() concurrents pour le même produit
+  // (double-clic sur le cœur, ou double soumission réseau) passent tous les
+  // deux le findFirst() avant qu'aucun n'ait committé et créent chacun leur
+  // propre ligne — le produit apparaît alors deux fois dans la wishlist.
+  @@unique([wishlistId, productId])
   @@index([wishlistId])
   @@index([productId])
 }
