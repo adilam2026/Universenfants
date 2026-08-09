@@ -163,14 +163,21 @@ export class CartService {
   async applyCoupon(cartId: string, code: string) {
     const coupon = await this.prisma.coupon.findUnique({ where: { code: code.toUpperCase() } });
     const now = new Date();
-    if (
-      !coupon ||
-      coupon.status !== "ACTIVE" ||
-      coupon.startAt > now ||
-      coupon.endAt < now ||
-      (coupon.maxUses !== null && coupon.usedCount >= coupon.maxUses)
-    ) {
-      throw new BadRequestException("Code promotionnel invalide ou expiré");
+    // Messages distincts par cause plutôt qu'un "invalide ou expiré" générique
+    // unique : un client qui a fait une faute de frappe et un client dont le
+    // code, valide, vient d'expirer voyaient jusqu'ici exactement le même
+    // texte, sans aucun moyen de comprendre pourquoi le code est refusé.
+    if (!coupon || coupon.status !== "ACTIVE") {
+      throw new BadRequestException("Code promotionnel invalide");
+    }
+    if (coupon.startAt > now) {
+      throw new BadRequestException("Ce code promotionnel n'est pas encore actif");
+    }
+    if (coupon.endAt < now) {
+      throw new BadRequestException("Ce code promotionnel a expiré");
+    }
+    if (coupon.maxUses !== null && coupon.usedCount >= coupon.maxUses) {
+      throw new BadRequestException("Ce code promotionnel a atteint son nombre maximal d'utilisations");
     }
     const full = await this.getFullCart(cartId);
     if (full.subtotal < Number(coupon.minCartAmount)) {
