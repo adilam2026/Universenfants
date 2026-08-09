@@ -6,6 +6,7 @@ import { Rocket } from "lucide-react";
 import { ProductForm } from "@/components/product-form";
 import { StockAdjustCard } from "@/components/stock-adjust-card";
 import { ProductImagesCard } from "@/components/product-images-card";
+import { ProductVariantsCard } from "@/components/product-variants-card";
 import { Button } from "@/components/ui/button";
 import { getAdminProduct, type AdminProduct } from "@/lib/products";
 
@@ -34,6 +35,11 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
             onChanged={(images) => setProduct((prev) => (prev ? { ...prev, images } : prev))}
           />
           <ProductForm product={product} />
+          <ProductVariantsCard
+            productId={product.id}
+            variants={product.variants}
+            onChanged={(variants) => setProduct((prev) => (prev ? { ...prev, variants } : prev))}
+          />
         </div>
         <div className="flex flex-col gap-5">
           <Button asChild variant="outline" className="w-full">

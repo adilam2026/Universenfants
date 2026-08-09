@@ -5,15 +5,9 @@ import { getProductBySlug, getProducts } from "@/lib/api";
 import { localized } from "@/lib/localized";
 import { ProductCard } from "@/components/product-card";
 import { ProductGallery } from "@/components/product-gallery";
-import { AddToCartButton } from "@/components/add-to-cart-button";
-import { WishlistButton } from "@/components/wishlist-button";
+import { ProductPurchasePanel } from "@/components/product-purchase-panel";
 import { WriteReviewForm } from "@/components/write-review-form";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-
-function dh(value: string | number) {
-  return `${Number(value).toLocaleString("fr-FR")} DH`;
-}
 
 export default async function ProductPage({ params }: PageProps<"/[locale]/produit/[slug]">) {
   const { locale, slug } = await params;
@@ -25,9 +19,6 @@ export default async function ProductPage({ params }: PageProps<"/[locale]/produ
   if (!product) notFound();
 
   const similar = await getProducts({ category: product.category.slug, limit: 4 });
-  const hasPromo = product.promoPrice !== null;
-  const stockLabel =
-    product.available <= 0 ? t("outOfStock") : product.available <= 3 ? t("lowStock", { n: product.available }) : t("inStock");
   const name = localized(product.nameFr, product.nameAr, currentLocale);
   const shortDesc = localized(product.shortDescFr ?? "", product.shortDescAr, currentLocale);
   const categoryName = localized(product.category.nameFr, product.category.nameAr, currentLocale);
@@ -55,20 +46,6 @@ export default async function ProductPage({ params }: PageProps<"/[locale]/produ
             </span>
           </div>
 
-          <div className="flex items-baseline gap-3 mt-4">
-            <span className="font-display text-3xl font-extrabold">{dh(product.promoPrice ?? product.price)}</span>
-            {hasPromo && (
-              <>
-                <span className="text-lg text-muted-foreground line-through">{dh(product.price)}</span>
-                <Badge variant="cta">-{Math.round((1 - Number(product.promoPrice) / Number(product.price)) * 100)}%</Badge>
-              </>
-            )}
-          </div>
-
-          <p className="mt-3 text-sm font-bold" style={{ color: product.available <= 0 ? "var(--destructive)" : product.available <= 3 ? "var(--brand-warning)" : "var(--brand-success)" }}>
-            {stockLabel}
-          </p>
-
           {shortDesc && <p className="mt-4 text-sm text-muted-foreground">{shortDesc}</p>}
           {product.ageMin != null && (
             <p className="mt-3 text-sm">
@@ -76,21 +53,8 @@ export default async function ProductPage({ params }: PageProps<"/[locale]/produ
             </p>
           )}
 
-          <div className="mt-6 flex items-center gap-2.5 fixed inset-x-4 bottom-20 z-30 md:static md:inset-auto bg-card md:bg-transparent rounded-2xl md:rounded-none border md:border-0 border-border p-3 md:p-0 shadow-lg md:shadow-none">
-            <WishlistButton
-              productId={product.id}
-              className="inline-flex size-10 items-center justify-center rounded-full border-[1.5px] border-border bg-transparent text-foreground hover:bg-secondary transition-colors"
-            />
-            {product.available <= 0 ? (
-              <Button variant="cta" className="flex-1" disabled>
-                {t("unavailable")}
-              </Button>
-            ) : (
-              <AddToCartButton productId={product.id} className="flex-1 px-5 py-2.5 text-sm font-bold">
-                {t("addToCartPrice", { price: dh(product.promoPrice ?? product.price) })}
-              </AddToCartButton>
-            )}
-          </div>
+          <ProductPurchasePanel product={product} />
+
           <Button variant="ghost" size="sm" className="mt-2.5">
             <Share2 className="size-4" /> {t("share")}
           </Button>

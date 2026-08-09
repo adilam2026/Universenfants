@@ -9,11 +9,13 @@ import { cn } from "@/lib/utils";
 
 export function AddToCartButton({
   productId,
+  variantId,
   disabled,
   className,
   children,
 }: {
   productId: string;
+  variantId?: string;
   disabled?: boolean;
   className?: string;
   children?: React.ReactNode;
@@ -25,7 +27,7 @@ export function AddToCartButton({
     if (disabled || state === "loading") return;
     setState("loading");
     try {
-      await addToCart(productId, 1);
+      await addToCart(productId, 1, variantId);
       broadcastCartUpdate();
       setState("done");
       setTimeout(() => setState("idle"), 1200);

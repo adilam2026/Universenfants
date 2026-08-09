@@ -7,6 +7,26 @@ export interface AdminProductImage {
   order: number;
 }
 
+export interface AdminProductVariant {
+  id: string;
+  sku: string;
+  label: string;
+  price: string | null;
+  costPrice: string | null;
+  stock: number;
+  reservedStock: number;
+  image: string | null;
+}
+
+export interface VariantPayload {
+  sku: string;
+  label: string;
+  price?: number;
+  costPrice?: number;
+  stock?: number;
+  image?: string;
+}
+
 export interface AdminProduct {
   id: string;
   sku: string;
@@ -33,6 +53,7 @@ export interface AdminProduct {
   category: { id: string; nameFr: string };
   brand: { id: string; name: string } | null;
   images: AdminProductImage[];
+  variants: AdminProductVariant[];
 }
 
 export interface UpsertProductPayload {
@@ -105,3 +126,12 @@ export const removeProductImage = (productId: string, imageId: string) =>
 
 export const reorderProductImages = (productId: string, imageIds: string[]) =>
   apiFetch<AdminProductImage[]>(`/products/${productId}/images/reorder`, { method: "PATCH", body: JSON.stringify({ imageIds }) });
+
+export const createVariant = (productId: string, payload: VariantPayload) =>
+  apiFetch<AdminProductVariant[]>(`/products/${productId}/variants`, { method: "POST", body: JSON.stringify(payload) });
+
+export const updateVariant = (productId: string, variantId: string, payload: VariantPayload) =>
+  apiFetch<AdminProductVariant[]>(`/products/${productId}/variants/${variantId}`, { method: "PATCH", body: JSON.stringify(payload) });
+
+export const removeVariant = (productId: string, variantId: string) =>
+  apiFetch<AdminProductVariant[]>(`/products/${productId}/variants/${variantId}`, { method: "DELETE" });

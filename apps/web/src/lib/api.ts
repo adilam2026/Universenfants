@@ -48,7 +48,7 @@ export interface ProductDetail extends ProductSummary {
   shortDescAr: string | null;
   longDescFr: string | null;
   longDescAr: string | null;
-  variants: { id: string; label: string; price: string | null; stock: number }[];
+  variants: { id: string; sku: string; label: string; price: string | null; stock: number; available: number; image: string | null }[];
   reviews: { id: string; rating: number; comment: string | null; createdAt: string }[];
   avgRating: number | null;
 }

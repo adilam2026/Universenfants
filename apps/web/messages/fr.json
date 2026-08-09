@@ -124,6 +124,7 @@
   },
   "product": {
     "sku": "SKU",
+    "variant": "Choisir une option",
     "addToCart": "Ajouter au panier",
     "addToCartPrice": "Ajouter au panier — {price}",
     "unavailable": "Indisponible",

@@ -7,6 +7,7 @@ import { ImageService } from "../../storage/image.service";
 import type { QueryProductsDto } from "./dto/query-products.dto";
 import type { UpsertProductDto } from "./dto/upsert-product.dto";
 import type { AdjustStockDto } from "./dto/adjust-stock.dto";
+import type { UpsertVariantDto } from "./dto/upsert-variant.dto";
 
 interface ImportRow {
   SKU?: unknown;
@@ -140,7 +141,8 @@ export class ProductsService {
         ? product.reviews.reduce((s, r) => s + r.rating, 0) / product.reviews.length
         : null;
 
-    return { ...this.toPublicShape(product), variants: product.variants, reviews: product.reviews, avgRating };
+    const variants = product.variants.map((v) => this.toPublicShape(v));
+    return { ...this.toPublicShape(product), variants, reviews: product.reviews, avgRating };
   }
 
   /** Ne renvoie jamais costPrice/reservedStock au Front — marge = donnée interne. */
@@ -479,5 +481,34 @@ export class ProductsService {
       ),
     );
     return this.prisma.productImage.findMany({ where: { productId }, orderBy: { order: "asc" } });
+  }
+
+  // ------------------------------------------------------------------
+  // Variantes produit (taille, couleur, ...)
+  // ------------------------------------------------------------------
+
+  async addVariant(productId: string, dto: UpsertVariantDto) {
+    const product = await this.prisma.product.findUnique({ where: { id: productId } });
+    if (!product) throw new NotFoundException("Produit introuvable");
+    await this.prisma.productVariant.create({ data: { productId, ...dto } });
+    return this.prisma.productVariant.findMany({ where: { productId } });
+  }
+
+  async updateVariant(productId: string, variantId: string, dto: UpsertVariantDto) {
+    const variant = await this.prisma.productVariant.findFirst({ where: { id: variantId, productId } });
+    if (!variant) throw new NotFoundException("Variante introuvable");
+    await this.prisma.productVariant.update({ where: { id: variantId }, data: dto });
+    return this.prisma.productVariant.findMany({ where: { productId } });
+  }
+
+  async removeVariant(productId: string, variantId: string) {
+    const variant = await this.prisma.productVariant.findFirst({ where: { id: variantId, productId } });
+    if (!variant) throw new NotFoundException("Variante introuvable");
+    const soldCount = await this.prisma.orderLine.count({ where: { variantId } });
+    if (soldCount > 0) {
+      throw new BadRequestException("Impossible de supprimer une variante déjà présente dans des commandes");
+    }
+    await this.prisma.productVariant.delete({ where: { id: variantId } });
+    return this.prisma.productVariant.findMany({ where: { productId } });
   }
 }

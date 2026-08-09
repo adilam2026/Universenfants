@@ -124,6 +124,7 @@
   },
   "product": {
     "sku": "المرجع",
+    "variant": "اختر خيارًا",
     "addToCart": "أضف إلى السلة",
     "addToCartPrice": "أضف إلى السلة — {price}",
     "unavailable": "غير متوفر",

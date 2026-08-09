@@ -12,6 +12,7 @@ import { ProductsService } from "./products.service";
 import { QueryProductsDto } from "./dto/query-products.dto";
 import { UpsertProductDto } from "./dto/upsert-product.dto";
 import { AdjustStockDto } from "./dto/adjust-stock.dto";
+import { UpsertVariantDto } from "./dto/upsert-variant.dto";
 
 @ApiTags("catalog")
 @Controller("products")
@@ -108,5 +109,26 @@ export class ProductsController {
   @RequirePermissions(PermissionCode.PRODUCT_UPDATE)
   reorderImages(@Param("id") id: string, @Body() body: { imageIds: string[] }) {
     return this.service.reorderImages(id, body.imageIds);
+  }
+
+  @Post(":id/variants")
+  @UseGuards(JwtAuthGuard, StaffGuard, PermissionsGuard)
+  @RequirePermissions(PermissionCode.PRODUCT_UPDATE)
+  addVariant(@Param("id") id: string, @Body() dto: UpsertVariantDto) {
+    return this.service.addVariant(id, dto);
+  }
+
+  @Patch(":id/variants/:variantId")
+  @UseGuards(JwtAuthGuard, StaffGuard, PermissionsGuard)
+  @RequirePermissions(PermissionCode.PRODUCT_UPDATE)
+  updateVariant(@Param("id") id: string, @Param("variantId") variantId: string, @Body() dto: UpsertVariantDto) {
+    return this.service.updateVariant(id, variantId, dto);
+  }
+
+  @Delete(":id/variants/:variantId")
+  @UseGuards(JwtAuthGuard, StaffGuard, PermissionsGuard)
+  @RequirePermissions(PermissionCode.PRODUCT_UPDATE)
+  removeVariant(@Param("id") id: string, @Param("variantId") variantId: string) {
+    return this.service.removeVariant(id, variantId);
   }
 }
