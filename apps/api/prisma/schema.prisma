@@ -849,3 +849,20 @@ model EmailTemplate {
   subject String
   active  Boolean @default(true)
 }
+
+// Suivi côté serveur des refresh tokens émis (customer et staff) : un JWT
+// seul ne peut jamais être révoqué avant sa propre expiration (30j) — sans
+// cette table, ni la rotation ni une déconnexion ne peuvent réellement
+// invalider un refresh token compromis, et un vol de token reste indétectable.
+model RefreshToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  kind      String // "customer" | "staff"
+  subjectId String // Customer.id ou StaffUser.id selon `kind`
+  revokedAt DateTime?
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+
+  @@index([subjectId, kind])
+  @@index([expiresAt])
+}

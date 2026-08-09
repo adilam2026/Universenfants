@@ -153,3 +153,21 @@ export async function staffLogin(email: string, password: string) {
   setSession(data.accessToken, data.user, data.refreshToken);
   return data.user;
 }
+
+/** Révoque le refresh token côté serveur avant de nettoyer le stockage local
+ * — sans ça, un refresh token intercepté reste utilisable jusqu'à sa propre
+ * expiration (30j) même après que le membre du staff se soit "déconnecté".
+ * L'appel réseau est fire-and-forget (best-effort) : le nettoyage local, lui,
+ * doit rester instantané et ne pas attendre un aller-retour réseau. */
+export function staffLogout() {
+  const refreshToken = getStaffRefreshToken();
+  if (refreshToken) {
+    fetch(`${API_URL}/auth/staff/logout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refreshToken }),
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    }).catch(() => undefined);
+  }
+  clearSession();
+}

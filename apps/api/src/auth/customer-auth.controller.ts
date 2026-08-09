@@ -48,6 +48,12 @@ export class CustomerAuthController {
     return this.service.refresh(dto.refreshToken);
   }
 
+  @Post("logout")
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  logout(@Body() dto: RefreshTokenDto) {
+    return this.service.logout(dto.refreshToken);
+  }
+
   @Get("me")
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, CustomerGuard)

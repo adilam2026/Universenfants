@@ -19,7 +19,7 @@ import {
   LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { clearSession, getStaffToken } from "@/lib/api-client";
+import { staffLogout, getStaffToken } from "@/lib/api-client";
 import { useStaffUser } from "@/hooks/use-staff-user";
 
 const NAV = [
@@ -124,7 +124,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               <p className="text-[11px] text-muted-foreground truncate">{user?.role}</p>
             </div>
             <button
-              onClick={() => { clearSession(); router.replace("/login"); }}
+              onClick={() => { staffLogout(); router.replace("/login"); }}
               className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-secondary hover:text-destructive"
               aria-label="Déconnexion"
             >

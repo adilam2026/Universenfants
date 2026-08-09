@@ -1,10 +1,12 @@
 import { Inject, Injectable, UnauthorizedException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
+import { randomBytes } from "node:crypto";
 import type { Request } from "express";
 import type Redis from "ioredis";
 import { PrismaService } from "../prisma/prisma.service";
 import { REDIS_CLIENT } from "../redis/redis.module";
 import { verifyPassword } from "./password.util";
+import { hashRefreshToken } from "./refresh-token.util";
 import type { StaffLoginDto } from "./dto/staff-login.dto";
 import type { JwtPayload } from "./types";
 
@@ -63,7 +65,14 @@ export class StaffAuthService {
 
   /** Émet un nouveau couple de tokens à partir d'un refresh token valide —
    * sans ça, les sessions expirent brutalement après JWT_ACCESS_EXPIRES_IN
-   * (15 min par défaut) puisque l'access token n'est jamais renouvelé. */
+   * (15 min par défaut) puisque l'access token n'est jamais renouvelé.
+   *
+   * Le token est à usage unique (révoqué en base dès qu'il est consommé) :
+   * s'il est présenté une seconde fois, c'est qu'il a été volé et rejoué (ou
+   * qu'un refresh concurrent a déjà tourné) — on révoque alors toutes les
+   * sessions actives de ce compte, particulièrement sensible côté staff
+   * (accès Back-Office) plutôt que de faire confiance à un JWT dont la seule
+   * validité cryptographique ne suffit plus. */
   async refresh(refreshToken: string) {
     let payload: JwtPayload;
     try {
@@ -76,31 +85,63 @@ export class StaffAuthService {
     }
     if (payload.kind !== "staff") throw new UnauthorizedException("Token invalide");
 
+    const tokenHash = hashRefreshToken(refreshToken);
+    const stored = await this.prisma.refreshToken.findUnique({ where: { tokenHash } });
+    if (!stored) throw new UnauthorizedException("Session expirée, merci de vous reconnecter");
+    if (stored.revokedAt) {
+      await this.prisma.refreshToken.updateMany({
+        where: { subjectId: payload.sub, kind: "staff", revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      throw new UnauthorizedException("Session invalide — toutes vos sessions ont été déconnectées par sécurité");
+    }
+    await this.prisma.refreshToken.update({ where: { id: stored.id }, data: { revokedAt: new Date() } });
+
     const staff = await this.prisma.staffUser.findUnique({ where: { id: payload.sub }, include: { role: true } });
     if (!staff?.active) throw new UnauthorizedException("Compte introuvable ou désactivé");
 
     return this.issueTokens(staff);
   }
 
-  private issueTokens(staff: { id: string; name: string; email: string; role: { code: string } }) {
+  /** Révocation explicite à la déconnexion — sans ça, un refresh token
+   * intercepté reste utilisable jusqu'à sa propre expiration (30j) même
+   * après que le membre du staff se soit "déconnecté" côté client. */
+  async logout(refreshToken: string) {
+    await this.prisma.refreshToken
+      .update({ where: { tokenHash: hashRefreshToken(refreshToken) }, data: { revokedAt: new Date() } })
+      .catch(() => undefined);
+    return { ok: true };
+  }
+
+  private async issueTokens(staff: { id: string; name: string; email: string; role: { code: string } }) {
     const payload: JwtPayload = {
       sub: staff.id,
       kind: "staff",
       email: staff.email,
       roleCode: staff.role.code,
+      jti: randomBytes(16).toString("hex"),
     };
-    return {
-      accessToken: this.jwt.sign(payload, {
-        secret: process.env.JWT_ACCESS_SECRET,
-        expiresIn: process.env.JWT_ACCESS_EXPIRES_IN ?? "15m",
-        algorithm: "HS256",
-      }),
-      refreshToken: this.jwt.sign(payload, {
-        secret: process.env.JWT_REFRESH_SECRET,
-        expiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? "30d",
-        algorithm: "HS256",
-      }),
-      user: { id: staff.id, name: staff.name, email: staff.email, role: staff.role.code },
-    };
+    const accessToken = this.jwt.sign(payload, {
+      secret: process.env.JWT_ACCESS_SECRET,
+      expiresIn: process.env.JWT_ACCESS_EXPIRES_IN ?? "15m",
+      algorithm: "HS256",
+    });
+    const refreshToken = this.jwt.sign(payload, {
+      secret: process.env.JWT_REFRESH_SECRET,
+      expiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? "30d",
+      algorithm: "HS256",
+    });
+
+    const decoded = this.jwt.decode<{ exp: number }>(refreshToken);
+    await this.prisma.refreshToken.create({
+      data: {
+        tokenHash: hashRefreshToken(refreshToken),
+        kind: "staff",
+        subjectId: staff.id,
+        expiresAt: new Date(decoded.exp * 1000),
+      },
+    });
+
+    return { accessToken, refreshToken, user: { id: staff.id, name: staff.name, email: staff.email, role: staff.role.code } };
   }
 }

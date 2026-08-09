@@ -2,6 +2,7 @@
 
 import {
   getCustomerToken,
+  getCustomerRefreshToken,
   setCustomerToken,
   clearCustomerToken,
   refreshCustomerAccessToken,
@@ -13,7 +14,12 @@ const FETCH_TIMEOUT_MS = 10_000;
 
 // Jamais de tentative de refresh sur ces routes : un 401 y est une réponse
 // normale (identifiants invalides), pas une expiration de session.
-const NO_REFRESH_PATHS = ["/auth/customer/login", "/auth/customer/register", "/auth/customer/refresh"];
+const NO_REFRESH_PATHS = [
+  "/auth/customer/login",
+  "/auth/customer/register",
+  "/auth/customer/refresh",
+  "/auth/customer/logout",
+];
 
 export interface CustomerProfile {
   id: string;
@@ -84,7 +90,16 @@ export async function login(payload: LoginPayload) {
   return accessToken;
 }
 
+/** Révoque le refresh token côté serveur avant de nettoyer le stockage local
+ * — sans ça, un refresh token intercepté (XSS, extension malveillante...)
+ * reste utilisable jusqu'à sa propre expiration (30j) même après que le
+ * client se soit "déconnecté". Best-effort : on nettoie le stockage local
+ * dans tous les cas, même si l'appel réseau échoue. */
 export function logout() {
+  const refreshToken = getCustomerRefreshToken();
+  if (refreshToken) {
+    authFetch("/auth/customer/logout", { method: "POST", body: JSON.stringify({ refreshToken }) }).catch(() => undefined);
+  }
   clearCustomerToken();
 }
 

@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
 import { PrismaService } from "../prisma/prisma.service";
 import { EmailService } from "../email/email.service";
 import { hashPassword, verifyPassword, detectIdentifierKind } from "./password.util";
+import { hashRefreshToken } from "./refresh-token.util";
 import type { RegisterCustomerDto } from "./dto/register-customer.dto";
 import type { LoginDto } from "./dto/login.dto";
 import type { ForgotPasswordDto } from "./dto/forgot-password.dto";
@@ -83,7 +84,13 @@ export class CustomerAuthService {
 
   /** Émet un nouveau couple de tokens à partir d'un refresh token valide —
    * sans ça, les sessions expirent brutalement après JWT_ACCESS_EXPIRES_IN
-   * (15 min par défaut) puisque l'access token n'est jamais renouvelé. */
+   * (15 min par défaut) puisque l'access token n'est jamais renouvelé.
+   *
+   * Le token est à usage unique (révoqué en base dès qu'il est consommé) :
+   * s'il est présenté une seconde fois, c'est qu'il a été volé et rejoué (ou
+   * qu'un refresh concurrent a déjà tourné) — on révoque alors toutes les
+   * sessions actives de ce compte plutôt que de faire confiance à un JWT
+   * dont la seule validité cryptographique ne suffit plus. */
   async refresh(refreshToken: string) {
     let payload: JwtPayload;
     try {
@@ -96,10 +103,32 @@ export class CustomerAuthService {
     }
     if (payload.kind !== "customer") throw new UnauthorizedException("Token invalide");
 
+    const tokenHash = hashRefreshToken(refreshToken);
+    const stored = await this.prisma.refreshToken.findUnique({ where: { tokenHash } });
+    if (!stored) throw new UnauthorizedException("Session expirée, merci de vous reconnecter");
+    if (stored.revokedAt) {
+      await this.prisma.refreshToken.updateMany({
+        where: { subjectId: payload.sub, kind: "customer", revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      throw new UnauthorizedException("Session invalide — toutes vos sessions ont été déconnectées par sécurité");
+    }
+    await this.prisma.refreshToken.update({ where: { id: stored.id }, data: { revokedAt: new Date() } });
+
     const customer = await this.prisma.customer.findUnique({ where: { id: payload.sub } });
     if (!customer) throw new UnauthorizedException("Compte introuvable");
 
     return this.issueTokens(customer.id, customer.email);
+  }
+
+  /** Révocation explicite à la déconnexion — sans ça, un refresh token
+   * intercepté reste utilisable jusqu'à sa propre expiration (30j) même
+   * après que l'utilisateur se soit "déconnecté" côté client. */
+  async logout(refreshToken: string) {
+    await this.prisma.refreshToken
+      .update({ where: { tokenHash: hashRefreshToken(refreshToken) }, data: { revokedAt: new Date() } })
+      .catch(() => undefined);
+    return { ok: true };
   }
 
   async me(customerId: string) {
@@ -149,19 +178,29 @@ export class CustomerAuthService {
     return { ok: true };
   }
 
-  private issueTokens(customerId: string, email?: string | null) {
-    const payload: JwtPayload = { sub: customerId, kind: "customer", email };
-    return {
-      accessToken: this.jwt.sign(payload, {
-        secret: process.env.JWT_ACCESS_SECRET,
-        expiresIn: process.env.JWT_ACCESS_EXPIRES_IN ?? "15m",
-        algorithm: "HS256",
-      }),
-      refreshToken: this.jwt.sign(payload, {
-        secret: process.env.JWT_REFRESH_SECRET,
-        expiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? "30d",
-        algorithm: "HS256",
-      }),
-    };
+  private async issueTokens(customerId: string, email?: string | null) {
+    const payload: JwtPayload = { sub: customerId, kind: "customer", email, jti: randomBytes(16).toString("hex") };
+    const accessToken = this.jwt.sign(payload, {
+      secret: process.env.JWT_ACCESS_SECRET,
+      expiresIn: process.env.JWT_ACCESS_EXPIRES_IN ?? "15m",
+      algorithm: "HS256",
+    });
+    const refreshToken = this.jwt.sign(payload, {
+      secret: process.env.JWT_REFRESH_SECRET,
+      expiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? "30d",
+      algorithm: "HS256",
+    });
+
+    const decoded = this.jwt.decode<{ exp: number }>(refreshToken);
+    await this.prisma.refreshToken.create({
+      data: {
+        tokenHash: hashRefreshToken(refreshToken),
+        kind: "customer",
+        subjectId: customerId,
+        expiresAt: new Date(decoded.exp * 1000),
+      },
+    });
+
+    return { accessToken, refreshToken };
   }
 }

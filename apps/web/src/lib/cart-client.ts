@@ -23,7 +23,7 @@ export function getCustomerToken(): string | null {
   return window.localStorage.getItem(AUTH_KEY);
 }
 
-function getCustomerRefreshToken(): string | null {
+export function getCustomerRefreshToken(): string | null {
   if (typeof window === "undefined") return null;
   return window.localStorage.getItem(REFRESH_KEY);
 }
