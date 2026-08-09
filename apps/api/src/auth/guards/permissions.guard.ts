@@ -4,6 +4,7 @@ import type { Request } from "express";
 import type { PermissionCode } from "@universenfants/shared";
 import { PrismaService } from "../../prisma/prisma.service";
 import { PERMISSIONS_KEY } from "../decorators/require-permissions.decorator";
+import { resolveStaffPermissions } from "../staff-permissions.util";
 import type { RequestUser } from "../types";
 
 /**
@@ -31,26 +32,13 @@ export class PermissionsGuard implements CanActivate {
       throw new ForbiddenException("Accès réservé au Back-Office");
     }
 
-    const staff = await this.prisma.staffUser.findUnique({
-      where: { id: user.sub },
-      include: {
-        role: { include: { permissions: { include: { permission: true } } } },
-        extraPermissions: { include: { permission: true } },
-      },
-    });
-    if (!staff || !staff.active) {
+    const resolved = await resolveStaffPermissions(this.prisma, user.sub);
+    if (!resolved) {
       throw new ForbiddenException("Compte désactivé");
     }
+    if (resolved.roleCode === "SUPER_ADMIN") return true;
 
-    // SUPER_ADMIN a toujours accès total (§172).
-    if (staff.role.code === "SUPER_ADMIN") return true;
-
-    const granted = new Set(staff.role.permissions.map((rp) => rp.permission.code));
-    for (const extra of staff.extraPermissions) {
-      if (extra.granted) granted.add(extra.permission.code);
-      else granted.delete(extra.permission.code);
-    }
-
+    const granted = new Set(resolved.permissions);
     const missing = required.filter((code) => !granted.has(code));
     if (missing.length > 0) {
       throw new ForbiddenException(`Permission(s) manquante(s) : ${missing.join(", ")}`);

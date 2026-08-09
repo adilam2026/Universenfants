@@ -13,6 +13,7 @@ export interface StaffUser {
   name: string;
   email: string;
   role: string;
+  permissions: string[];
 }
 
 export function getStaffToken(): string | null {

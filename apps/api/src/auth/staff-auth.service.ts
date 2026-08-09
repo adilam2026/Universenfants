@@ -7,6 +7,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { REDIS_CLIENT } from "../redis/redis.module";
 import { verifyPassword } from "./password.util";
 import { hashRefreshToken } from "./refresh-token.util";
+import { resolveStaffPermissions } from "./staff-permissions.util";
 import type { StaffLoginDto } from "./dto/staff-login.dto";
 import type { JwtPayload } from "./types";
 
@@ -153,6 +154,24 @@ export class StaffAuthService {
       },
     });
 
-    return { accessToken, refreshToken, user: { id: staff.id, name: staff.name, email: staff.email, role: staff.role.code } };
+    // Le Front n'avait aucun moyen de savoir ce qu'un membre du staff peut
+    // réellement faire : la sidebar affichait tous les modules à tout le
+    // monde, et seule la soumission finale révélait un 403. On expose donc
+    // l'ensemble de permissions déjà calculé côté serveur (PermissionsGuard)
+    // pour que l'UI puisse masquer/désactiver en conséquence — la vérification
+    // serveur reste la seule source de vérité, ceci n'est qu'un reflet pour l'affichage.
+    const resolved = await resolveStaffPermissions(this.prisma, staff.id);
+
+    return {
+      accessToken,
+      refreshToken,
+      user: {
+        id: staff.id,
+        name: staff.name,
+        email: staff.email,
+        role: staff.role.code,
+        permissions: resolved?.permissions ?? [],
+      },
+    };
   }
 }

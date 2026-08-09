@@ -7,8 +7,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getSettings, updateSettings, type AdminSettings } from "@/lib/settings";
 import { ApiError } from "@/lib/api-client";
+import { useStaffUser } from "@/hooks/use-staff-user";
 
 export default function SettingsPage() {
+  const user = useStaffUser();
+  // La lecture (GET /settings) n'est pas restreinte par rôle — seule la
+  // sauvegarde l'est côté API (SETTINGS_MANAGE). Sans ce contrôle ici, un
+  // membre du staff sans ce droit pouvait remplir tout le formulaire et ne
+  // découvrir le refus qu'à la soumission.
+  const canManage = (user?.permissions ?? []).includes("settings.manage");
   const [settings, setSettings] = useState<AdminSettings | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -49,24 +56,33 @@ export default function SettingsPage() {
       <Card className="max-w-lg">
         <CardHeader><CardTitle>Paramètres globaux</CardTitle></CardHeader>
         <CardContent>
+          {!canManage && (
+            <p className="text-xs rounded-lg bg-secondary p-2.5 mb-3.5">
+              Lecture seule : votre rôle ne vous permet pas de modifier les paramètres.
+            </p>
+          )}
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="vatRate">Taux de TVA (%)</Label>
-              <Input id="vatRate" name="vatRate" type="number" step="0.1" min={0} max={100} defaultValue={settings.vatRate * 100} />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="loyaltyRedeemRate">Points fidélité requis pour 1 DH de réduction</Label>
-              <Input id="loyaltyRedeemRate" name="loyaltyRedeemRate" type="number" min={1} defaultValue={settings.loyaltyRedeemRate} />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="freeShippingThreshold">Seuil de livraison gratuite global (DH)</Label>
-              <Input id="freeShippingThreshold" name="freeShippingThreshold" type="number" min={0} defaultValue={settings.freeShippingThreshold} />
-              <p className="text-xs text-muted-foreground">S&apos;applique aux villes sans seuil spécifique (voir Livraison).</p>
-            </div>
+            <fieldset disabled={!canManage} className="contents">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="vatRate">Taux de TVA (%)</Label>
+                <Input id="vatRate" name="vatRate" type="number" step="0.1" min={0} max={100} defaultValue={settings.vatRate * 100} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="loyaltyRedeemRate">Points fidélité requis pour 1 DH de réduction</Label>
+                <Input id="loyaltyRedeemRate" name="loyaltyRedeemRate" type="number" min={1} defaultValue={settings.loyaltyRedeemRate} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="freeShippingThreshold">Seuil de livraison gratuite global (DH)</Label>
+                <Input id="freeShippingThreshold" name="freeShippingThreshold" type="number" min={0} defaultValue={settings.freeShippingThreshold} />
+                <p className="text-xs text-muted-foreground">S&apos;applique aux villes sans seuil spécifique (voir Livraison).</p>
+              </div>
+            </fieldset>
             {error && <p className="text-sm text-destructive">{error}</p>}
-            <Button type="submit" disabled={submitting}>
-              {submitting ? "Enregistrement…" : saved ? "Enregistré ✓" : "Enregistrer"}
-            </Button>
+            {canManage && (
+              <Button type="submit" disabled={submitting}>
+                {submitting ? "Enregistrement…" : saved ? "Enregistré ✓" : "Enregistrer"}
+              </Button>
+            )}
           </form>
         </CardContent>
       </Card>
