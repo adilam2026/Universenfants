@@ -124,7 +124,9 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             <span>{t("totalTtc")}</span>
             <span>{dh(order.total)}</span>
           </div>
-          <p className="text-[11px] text-muted-foreground text-right">{t("vatIncluded", { amount: dh(order.vatAmount) })}</p>
+          <p className="text-[11px] text-muted-foreground text-right">
+            {t("vatIncluded", { rate: Math.round(Number(order.vatRate) * 100), amount: dh(order.vatAmount) })}
+          </p>
         </div>
       </div>
 

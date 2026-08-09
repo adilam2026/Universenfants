@@ -159,6 +159,7 @@ export interface OrderDetail extends OrderSummary {
   shippingFee: string;
   discount: string;
   loyaltyDiscount: string;
+  vatRate: string;
   vatAmount: string;
   shippingCity: string;
   shippingAddress: string;

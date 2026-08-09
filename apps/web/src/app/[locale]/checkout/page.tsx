@@ -3,12 +3,11 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useTranslations } from "next-intl";
 import { useCart, broadcastCartUpdate } from "@/hooks/use-cart";
+import { useStoreSettings } from "@/hooks/use-store-settings";
 import { checkout } from "@/lib/cart-client";
 import { isLoggedIn, me, type CustomerProfile } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "@/i18n/navigation";
-
-const CITIES = ["Casablanca", "Rabat", "Marrakech", "Fès", "Tanger", "Agadir"];
 
 function dh(value: number) {
   return `${value.toLocaleString("fr-FR")} DH`;
@@ -17,11 +16,13 @@ function dh(value: number) {
 export default function CheckoutPage() {
   const t = useTranslations("checkout");
   const { cart, loading } = useCart();
+  const storeSettings = useStoreSettings();
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [profile, setProfile] = useState<CustomerProfile | null>(null);
   const [useLoyaltyPoints, setUseLoyaltyPoints] = useState(false);
+  const [selectedCity, setSelectedCity] = useState("");
 
   useEffect(() => {
     if (isLoggedIn()) me().then(setProfile).catch(() => undefined);
@@ -51,15 +52,20 @@ export default function CheckoutPage() {
     }
   }
 
-  if (loading) return <div className="mx-auto max-w-3xl px-4 py-16 text-center text-muted-foreground">{t("loading")}</div>;
+  if (loading || !storeSettings) return <div className="mx-auto max-w-3xl px-4 py-16 text-center text-muted-foreground">{t("loading")}</div>;
   if (!cart || cart.lines.length === 0) {
     return <div className="mx-auto max-w-3xl px-4 py-16 text-center text-muted-foreground">{t("empty")}</div>;
   }
 
-  const shipping = cart.subtotal >= 300 ? 0 : 25;
+  // Frais de port réels de la ville choisie (le "seuil de livraison offerte"
+  // peut lui-même varier par ville) — jamais un montant fixe codé en dur qui
+  // diverge du Back-Office et du montant réellement facturé au serveur.
+  const cityInfo = storeSettings.cities.find((c) => c.name === selectedCity) ?? null;
+  const shipping = cityInfo ? (cart.subtotal >= cityInfo.freeShippingFrom ? 0 : cityInfo.shippingFee) : 0;
   const maxLoyaltyDiscount = Math.max(0, cart.subtotal - cart.discount);
+  const loyaltyRate = storeSettings.settings.loyaltyRedeemRate;
   const loyaltyDiscount =
-    useLoyaltyPoints && profile ? Math.min(Math.floor(profile.loyaltyPoints / 10), maxLoyaltyDiscount) : 0;
+    useLoyaltyPoints && profile ? Math.min(Math.floor(profile.loyaltyPoints / loyaltyRate), maxLoyaltyDiscount) : 0;
   const total = Math.max(0, cart.subtotal - cart.discount - loyaltyDiscount + shipping);
 
   return (
@@ -76,11 +82,17 @@ export default function CheckoutPage() {
             <Field label={t("phone")} name="phone" required placeholder="06 XX XX XX XX" />
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-bold text-muted-foreground">{t("city")} *</label>
-              <select name="city" required className="rounded-lg border border-border px-3 py-2.5 text-sm">
+              <select
+                name="city"
+                required
+                value={selectedCity}
+                onChange={(e) => setSelectedCity(e.target.value)}
+                className="rounded-lg border border-border px-3 py-2.5 text-sm"
+              >
                 <option value="">{t("chooseCity")}</option>
-                {CITIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
+                {storeSettings.cities.map((c) => (
+                  <option key={c.name} value={c.name}>
+                    {c.name}
                   </option>
                 ))}
               </select>
@@ -108,6 +120,12 @@ export default function CheckoutPage() {
               </div>
             ))}
           </div>
+          {cityInfo && (
+            <div className="flex justify-between text-sm mt-2.5">
+              <span className="text-muted-foreground">{t("shipping")}</span>
+              <span>{shipping === 0 ? t("free") : dh(shipping)}</span>
+            </div>
+          )}
           {profile && profile.loyaltyPoints > 0 && (
             <label className="flex items-center gap-2.5 text-sm rounded-xl bg-secondary p-3 mt-3.5 cursor-pointer">
               <input
@@ -116,7 +134,7 @@ export default function CheckoutPage() {
                 onChange={(e) => setUseLoyaltyPoints(e.target.checked)}
                 className="size-4"
               />
-              {t("useLoyaltyPoints", { n: profile.loyaltyPoints, amount: dh(Math.round(profile.loyaltyPoints / 10)) })}
+              {t("useLoyaltyPoints", { n: profile.loyaltyPoints, amount: dh(Math.round(profile.loyaltyPoints / loyaltyRate)) })}
             </label>
           )}
           {loyaltyDiscount > 0 && (

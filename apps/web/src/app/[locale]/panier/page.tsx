@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import Image from "next/image";
 import { Minus, Plus, Trash2, Share2, ShoppingBag } from "lucide-react";
 import { useCart, broadcastCartUpdate } from "@/hooks/use-cart";
+import { useStoreSettings } from "@/hooks/use-store-settings";
 import { updateCartLine, removeCartLine, applyCoupon, removeCoupon, shareCart } from "@/lib/cart-client";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
@@ -16,6 +17,7 @@ function dh(value: number) {
 export default function CartPage() {
   const t = useTranslations("cart");
   const { cart, loading, refresh } = useCart();
+  const storeSettings = useStoreSettings();
   const [couponInput, setCouponInput] = useState("");
   const [couponError, setCouponError] = useState<string | null>(null);
   const [shareLink, setShareLink] = useState<string | null>(null);
@@ -51,8 +53,14 @@ export default function CartPage() {
   if (loading) return <div className="mx-auto max-w-6xl px-4 py-16 text-center text-muted-foreground">…</div>;
 
   const isEmpty = !cart || cart.lines.length === 0;
-  const shipping = cart && cart.subtotal > 0 ? (cart.subtotal >= 300 ? 0 : 25) : 0;
-  const total = cart ? Math.max(0, cart.subtotal - cart.discount + shipping) : 0;
+  // Le seuil de livraison offerte réel (réglage Back-Office) — le frais de
+  // port exact dépend de la ville, pas encore choisie à ce stade, donc le
+  // total ici reste hors livraison plutôt que d'inclure une estimation
+  // fabriquée qui pourrait ne correspondre à aucune ville réelle.
+  const freeShippingThreshold = storeSettings?.settings.freeShippingThreshold ?? null;
+  const freeShipping = cart !== null && freeShippingThreshold !== null && cart.subtotal >= freeShippingThreshold;
+  const total = cart ? Math.max(0, cart.subtotal - cart.discount) : 0;
+  const vatRate = storeSettings?.settings.vatRate ?? null;
 
   return (
     <div className="mx-auto max-w-6xl px-4 md:px-7 py-4">
@@ -149,13 +157,17 @@ export default function CartPage() {
               )}
               <div className="flex justify-between">
                 <span className="text-muted-foreground">{t("shipping")}</span>
-                <span>{shipping === 0 ? t("free") : dh(shipping)}</span>
+                <span>{freeShipping ? t("free") : t("shippingTbd")}</span>
               </div>
               <div className="flex justify-between text-lg font-extrabold pt-2 border-t border-border">
                 <span>{t("total")}</span>
                 <span>{dh(total)}</span>
               </div>
-              <p className="text-[11px] text-muted-foreground text-right">{t("vatIncluded", { amount: dh(Math.round((total * 0.2) / 1.2)) })}</p>
+              {vatRate !== null && (
+                <p className="text-[11px] text-muted-foreground text-right">
+                  {t("vatIncluded", { rate: Math.round(vatRate * 100), amount: dh(Math.round(total - total / (1 + vatRate))) })}
+                </p>
+              )}
             </div>
             <Button asChild variant="cta" className="w-full mt-4">
               <Link href="/checkout">{t("checkout")}</Link>

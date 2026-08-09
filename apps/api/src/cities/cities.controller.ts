@@ -11,25 +11,38 @@ import { CitiesService } from "./cities.service";
 import { UpsertCityDto } from "./dto/upsert-city.dto";
 
 @ApiTags("cities")
-@ApiBearerAuth()
 @Controller("cities")
-@UseGuards(JwtAuthGuard, StaffGuard, PermissionsGuard)
 export class CitiesController {
   constructor(private readonly service: CitiesService) {}
 
+  // Public : villes réellement livrables (actives), avec frais de port —
+  // apps/web en a besoin pour le sélecteur de ville au checkout, sans quoi
+  // il retombe sur une liste codée en dur qui diverge du Back-Office dès
+  // qu'une ville est ajoutée/désactivée ou son tarif changé.
+  @Get("public")
+  listPublic() {
+    return this.service.listPublic();
+  }
+
   @Get()
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, StaffGuard, PermissionsGuard)
   @RequirePermissions(PermissionCode.SHIPPING_READ)
   list() {
     return this.service.list();
   }
 
   @Post()
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, StaffGuard, PermissionsGuard)
   @RequirePermissions(PermissionCode.SHIPPING_UPDATE)
   create(@Body() dto: UpsertCityDto, @CurrentUser() user: RequestUser) {
     return this.service.create(dto, user.sub);
   }
 
   @Patch(":id")
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, StaffGuard, PermissionsGuard)
   @RequirePermissions(PermissionCode.SHIPPING_UPDATE)
   update(@Param("id") id: string, @Body() dto: UpsertCityDto, @CurrentUser() user: RequestUser) {
     return this.service.update(id, dto, user.sub);

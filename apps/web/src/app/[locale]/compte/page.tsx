@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
 import { login, register, logout, me, type CustomerProfile } from "@/lib/auth-client";
 import { useIsLoggedIn } from "@/hooks/use-is-logged-in";
+import { useStoreSettings } from "@/hooks/use-store-settings";
 
 function dh(value: string | number) {
   return `${Number(value).toLocaleString("fr-FR")} DH`;
@@ -16,6 +17,8 @@ export default function AccountPage() {
   const t = useTranslations("account");
   const loggedIn = useIsLoggedIn();
   const [profile, setProfile] = useState<CustomerProfile | null>(null);
+  const storeSettings = useStoreSettings();
+  const loyaltyRate = storeSettings?.settings.loyaltyRedeemRate ?? null;
 
   useEffect(() => {
     if (loggedIn !== true) return;
@@ -40,7 +43,9 @@ export default function AccountPage() {
         <div>
           <span className="text-xs font-bold uppercase text-brand-highlight-foreground">{t("loyaltyProgram")}</span>
           <p className="font-display text-2xl font-extrabold mt-1">{t("points", { n: profile.loyaltyPoints })}</p>
-          <p className="text-xs text-muted-foreground">{t("discountAvailable", { amount: dh(Math.round(profile.loyaltyPoints / 10)) })}</p>
+          {loyaltyRate !== null && (
+            <p className="text-xs text-muted-foreground">{t("discountAvailable", { amount: dh(Math.round(profile.loyaltyPoints / loyaltyRate)) })}</p>
+          )}
         </div>
         <Button asChild>
           <Link href="/panier">{t("usePoints")}</Link>
