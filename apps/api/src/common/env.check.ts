@@ -40,4 +40,17 @@ export function assertRequiredEnv() {
   if (!process.env.SMTP_HOST) {
     Logger.warn("SMTP_HOST non défini — les emails transactionnels ne seront pas envoyés en production", "Bootstrap");
   }
+  // Contrairement à SENTRY_DSN/SMTP_HOST (dégradation sans perte de données),
+  // une R2 absente fait retomber sur le stockage disque local du conteneur —
+  // qui ne survit à AUCUN redéploiement. Toute image produit uploadée est
+  // alors perdue au prochain déploiement, silencieusement.
+  const r2Configured = Boolean(
+    process.env.R2_ACCOUNT_ID && process.env.R2_BUCKET && process.env.R2_ACCESS_KEY_ID && process.env.R2_SECRET_ACCESS_KEY && process.env.R2_PUBLIC_URL,
+  );
+  if (!r2Configured) {
+    Logger.warn(
+      "R2 non configuré — les images produit seront stockées sur le disque local du conteneur et PERDUES au prochain redéploiement",
+      "Bootstrap",
+    );
+  }
 }
