@@ -4,6 +4,7 @@ import { AppModule } from "../src/app.module";
 import { PrismaService } from "../src/prisma/prisma.service";
 import { CartService } from "../src/cart/cart.service";
 import { OrdersService } from "../src/orders/orders.service";
+import { ProductsService } from "../src/catalog/products/products.service";
 
 // Ces tests reproduisent en conditions réelles (vraie base Postgres, vraies
 // transactions, vrais verrous SELECT ... FOR UPDATE) les deux bugs de
@@ -16,6 +17,7 @@ describe("Checkout concurrency (e2e)", () => {
   let prisma: PrismaService;
   let cartService: CartService;
   let ordersService: OrdersService;
+  let productsService: ProductsService;
 
   let categoryId: string;
   let productId: string;
@@ -28,6 +30,7 @@ describe("Checkout concurrency (e2e)", () => {
     prisma = app.get(PrismaService);
     cartService = app.get(CartService);
     ordersService = app.get(OrdersService);
+    productsService = app.get(ProductsService);
 
     const city = await prisma.city.findFirst({ where: { active: true } });
     if (!city) throw new Error("Aucune ville active en base — lancer prisma:seed avant ce test");
@@ -144,5 +147,47 @@ describe("Checkout concurrency (e2e)", () => {
 
     await prisma.couponRedemption.deleteMany({ where: { couponId: coupon.id } });
     await prisma.coupon.delete({ where: { id: coupon.id } });
+  });
+
+  it("never loses updates under concurrent stock adjustments (SELECT ... FOR UPDATE)", async () => {
+    // Sans le verrou de ligne dans adjustStock(), N décréments concurrents
+    // lisant tous le même stock de départ produiraient un "lost update" :
+    // le stock final serait supérieur à stock_initial - N au lieu d'être
+    // exactement égal, chaque écriture écrasant la précédente au lieu de
+    // s'accumuler.
+    const product = await prisma.product.create({
+      data: {
+        sku: `CONC-STOCK-${Date.now()}`,
+        nameFr: "Produit test ajustement stock",
+        categoryId,
+        price: 100,
+        costPrice: 50,
+        seoUrl: `produit-test-stock-${Date.now()}`,
+        stock: 100,
+        status: "ACTIVE",
+      },
+    });
+    // staffUserId est une vraie FK vers StaffUser — on réutilise un compte
+    // existant (créé par le seed) plutôt qu'une valeur arbitraire.
+    const staff = await prisma.staffUser.findFirstOrThrow();
+
+    const concurrentAdjustments = 20;
+    const results = await Promise.allSettled(
+      Array.from({ length: concurrentAdjustments }, () =>
+        productsService.adjustStock(product.id, { delta: -1, reason: "INVENTORY_CORRECTION" }, staff.id),
+      ),
+    );
+
+    const fulfilled = results.filter((r) => r.status === "fulfilled");
+    expect(fulfilled).toHaveLength(concurrentAdjustments);
+
+    const updated = await prisma.product.findUniqueOrThrow({ where: { id: product.id } });
+    expect(updated.stock).toBe(100 - concurrentAdjustments);
+
+    const movements = await prisma.stockMovement.count({ where: { productId: product.id } });
+    expect(movements).toBe(concurrentAdjustments);
+
+    await prisma.stockMovement.deleteMany({ where: { productId: product.id } });
+    await prisma.product.delete({ where: { id: product.id } });
   });
 });
