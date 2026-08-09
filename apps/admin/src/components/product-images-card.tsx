@@ -35,7 +35,12 @@ export function ProductImagesCard({
     }
   }
 
-  async function handleRemove(imageId: string) {
+  async function handleRemove(imageId: string, index: number) {
+    // Aucune confirmation n'existait, y compris pour l'image de couverture
+    // (index 0) ou la dernière image restante — un clic malheureux laissait
+    // le produit sans aucune image, sans avertissement.
+    const label = index === 0 && images.length > 1 ? "l'image principale" : images.length === 1 ? "la seule image du produit" : "cette image";
+    if (!window.confirm(`Supprimer ${label} ? Cette action est irréversible.`)) return;
     try {
       const updated = await removeProductImage(productId, imageId);
       onChanged(updated);
@@ -45,6 +50,7 @@ export function ProductImagesCard({
   }
 
   async function move(index: number, direction: -1 | 1) {
+    const previous = images;
     const next = [...images];
     const target = index + direction;
     if (target < 0 || target >= next.length) return;
@@ -53,6 +59,10 @@ export function ProductImagesCard({
     try {
       await reorderProductImages(productId, next.map((i) => i.id));
     } catch (err) {
+      // Sans ce retour en arrière, un échec réseau laissait l'ordre affiché
+      // désynchronisé de l'ordre réel côté serveur jusqu'au prochain
+      // rechargement complet de la page.
+      onChanged(previous);
       setError(err instanceof Error ? err.message : "Une erreur est survenue");
     }
   }
@@ -71,7 +81,7 @@ export function ProductImagesCard({
                 <button type="button" onClick={() => move(i, -1)} disabled={i === 0} className="flex size-6 items-center justify-center rounded bg-white/90 text-foreground disabled:opacity-30">
                   <ArrowLeft className="size-3.5" />
                 </button>
-                <button type="button" onClick={() => handleRemove(img.id)} className="flex size-6 items-center justify-center rounded bg-white/90 text-destructive">
+                <button type="button" onClick={() => handleRemove(img.id, i)} className="flex size-6 items-center justify-center rounded bg-white/90 text-destructive">
                   <Trash2 className="size-3.5" />
                 </button>
                 <button type="button" onClick={() => move(i, 1)} disabled={i === images.length - 1} className="flex size-6 items-center justify-center rounded bg-white/90 text-foreground disabled:opacity-30">

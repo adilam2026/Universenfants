@@ -564,17 +564,25 @@ export class ProductsService {
     if (!product) throw new NotFoundException("Produit introuvable");
 
     const uploaded = await this.images.processAndUpload(buffer, `products/${productId}`);
-    const maxOrder = await this.prisma.productImage.aggregate({ where: { productId }, _max: { order: true } });
-
-    await this.prisma.productImage.create({
-      data: {
-        productId,
-        url: uploaded.url,
-        thumbnailUrl: uploaded.thumbnailUrl,
-        key: uploaded.key,
-        order: (maxOrder._max.order ?? -1) + 1,
-      },
-    });
+    try {
+      const maxOrder = await this.prisma.productImage.aggregate({ where: { productId }, _max: { order: true } });
+      await this.prisma.productImage.create({
+        data: {
+          productId,
+          url: uploaded.url,
+          thumbnailUrl: uploaded.thumbnailUrl,
+          key: uploaded.key,
+          order: (maxOrder._max.order ?? -1) + 1,
+        },
+      });
+    } catch (err) {
+      // Le fichier vient d'être uploadé avec succès (opération non
+      // transactionnelle avec la DB) — si l'insertion échoue ensuite, le
+      // fichier restait orphelin dans le stockage indéfiniment sans jamais
+      // être nettoyé.
+      await this.images.remove(uploaded.key).catch(() => undefined);
+      throw err;
+    }
     return this.prisma.productImage.findMany({ where: { productId }, orderBy: { order: "asc" } });
   }
 
