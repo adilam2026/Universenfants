@@ -150,6 +150,19 @@ export class CartService {
   async updateLine(cartId: string, lineId: string, dto: UpdateCartLineDto) {
     const line = await this.prisma.cartLine.findFirst({ where: { id: lineId, cartId } });
     if (!line) throw new NotFoundException("Ligne de panier introuvable");
+
+    // Rien ne bornait la quantité au stock réellement disponible ici — un
+    // client pouvait cliquer "+" au-delà du stock sans le moindre retour, et
+    // ne découvrait le problème qu'au moment du checkout (reserveStock).
+    // Autant le signaler immédiatement, au même niveau de granularité que le
+    // reste du panier (variante si sélectionnée, sinon produit).
+    const available = line.variantId
+      ? await this.prisma.productVariant.findUnique({ where: { id: line.variantId }, select: { stock: true, reservedStock: true } })
+      : await this.prisma.product.findUnique({ where: { id: line.productId }, select: { stock: true, reservedStock: true } });
+    if (!available || available.stock - available.reservedStock < dto.quantity) {
+      throw new BadRequestException("Stock insuffisant pour cette quantité");
+    }
+
     return this.prisma.cartLine.update({ where: { id: lineId }, data: { quantity: dto.quantity } });
   }
 

@@ -21,18 +21,43 @@ export default function CartPage() {
   const [couponInput, setCouponInput] = useState("");
   const [couponError, setCouponError] = useState<string | null>(null);
   const [shareLink, setShareLink] = useState<string | null>(null);
+  // Verrou par ligne : sans lui, deux clics rapides sur "+" partent tous les
+  // deux du même `current` (capturé au rendu précédent) avant que le premier
+  // n'ait rafraîchi le panier — un clic sur deux était silencieusement
+  // perdu. Bloquer les boutons de la ligne pendant la requête en cours
+  // garantit que `current` reflète toujours la vraie quantité au clic suivant.
+  const [pendingLineId, setPendingLineId] = useState<string | null>(null);
+  const [lineError, setLineError] = useState<{ lineId: string; message: string } | null>(null);
 
   async function changeQty(lineId: string, delta: number, current: number) {
+    if (pendingLineId) return;
     const next = Math.max(1, current + delta);
-    await updateCartLine(lineId, next);
-    broadcastCartUpdate();
-    refresh();
+    setPendingLineId(lineId);
+    setLineError(null);
+    try {
+      await updateCartLine(lineId, next);
+      broadcastCartUpdate();
+      refresh();
+    } catch (err) {
+      setLineError({ lineId, message: err instanceof Error ? err.message : "Une erreur est survenue" });
+    } finally {
+      setPendingLineId(null);
+    }
   }
 
   async function remove(lineId: string) {
-    await removeCartLine(lineId);
-    broadcastCartUpdate();
-    refresh();
+    if (pendingLineId) return;
+    setPendingLineId(lineId);
+    setLineError(null);
+    try {
+      await removeCartLine(lineId);
+      broadcastCartUpdate();
+      refresh();
+    } catch (err) {
+      setLineError({ lineId, message: err instanceof Error ? err.message : "Une erreur est survenue" });
+    } finally {
+      setPendingLineId(null);
+    }
   }
 
   async function handleCoupon() {
@@ -89,18 +114,33 @@ export default function CartPage() {
                     <p className="text-xs text-muted-foreground mt-0.5">{t("unitPrice", { price: dh(line.unitPrice) })}</p>
                     <div className="flex items-center gap-3 mt-2">
                       <div className="flex items-center rounded-full border border-border">
-                        <button onClick={() => changeQty(line.id, -1, line.quantity)} className="flex size-7 items-center justify-center" aria-label={t("decrease")}>
+                        <button
+                          onClick={() => changeQty(line.id, -1, line.quantity)}
+                          disabled={pendingLineId === line.id}
+                          className="flex size-7 items-center justify-center disabled:opacity-50"
+                          aria-label={t("decrease")}
+                        >
                           <Minus className="size-3.5" />
                         </button>
                         <span className="w-6 text-center text-sm font-bold">{line.quantity}</span>
-                        <button onClick={() => changeQty(line.id, 1, line.quantity)} className="flex size-7 items-center justify-center" aria-label={t("increase")}>
+                        <button
+                          onClick={() => changeQty(line.id, 1, line.quantity)}
+                          disabled={pendingLineId === line.id}
+                          className="flex size-7 items-center justify-center disabled:opacity-50"
+                          aria-label={t("increase")}
+                        >
                           <Plus className="size-3.5" />
                         </button>
                       </div>
-                      <button onClick={() => remove(line.id)} className="text-xs font-bold text-muted-foreground hover:text-destructive flex items-center gap-1">
+                      <button
+                        onClick={() => remove(line.id)}
+                        disabled={pendingLineId === line.id}
+                        className="text-xs font-bold text-muted-foreground hover:text-destructive flex items-center gap-1 disabled:opacity-50"
+                      >
                         <Trash2 className="size-3.5" /> {t("remove")}
                       </button>
                     </div>
+                    {lineError?.lineId === line.id && <p className="text-xs text-destructive mt-1.5">{lineError.message}</p>}
                   </div>
                   <span className="font-display font-extrabold text-sm">{dh(line.unitPrice * line.quantity)}</span>
                 </div>
