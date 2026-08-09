@@ -77,12 +77,13 @@ export default function CheckoutPage() {
         <section className="rounded-2xl border border-border bg-card p-4">
           <h3 className="font-bold mb-3.5">{t("step1")}</h3>
           <div className="grid sm:grid-cols-2 gap-3.5">
-            <Field label={t("lastName")} name="firstName" required placeholder="Salma" />
-            <Field label={t("firstName")} name="lastName" required placeholder="El Amrani" />
+            <Field label={t("firstName")} name="firstName" required placeholder="Salma" />
+            <Field label={t("lastName")} name="lastName" required placeholder="El Amrani" />
             <Field label={t("phone")} name="phone" required placeholder="06 XX XX XX XX" />
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold text-muted-foreground">{t("city")} *</label>
+              <label htmlFor="checkout-city" className="text-xs font-bold text-muted-foreground">{t("city")} *</label>
               <select
+                id="checkout-city"
                 name="city"
                 required
                 value={selectedCity}
@@ -102,8 +103,8 @@ export default function CheckoutPage() {
               <Field label={t("address")} name="addressLine" required placeholder={t("addressPlaceholder")} />
             </div>
             <div className="sm:col-span-2 flex flex-col gap-1.5">
-              <label className="text-xs font-bold text-muted-foreground">{t("comment")}</label>
-              <textarea name="comment" rows={2} className="rounded-lg border border-border px-3 py-2.5 text-sm" placeholder={t("commentPlaceholder")} />
+              <label htmlFor="checkout-comment" className="text-xs font-bold text-muted-foreground">{t("comment")}</label>
+              <textarea id="checkout-comment" name="comment" rows={2} className="rounded-lg border border-border px-3 py-2.5 text-sm" placeholder={t("commentPlaceholder")} />
             </div>
           </div>
         </section>
@@ -165,12 +166,13 @@ export default function CheckoutPage() {
 }
 
 function Field({ label, name, required, placeholder, type = "text" }: { label: string; name: string; required?: boolean; placeholder?: string; type?: string }) {
+  const id = `checkout-${name}`;
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-xs font-bold text-muted-foreground">
+      <label htmlFor={id} className="text-xs font-bold text-muted-foreground">
         {label} {required && "*"}
       </label>
-      <input name={name} type={type} required={required} placeholder={placeholder} className="rounded-lg border border-border px-3 py-2.5 text-sm" />
+      <input id={id} name={name} type={type} required={required} placeholder={placeholder} className="rounded-lg border border-border px-3 py-2.5 text-sm" />
     </div>
   );
 }
