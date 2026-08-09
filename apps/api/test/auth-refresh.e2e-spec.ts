@@ -76,6 +76,22 @@ describe("Customer refresh token lifecycle (e2e)", () => {
     await expect(authService.refresh(token2)).rejects.toThrow();
   });
 
+  it("only lets one of two truly concurrent refreshes of the same token succeed (TOCTOU race)", async () => {
+    // Avant le verrou de ligne sur RefreshToken (SELECT ... FOR UPDATE), deux
+    // refresh() lancés en parallèle avec le même token lisaient tous deux
+    // revokedAt=null avant qu'aucun n'ait committé sa révocation, et
+    // réussissaient donc tous les deux — un jeton "à usage unique" produisait
+    // alors deux sessions valides au lieu de faire échouer le second.
+    const { refreshToken } = await registerCustomer();
+
+    const results = await Promise.allSettled([authService.refresh(refreshToken), authService.refresh(refreshToken)]);
+    const fulfilled = results.filter((r) => r.status === "fulfilled");
+    const rejected = results.filter((r) => r.status === "rejected");
+
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+  });
+
   it("rejects an unknown/garbage refresh token", async () => {
     await expect(authService.refresh("not.a.valid.jwt")).rejects.toThrow();
   });

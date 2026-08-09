@@ -104,16 +104,27 @@ export class CustomerAuthService {
     if (payload.kind !== "customer") throw new UnauthorizedException("Token invalide");
 
     const tokenHash = hashRefreshToken(refreshToken);
-    const stored = await this.prisma.refreshToken.findUnique({ where: { tokenHash } });
-    if (!stored) throw new UnauthorizedException("Session expirée, merci de vous reconnecter");
-    if (stored.revokedAt) {
+    // Verrou de ligne : sans lui, deux refresh() concurrents pour le même
+    // refresh token (deux onglets, retry réseau, ou un jeton volé rejoué en
+    // parallèle de l'usage légitime) peuvent tous deux lire revokedAt=null
+    // avant qu'aucun n'ait committé sa révocation, et donc réussir tous les
+    // deux — un jeton pourtant "à usage unique" produirait alors deux
+    // sessions valides au lieu de déclencher la détection de rejeu prévue.
+    const reused = await this.prisma.$transaction(async (tx) => {
+      const [stored] = await tx.$queryRaw<{ id: string; revokedAt: Date | null }[]>`
+        SELECT id, "revokedAt" FROM "RefreshToken" WHERE "tokenHash" = ${tokenHash} FOR UPDATE`;
+      if (!stored) throw new UnauthorizedException("Session expirée, merci de vous reconnecter");
+      if (stored.revokedAt) return true;
+      await tx.refreshToken.update({ where: { id: stored.id }, data: { revokedAt: new Date() } });
+      return false;
+    });
+    if (reused) {
       await this.prisma.refreshToken.updateMany({
         where: { subjectId: payload.sub, kind: "customer", revokedAt: null },
         data: { revokedAt: new Date() },
       });
       throw new UnauthorizedException("Session invalide — toutes vos sessions ont été déconnectées par sécurité");
     }
-    await this.prisma.refreshToken.update({ where: { id: stored.id }, data: { revokedAt: new Date() } });
 
     const customer = await this.prisma.customer.findUnique({ where: { id: payload.sub } });
     if (!customer) throw new UnauthorizedException("Compte introuvable");
