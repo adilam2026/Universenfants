@@ -25,7 +25,11 @@ export class AnalyticsService {
         orderBy: { _sum: { lineTotal: "desc" } },
         take: 5,
       }),
-      this.prisma.order.groupBy({ by: ["status"], _count: { _all: true } }),
+      // Sans le même filtre createdAt que les deux requêtes ci-dessus, cette
+      // répartition portait sur tout l'historique alors que la page est
+      // explicitement labellée "30 derniers jours" — incohérente avec le
+      // CA et le nombre de commandes affichés juste au-dessus.
+      this.prisma.order.groupBy({ by: ["status"], where: { createdAt: { gte: since } }, _count: { _all: true } }),
     ]);
 
     // Les 30 jours sont tous représentés (même à 0) pour que le graphique
@@ -50,7 +54,10 @@ export class AnalyticsService {
     return {
       totalRevenue,
       totalOrders,
-      avgOrderValue: totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0,
+      // totalRevenue exclut les commandes annulées (billable) — diviser par
+      // totalOrders (qui les inclut) sous-estimait le panier moyen dès qu'il
+      // y avait ne serait-ce qu'une annulation dans les 30 derniers jours.
+      avgOrderValue: billable.length > 0 ? Math.round(totalRevenue / billable.length) : 0,
       revenueByDay,
       topProducts: orderLines.map((l) => ({
         name: l.productNameSnapshot,
