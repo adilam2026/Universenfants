@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { ProductsService, type StockLine } from "../catalog/products/products.service";
 import { SettingsService } from "../settings/settings.service";
@@ -219,12 +219,28 @@ export class OrdersService {
         data: { firstName: dto.firstName, lastName: dto.lastName, email: dto.email ?? found.email },
       });
     }
-    const created = await this.prisma.customer.create({
-      data: { firstName: dto.firstName, lastName: dto.lastName, email: dto.email, phone: dto.phone },
-    });
-    await this.prisma.loyaltyAccount.create({ data: { customerId: created.id } });
-    await this.prisma.wishlist.create({ data: { customerId: created.id } });
-    return created;
+    try {
+      const created = await this.prisma.customer.create({
+        data: { firstName: dto.firstName, lastName: dto.lastName, email: dto.email, phone: dto.phone },
+      });
+      await this.prisma.loyaltyAccount.create({ data: { customerId: created.id } });
+      await this.prisma.wishlist.create({ data: { customerId: created.id } });
+      return created;
+    } catch (err) {
+      // Deux checkouts invités concurrents avec le même email/téléphone (deux
+      // onglets, retry réseau) peuvent tous deux avoir vu "aucun client
+      // trouvé" avant qu'aucun n'ait committé — le second create() percute
+      // alors la contrainte unique sur Customer.email. Plutôt que de faire
+      // échouer une commande par ailleurs légitime, on relit le client que
+      // l'autre requête vient de créer et on s'y rattache.
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+        const winner = await this.prisma.customer.findFirst({
+          where: { OR: [dto.email ? { email: dto.email } : undefined, { phone: dto.phone }].filter(Boolean) as any },
+        });
+        if (winner) return winner;
+      }
+      throw err;
+    }
   }
 
   /** I7 : la règle ville prime toujours sur la règle globale ; la règle
