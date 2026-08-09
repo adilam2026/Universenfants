@@ -108,7 +108,23 @@ export class ProductsService {
       if (rankedIds) {
         where.id = { in: rankedIds.length > 0 ? rankedIds : ["__none__"] };
       } else {
-        where.nameFr = { contains: query.q, mode: "insensitive" };
+        // Repli Postgres : Meilisearch indexe nameFr/nameAr/sku (search.service.ts),
+        // donc ce filtre doit couvrir les trois — un simple `nameFr contains`
+        // faisait perdre silencieusement la recherche en arabe et par SKU
+        // pendant toute panne Meilisearch, sans que le français cesse de
+        // fonctionner pour masquer la régression.
+        // Assigné via `where.AND` (pas `where.OR`) : `promoOnly` ci-dessus peut
+        // déjà avoir posé son propre `where.OR` — les deux coexistent en étant
+        // implicitement combinés par ET par Prisma au niveau racine.
+        where.AND = [
+          {
+            OR: [
+              { nameFr: { contains: query.q, mode: "insensitive" } },
+              { nameAr: { contains: query.q, mode: "insensitive" } },
+              { sku: { contains: query.q, mode: "insensitive" } },
+            ],
+          },
+        ];
       }
     }
 
