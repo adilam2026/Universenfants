@@ -50,14 +50,32 @@ export class SearchService implements OnModuleInit {
     return this.available;
   }
 
-  async indexProduct(doc: ProductSearchDoc) {
-    if (!this.available) return;
-    await this.client.index(PRODUCTS_INDEX).addDocuments([doc]).catch((err) => this.logger.warn(`indexProduct failed: ${err.message}`));
+  /** @returns true si le document a bien été transmis à Meilisearch — l'appelant
+   * (reindexSearch, import Excel) ne doit pas annoncer un succès d'indexation
+   * qui n'a en réalité pas eu lieu (moteur indisponible ou écriture en échec). */
+  async indexProduct(doc: ProductSearchDoc): Promise<boolean> {
+    if (!this.available) return false;
+    return this.client
+      .index(PRODUCTS_INDEX)
+      .addDocuments([doc])
+      .then(() => true)
+      .catch((err) => {
+        this.logger.warn(`indexProduct failed: ${err.message}`);
+        return false;
+      });
   }
 
-  async indexProducts(docs: ProductSearchDoc[]) {
-    if (!this.available || docs.length === 0) return;
-    await this.client.index(PRODUCTS_INDEX).addDocuments(docs).catch((err) => this.logger.warn(`indexProducts failed: ${err.message}`));
+  async indexProducts(docs: ProductSearchDoc[]): Promise<boolean> {
+    if (!this.available) return false;
+    if (docs.length === 0) return true;
+    return this.client
+      .index(PRODUCTS_INDEX)
+      .addDocuments(docs)
+      .then(() => true)
+      .catch((err) => {
+        this.logger.warn(`indexProducts failed: ${err.message}`);
+        return false;
+      });
   }
 
   async removeProduct(id: string) {

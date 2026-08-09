@@ -202,7 +202,9 @@ export class ProductsService {
   }
 
   /** Import Excel produits en masse — upsert par SKU, une ligne = un produit. */
-  async importFromExcel(buffer: Buffer): Promise<{ results: ImportRowResult[]; created: number; updated: number; errors: number }> {
+  async importFromExcel(
+    buffer: Buffer,
+  ): Promise<{ results: ImportRowResult[]; created: number; updated: number; errors: number; searchIndexOk: boolean }> {
     const workbook = XLSX.read(buffer, { type: "buffer" });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json<ImportRow>(sheet, { defval: undefined });
@@ -290,15 +292,14 @@ export class ProductsService {
       }
     }
 
-    if (results.some((r) => r.status !== "error")) {
-      await this.reindexSearch();
-    }
+    const searchIndexOk = results.some((r) => r.status !== "error") ? (await this.reindexSearch()).searchIndexOk : true;
 
     return {
       results,
       created: results.filter((r) => r.status === "created").length,
       updated: results.filter((r) => r.status === "updated").length,
       errors: results.filter((r) => r.status === "error").length,
+      searchIndexOk,
     };
   }
 
@@ -381,8 +382,15 @@ export class ProductsService {
       include: { category: true, brand: true },
     });
     const active = await this.pricing.getActivePromotions();
-    await this.search.indexProducts(products.map((p) => this.toSearchDoc(this.applyEffectivePricing(p, active))));
-    return { indexed: products.length };
+    // Le moteur de recherche est éventuellement indisponible, ou l'écriture
+    // peut échouer côté Meilisearch — sans remonter ce statut, un admin
+    // relançant une réindexation après incident recevait toujours
+    // "{ indexed: N }" même quand rien n'avait réellement été écrit dans
+    // l'index, masquant une recherche restée désynchronisée du catalogue.
+    const searchIndexOk = await this.search.indexProducts(
+      products.map((p) => this.toSearchDoc(this.applyEffectivePricing(p, active))),
+    );
+    return { indexed: products.length, searchIndexOk };
   }
 
   async adjustStock(productId: string, dto: AdjustStockDto, staffUserId: string) {

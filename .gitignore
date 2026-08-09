@@ -15,3 +15,4 @@ apps/api/generated/
 apps/api/uploads/
 apps/api/.mail-outbox/
 *.tsbuildinfo
+.meili_data/
