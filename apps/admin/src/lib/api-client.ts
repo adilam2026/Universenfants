@@ -4,6 +4,8 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api";
 const TOKEN_KEY = "ue_staff_token";
 const USER_KEY = "ue_staff_user";
 
+export const STAFF_SESSION_CHANGED_EVENT = "ue:staff-session-changed";
+
 export interface StaffUser {
   id: string;
   name: string;
@@ -16,20 +18,33 @@ export function getStaffToken(): string | null {
   return window.localStorage.getItem(TOKEN_KEY);
 }
 
+// Cache la valeur parsée par chaîne JSON brute : useSyncExternalStore (voir
+// useStaffUser) exige que getSnapshot renvoie une référence stable tant que
+// la donnée sous-jacente n'a pas changé, sous peine de boucle infinie —
+// JSON.parse à chaque appel créerait un nouvel objet à chaque rendu.
+let cachedRaw: string | null = null;
+let cachedUser: StaffUser | null = null;
+
 export function getStaffUser(): StaffUser | null {
   if (typeof window === "undefined") return null;
   const raw = window.localStorage.getItem(USER_KEY);
-  return raw ? (JSON.parse(raw) as StaffUser) : null;
+  if (raw !== cachedRaw) {
+    cachedRaw = raw;
+    cachedUser = raw ? (JSON.parse(raw) as StaffUser) : null;
+  }
+  return cachedUser;
 }
 
 function setSession(accessToken: string, user: StaffUser) {
   window.localStorage.setItem(TOKEN_KEY, accessToken);
   window.localStorage.setItem(USER_KEY, JSON.stringify(user));
+  window.dispatchEvent(new Event(STAFF_SESSION_CHANGED_EVENT));
 }
 
 export function clearSession() {
   window.localStorage.removeItem(TOKEN_KEY);
   window.localStorage.removeItem(USER_KEY);
+  window.dispatchEvent(new Event(STAFF_SESSION_CHANGED_EVENT));
 }
 
 export class ApiError extends Error {

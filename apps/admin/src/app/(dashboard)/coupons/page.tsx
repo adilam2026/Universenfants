@@ -10,10 +10,6 @@ import { Badge } from "@/components/ui/badge";
 import { listCoupons, createCoupon, updateCoupon, type AdminCoupon } from "@/lib/coupons";
 import { ApiError } from "@/lib/api-client";
 
-function dh(value: string | number) {
-  return `${Number(value).toLocaleString("fr-FR")} DH`;
-}
-
 const TYPE_LABEL: Record<string, string> = {
   PERCENTAGE: "%",
   FIXED_AMOUNT: "DH",

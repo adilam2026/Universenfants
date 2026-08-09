@@ -5,7 +5,8 @@ import { useTranslations } from "next-intl";
 import { Star, Package, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
-import { isLoggedIn, login, register, logout, me, type CustomerProfile } from "@/lib/auth-client";
+import { login, register, logout, me, type CustomerProfile } from "@/lib/auth-client";
+import { useIsLoggedIn } from "@/hooks/use-is-logged-in";
 
 function dh(value: string | number) {
   return `${Number(value).toLocaleString("fr-FR")} DH`;
@@ -13,31 +14,22 @@ function dh(value: string | number) {
 
 export default function AccountPage() {
   const t = useTranslations("account");
-  const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
+  const loggedIn = useIsLoggedIn();
   const [profile, setProfile] = useState<CustomerProfile | null>(null);
 
   useEffect(() => {
-    if (!isLoggedIn()) {
-      setLoggedIn(false);
-      return;
-    }
+    if (loggedIn !== true) return;
     me()
-      .then((p) => {
-        setProfile(p);
-        setLoggedIn(true);
-      })
-      .catch(() => {
-        logout();
-        setLoggedIn(false);
-      });
-  }, []);
+      .then(setProfile)
+      .catch(() => logout());
+  }, [loggedIn]);
 
-  if (loggedIn === null) {
+  if (loggedIn === null || (loggedIn && !profile)) {
     return <div className="mx-auto max-w-md px-4 py-16 text-center text-muted-foreground">{t("loading")}</div>;
   }
 
   if (!loggedIn || !profile) {
-    return <AuthForm onSuccess={(p) => { setProfile(p); setLoggedIn(true); }} />;
+    return <AuthForm onSuccess={setProfile} />;
   }
 
   return (
@@ -99,7 +91,6 @@ export default function AccountPage() {
         className="mt-5 text-muted-foreground"
         onClick={() => {
           logout();
-          setLoggedIn(false);
           setProfile(null);
         }}
       >

@@ -76,6 +76,10 @@ export function LandingPageForm({ page, initialProductId }: { page?: AdminLandin
     listAdminProducts().then(setProducts);
   }, []);
 
+  // Pré-remplissage ponctuel du formulaire dès que le produit visé (raccourci
+  // "Créer une Landing Page" depuis une fiche produit) est disponible — pas
+  // une synchronisation continue, garde `!name` pour ne s'exécuter qu'une fois.
+  /* eslint-disable react-hooks/set-state-in-effect -- pré-remplissage ponctuel, voir commentaire ci-dessus */
   useEffect(() => {
     if (!page && initialProductId && products.length > 0 && !name) {
       const p = products.find((x) => x.id === initialProductId);
@@ -88,6 +92,7 @@ export function LandingPageForm({ page, initialProductId }: { page?: AdminLandin
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [products]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   function handleTemplateChange(next: LandingTemplate) {
     setTemplate(next);

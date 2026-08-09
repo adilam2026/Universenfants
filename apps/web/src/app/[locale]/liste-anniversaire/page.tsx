@@ -4,7 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { Cake, Copy, Check, Trash2, Search } from "lucide-react";
 import { Link } from "@/i18n/navigation";
-import { isLoggedIn } from "@/lib/auth-client";
+import { useIsLoggedIn } from "@/hooks/use-is-logged-in";
 import {
   getMyBirthdayLists,
   createBirthdayList,
@@ -22,18 +22,14 @@ function dh(value: string | number) {
 
 export default function BirthdayListPage() {
   const t = useTranslations("birthdayList");
-  const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
+  const loggedIn = useIsLoggedIn();
   const [lists, setLists] = useState<BirthdayList[] | null>(null);
   const [active, setActive] = useState<BirthdayList | null>(null);
 
   useEffect(() => {
-    if (!isLoggedIn()) {
-      setLoggedIn(false);
-      return;
-    }
-    setLoggedIn(true);
+    if (loggedIn !== true) return;
     refresh();
-  }, []);
+  }, [loggedIn]);
 
   async function refresh() {
     const data = await getMyBirthdayLists();

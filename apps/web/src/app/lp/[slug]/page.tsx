@@ -44,7 +44,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
 
   // Un 2e CTA après le premier bloc "avantages"/"réassurance" rencontré,
   // pour que le bouton apparaisse à plusieurs endroits (§CTA et conversion).
-  let inlineCtaInserted = false;
+  const inlineCtaIndex = bodyBlocks.findIndex((b) => b.type === "advantages" || b.type === "trust");
 
   return (
     <div className="min-h-screen pb-24 md:pb-8" style={{ ...cssVars, background: "var(--lp-soft)" }}>
@@ -61,16 +61,12 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
         countdownEndAt={page.countdownEnabled ? page.countdownEndAt : null}
       />
 
-      {bodyBlocks.map((block, i) => {
-        const shouldInsertCta = !inlineCtaInserted && (block.type === "advantages" || block.type === "trust");
-        if (shouldInsertCta) inlineCtaInserted = true;
-        return (
-          <div key={i}>
-            <BlockRenderer block={block} />
-            {shouldInsertCta && <InlineCta label={ctaLabel} />}
-          </div>
-        );
-      })}
+      {bodyBlocks.map((block, i) => (
+        <div key={i}>
+          <BlockRenderer block={block} />
+          {i === inlineCtaIndex && <InlineCta label={ctaLabel} />}
+        </div>
+      ))}
 
       <section className="px-5 py-6 max-w-md mx-auto">
         <QuickOrderForm

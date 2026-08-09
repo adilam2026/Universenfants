@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import {
   LayoutDashboard,
   PackageSearch,
@@ -19,7 +19,8 @@ import {
   LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { clearSession, getStaffToken, getStaffUser, type StaffUser } from "@/lib/api-client";
+import { clearSession, getStaffToken } from "@/lib/api-client";
+import { useStaffUser } from "@/hooks/use-staff-user";
 
 const NAV = [
   {
@@ -66,19 +67,18 @@ const NAV = [
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [user, setUser] = useState<StaffUser | null>(null);
-  const [checked, setChecked] = useState(false);
+  const user = useStaffUser();
 
+  // Vérifie le token directement plutôt que de dépendre de `user` : sur une
+  // navigation complète, useSyncExternalStore rend d'abord la valeur serveur
+  // (null) le temps de l'hydratation avant de se resynchroniser au rendu
+  // suivant — un effet dépendant de `user` s'exécuterait sur cette valeur
+  // transitoire et redirigerait à tort vers /login à chaque rechargement.
   useEffect(() => {
-    if (!getStaffToken()) {
-      router.replace("/login");
-      return;
-    }
-    setUser(getStaffUser());
-    setChecked(true);
+    if (!getStaffToken()) router.replace("/login");
   }, [router]);
 
-  if (!checked) return null;
+  if (!user) return null;
 
   return (
     <div className="flex min-h-screen">

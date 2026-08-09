@@ -7,9 +7,13 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint \"src/**/*.ts\""
   },
   "devDependencies": {
-    "typescript": "^5.7.2"
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.8.1",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.66.0"
   }
 }

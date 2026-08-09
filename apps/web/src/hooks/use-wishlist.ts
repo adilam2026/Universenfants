@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { isLoggedIn } from "@/lib/auth-client";
+import { useIsLoggedIn } from "@/hooks/use-is-logged-in";
 import { getWishlist, addToWishlist, removeFromWishlist, type WishlistLine } from "@/lib/wishlist-client";
+import { isLoggedIn } from "@/lib/auth-client";
 
 export const WISHLIST_UPDATED_EVENT = "ue:wishlist-updated";
 
@@ -11,29 +12,26 @@ function broadcastWishlistUpdate() {
 }
 
 export function useWishlist() {
+  const loggedIn = useIsLoggedIn();
   const [lines, setLines] = useState<WishlistLine[]>([]);
-  const [loading, setLoading] = useState(true);
-  // null tant que le statut de connexion (basé sur localStorage) n'a pas été
-  // vérifié côté client, pour ne jamais brancher le rendu SSR dessus.
-  const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
+  // Ne redevient jamais true après le chargement initial — un rafraîchissement
+  // suite à un toggle n'a pas besoin de réafficher un état de chargement.
+  const [fetched, setFetched] = useState(false);
 
   const refresh = useCallback(async () => {
-    if (!isLoggedIn()) {
-      setLoggedIn(false);
-      setLines([]);
-      setLoading(false);
-      return;
-    }
-    setLoggedIn(true);
+    if (!isLoggedIn()) return;
     try {
       setLines(await getWishlist());
     } finally {
-      setLoading(false);
+      setFetched(true);
     }
   }, []);
 
   useEffect(() => {
-    refresh();
+    if (loggedIn === true) refresh();
+  }, [loggedIn, refresh]);
+
+  useEffect(() => {
     window.addEventListener(WISHLIST_UPDATED_EVENT, refresh);
     return () => window.removeEventListener(WISHLIST_UPDATED_EVENT, refresh);
   }, [refresh]);
@@ -51,5 +49,6 @@ export function useWishlist() {
     [lines],
   );
 
+  const loading = loggedIn === null || (loggedIn === true && !fetched);
   return { lines, loading, loggedIn, has, toggle, refresh };
 }

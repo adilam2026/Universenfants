@@ -1,3 +1,4 @@
+import Link from "next/link";
 import "./globals.css";
 
 // Filet de sécurité pour une route qui échapperait au segment [locale] (cas
@@ -11,12 +12,12 @@ export default function RootNotFound() {
           <p className="text-6xl mb-4">🧸</p>
           <h1 className="text-2xl font-extrabold mb-2">Page introuvable</h1>
           <p className="text-sm text-muted-foreground mb-6">Cette page n&apos;existe pas ou a été déplacée.</p>
-          <a
+          <Link
             href="/fr"
             className="inline-flex items-center justify-center rounded-full bg-brand-cta text-brand-cta-foreground px-6 py-3 text-sm font-bold"
           >
             Retour à l&apos;accueil
-          </a>
+          </Link>
         </div>
       </body>
     </html>

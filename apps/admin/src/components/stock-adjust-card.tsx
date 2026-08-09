@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +16,7 @@ const REASONS: { value: StockAdjustReason; label: string }[] = [
 ];
 
 export function StockAdjustCard({ product, onAdjusted }: { product: AdminProduct; onAdjusted: (newStock: number) => void }) {
+  const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [archiving, setArchiving] = useState(false);
@@ -40,7 +42,7 @@ export function StockAdjustCard({ product, onAdjusted }: { product: AdminProduct
     setArchiving(true);
     try {
       await archiveProduct(product.id);
-      window.location.href = "/produits";
+      router.push("/produits");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Une erreur est survenue");
       setArchiving(false);

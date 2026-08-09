@@ -4,6 +4,8 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api";
 const TOKEN_KEY = "ue_cart_token";
 const AUTH_KEY = "ue_customer_token";
 
+export const AUTH_CHANGED_EVENT = "ue:auth-changed";
+
 export function getCartToken(): string {
   if (typeof window === "undefined") return "";
   let token = window.localStorage.getItem(TOKEN_KEY);
@@ -21,10 +23,12 @@ export function getCustomerToken(): string | null {
 
 export function setCustomerToken(token: string) {
   window.localStorage.setItem(AUTH_KEY, token);
+  window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
 }
 
 export function clearCustomerToken() {
   window.localStorage.removeItem(AUTH_KEY);
+  window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
 }
 
 export interface CartLine {

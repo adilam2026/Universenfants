@@ -7,4 +7,4 @@ export interface JwtPayload {
   roleCode?: string; // staff only
 }
 
-export interface RequestUser extends JwtPayload {}
+export type RequestUser = JwtPayload;

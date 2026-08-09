@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { Package } from "lucide-react";
 import { Link } from "@/i18n/navigation";
-import { isLoggedIn, getMyOrders, type OrderSummary } from "@/lib/auth-client";
+import { getMyOrders, type OrderSummary } from "@/lib/auth-client";
+import { useIsLoggedIn } from "@/hooks/use-is-logged-in";
 
 function dh(value: string | number) {
   return `${Number(value).toLocaleString("fr-FR")} DH`;
@@ -23,16 +24,12 @@ export default function MyOrdersPage() {
   const t = useTranslations("orders");
   const locale = useLocale();
   const [orders, setOrders] = useState<OrderSummary[] | null>(null);
-  const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
+  const loggedIn = useIsLoggedIn();
 
   useEffect(() => {
-    if (!isLoggedIn()) {
-      setLoggedIn(false);
-      return;
-    }
-    setLoggedIn(true);
+    if (loggedIn !== true) return;
     getMyOrders().then(setOrders);
-  }, []);
+  }, [loggedIn]);
 
   if (loggedIn === null) return null;
 

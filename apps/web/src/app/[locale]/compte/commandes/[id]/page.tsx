@@ -5,8 +5,9 @@ import { useTranslations } from "next-intl";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link } from "@/i18n/navigation";
-import { isLoggedIn, getMyOrder, cancelMyOrder, type OrderDetail } from "@/lib/auth-client";
+import { getMyOrder, cancelMyOrder, type OrderDetail } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
+import { useIsLoggedIn } from "@/hooks/use-is-logged-in";
 
 function dh(value: string | number) {
   return `${Number(value).toLocaleString("fr-FR")} DH`;
@@ -24,7 +25,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const { id } = use(params);
   const t = useTranslations("orders");
   const [order, setOrder] = useState<OrderDetail | null>(null);
-  const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
+  const loggedIn = useIsLoggedIn();
   const [error, setError] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
@@ -43,15 +44,11 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   }
 
   useEffect(() => {
-    if (!isLoggedIn()) {
-      setLoggedIn(false);
-      return;
-    }
-    setLoggedIn(true);
+    if (loggedIn !== true) return;
     getMyOrder(id)
       .then(setOrder)
       .catch(() => setError(t("notFound")));
-  }, [id, t]);
+  }, [id, t, loggedIn]);
 
   if (loggedIn === null) return null;
   if (!loggedIn) {

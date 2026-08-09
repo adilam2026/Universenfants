@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Star, Loader2 } from "lucide-react";
-import { isLoggedIn } from "@/lib/auth-client";
+import { useIsLoggedIn } from "@/hooks/use-is-logged-in";
 import { getReviewEligibility, submitReview } from "@/lib/reviews-client";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -12,6 +12,7 @@ type Status = "checking" | "hidden" | "already-reviewed" | "can-review" | "submi
 
 export function WriteReviewForm({ productId }: { productId: string }) {
   const t = useTranslations("product");
+  const loggedIn = useIsLoggedIn();
   const [status, setStatus] = useState<Status>("checking");
   const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
@@ -19,15 +20,14 @@ export function WriteReviewForm({ productId }: { productId: string }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // "checking" et "hidden" sont rendus de façon identique (rien) — pas besoin
+  // de distinguer "pas connecté" via un setState, le statut reste "checking".
   useEffect(() => {
-    if (!isLoggedIn()) {
-      setStatus("hidden");
-      return;
-    }
+    if (loggedIn !== true) return;
     getReviewEligibility(productId)
       .then((e) => setStatus(e.alreadyReviewed ? "already-reviewed" : e.canReview ? "can-review" : "hidden"))
       .catch(() => setStatus("hidden"));
-  }, [productId]);
+  }, [productId, loggedIn]);
 
   async function handleSubmit() {
     if (rating === 0) return;
