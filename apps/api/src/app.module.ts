@@ -1,11 +1,11 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
-import { ThrottlerStorageRedisService } from "@nest-lab/throttler-storage-redis";
 import { APP_GUARD } from "@nestjs/core";
 import type Redis from "ioredis";
 import { PrismaModule } from "./prisma/prisma.module";
 import { RedisModule, REDIS_CLIENT } from "./redis/redis.module";
+import { ResilientThrottlerStorageService } from "./redis/resilient-throttler-storage.service";
 import { HealthController } from "./health/health.controller";
 import { AuthModule } from "./auth/auth.module";
 import { CategoriesModule } from "./catalog/categories/categories.module";
@@ -39,7 +39,7 @@ import { EmailModule } from "./email/email.module";
       inject: [REDIS_CLIENT],
       useFactory: (redis: Redis) => ({
         throttlers: [{ ttl: 60_000, limit: 120 }],
-        storage: new ThrottlerStorageRedisService(redis),
+        storage: new ResilientThrottlerStorageService(redis),
       }),
     }),
     PrismaModule,
