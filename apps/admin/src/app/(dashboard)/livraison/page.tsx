@@ -79,10 +79,14 @@ export default function ShippingPage() {
             </div>
             <Button type="submit"><Plus className="size-4" /> Ajouter</Button>
           </form>
-          {error && <p className="text-sm text-destructive mt-3">{error}</p>}
         </CardContent>
       </Card>
 
+      {/* Affiché ici plutôt que dans la carte "Ajouter une ville" : une
+          erreur d'enregistrement sur une ligne du tableau (souvent scrollé
+          loin du formulaire d'ajout) restait auparavant invisible pour
+          l'opérateur. */}
+      {error && <p className="text-sm text-destructive mb-3">{error}</p>}
       <div className="rounded-lg border border-border bg-card overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -121,8 +125,8 @@ function CityRow({ city, onSave }: { city: AdminCity; onSave: (city: AdminCity, 
     <tr className="border-b border-border last:border-0">
       <td className="px-4 py-2.5 font-medium">{city.name}</td>
       <td className="px-4 py-2.5 text-muted-foreground">{city.group?.name ?? "—"}</td>
-      <td className="px-4 py-2.5"><Input value={fee} onChange={(e) => setFee(e.target.value)} type="number" step="0.01" className="w-24" /></td>
-      <td className="px-4 py-2.5"><Input value={freeFrom} onChange={(e) => setFreeFrom(e.target.value)} type="number" step="0.01" className="w-28" placeholder={dh(0)} /></td>
+      <td className="px-4 py-2.5"><Input value={fee} onChange={(e) => setFee(e.target.value)} type="number" step="0.01" min={0} className="w-24" /></td>
+      <td className="px-4 py-2.5"><Input value={freeFrom} onChange={(e) => setFreeFrom(e.target.value)} type="number" step="0.01" min={0} className="w-28" placeholder={dh(0)} /></td>
       <td className="px-4 py-2.5">
         <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="size-4" />
       </td>

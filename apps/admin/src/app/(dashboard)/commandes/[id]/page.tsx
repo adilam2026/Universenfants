@@ -29,6 +29,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const [error, setError] = useState<string | null>(null);
   const [updating, setUpdating] = useState<string | null>(null);
   const [paymentAmount, setPaymentAmount] = useState("");
+  const [recordingPayment, setRecordingPayment] = useState(false);
 
   function refresh() {
     getAdminOrder(id).then(setOrder).catch((e) => setError(e instanceof Error ? e.message : "Commande introuvable"));
@@ -50,14 +51,18 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   }
 
   async function handlePayment() {
+    if (recordingPayment) return;
     const amount = Number(paymentAmount);
     if (!amount || amount <= 0) return;
+    setRecordingPayment(true);
     try {
       await recordOrderPayment(id, amount);
       setPaymentAmount("");
       refresh();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Une erreur est survenue");
+    } finally {
+      setRecordingPayment(false);
     }
   }
 
@@ -152,8 +157,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               <p className="text-sm text-muted-foreground">Encaissé : {dh(order.paidAmount)} / {dh(order.total)}</p>
               {order.paymentStatus !== "PAID" && (
                 <div className="flex gap-2">
-                  <Input type="number" min={0} step="0.01" placeholder="Montant" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} />
-                  <Button size="sm" onClick={handlePayment}>Enregistrer</Button>
+                  <Input type="number" min={0} step="0.01" placeholder="Montant" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} disabled={recordingPayment} />
+                  <Button size="sm" onClick={handlePayment} disabled={recordingPayment}>{recordingPayment ? "…" : "Enregistrer"}</Button>
                 </div>
               )}
             </CardContent>
