@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from "@nestjs/comm
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AuditLogService } from "../../common/audit-log.service";
+import { resolveDateRange } from "../date-range.util";
 import type { UpsertCouponDto } from "./dto/upsert-coupon.dto";
 
 @Injectable()
@@ -27,12 +28,13 @@ export class CouponsService {
 
   async create(dto: UpsertCouponDto, staffUserId: string) {
     this.assertValidValue(dto);
+    const { startAt, endAt } = resolveDateRange(dto.startAt, dto.endAt);
     const data = {
       code: dto.code.toUpperCase(),
       type: dto.type,
       value: dto.value,
-      startAt: new Date(dto.startAt),
-      endAt: new Date(dto.endAt),
+      startAt,
+      endAt,
       maxUses: dto.maxUses,
       maxUsesPerCustomer: dto.maxUsesPerCustomer ?? 1,
       minCartAmount: dto.minCartAmount ?? 0,
@@ -62,12 +64,13 @@ export class CouponsService {
     const existing = await this.prisma.coupon.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException("Coupon introuvable");
     this.assertValidValue(dto);
+    const { startAt, endAt } = resolveDateRange(dto.startAt, dto.endAt);
     const data = {
       code: dto.code.toUpperCase(),
       type: dto.type,
       value: dto.value,
-      startAt: new Date(dto.startAt),
-      endAt: new Date(dto.endAt),
+      startAt,
+      endAt,
       maxUses: dto.maxUses,
       maxUsesPerCustomer: dto.maxUsesPerCustomer ?? 1,
       minCartAmount: dto.minCartAmount ?? 0,

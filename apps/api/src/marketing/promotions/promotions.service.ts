@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AuditLogService } from "../../common/audit-log.service";
+import { resolveDateRange } from "../date-range.util";
 import type { UpsertPromotionDto } from "./dto/upsert-promotion.dto";
 
 @Injectable()
@@ -39,6 +40,7 @@ export class PromotionsService {
 
   async create(dto: UpsertPromotionDto, staffUserId: string) {
     await this.assertConsistentScope(dto);
+    const { startAt, endAt } = resolveDateRange(dto.startAt, dto.endAt);
     const data = {
       name: dto.name,
       type: dto.type,
@@ -46,8 +48,8 @@ export class PromotionsService {
       scope: dto.scope,
       categoryId: dto.scope === "CATEGORY" ? dto.categoryId : undefined,
       brandId: dto.scope === "BRAND" ? dto.brandId : undefined,
-      startAt: new Date(dto.startAt),
-      endAt: new Date(dto.endAt),
+      startAt,
+      endAt,
       status: dto.status ?? "SCHEDULED",
     };
     // Écriture atomique avec sa trace d'audit (impact direct sur les prix
@@ -66,6 +68,7 @@ export class PromotionsService {
     const existing = await this.prisma.promotion.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException("Promotion introuvable");
     await this.assertConsistentScope(dto);
+    const { startAt, endAt } = resolveDateRange(dto.startAt, dto.endAt);
     const data = {
       name: dto.name,
       type: dto.type,
@@ -73,8 +76,8 @@ export class PromotionsService {
       scope: dto.scope,
       categoryId: dto.scope === "CATEGORY" ? dto.categoryId : null,
       brandId: dto.scope === "BRAND" ? dto.brandId : null,
-      startAt: new Date(dto.startAt),
-      endAt: new Date(dto.endAt),
+      startAt,
+      endAt,
       status: dto.status ?? existing.status,
     };
     return this.prisma.$transaction(async (tx) => {

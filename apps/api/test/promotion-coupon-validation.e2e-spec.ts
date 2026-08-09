@@ -115,6 +115,23 @@ describe("Promotion / coupon admin validation (e2e)", () => {
     ).rejects.toThrow(/ne peut pas dépasser 100/);
   });
 
+  it("rejects a promotion with endAt before startAt", async () => {
+    await expect(
+      promotions.create(
+        {
+          name: "Promo dates inversées",
+          type: "PERCENTAGE",
+          value: 10,
+          scope: "CATEGORY",
+          categoryId,
+          startAt: new Date(Date.now() + 86_400_000).toISOString(),
+          endAt: new Date(Date.now() - 86_400_000).toISOString(),
+        } as never,
+        staffUserId,
+      ),
+    ).rejects.toThrow(/postérieure à la date de début/);
+  });
+
   it("accepts a well-formed category promotion and records an audit log entry", async () => {
     const created = await promotions.create(
       {
@@ -163,6 +180,42 @@ describe("Promotion / coupon admin validation (e2e)", () => {
 
     await prisma.auditLog.deleteMany({ where: { entity: "Coupon", entityId: first.id } });
     await prisma.coupon.delete({ where: { id: first.id } });
+  });
+
+  it("rejects a coupon with endAt before startAt", async () => {
+    await expect(
+      coupons.create(
+        {
+          code: `INVERTED-${Date.now()}`,
+          type: "FIXED_AMOUNT",
+          value: 10,
+          startAt: new Date(Date.now() + 86_400_000).toISOString(),
+          endAt: new Date(Date.now() - 86_400_000).toISOString(),
+        } as never,
+        staffUserId,
+      ),
+    ).rejects.toThrow(/postérieure à la date de début/);
+  });
+
+  it("treats a date-only endAt of today as valid through end of day rather than expiring on creation", async () => {
+    const today = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD", comme envoyé par <input type=date> côté admin
+    const created = await coupons.create(
+      {
+        code: `SAMEDAY-${Date.now()}`,
+        type: "FIXED_AMOUNT",
+        value: 10,
+        startAt: new Date(Date.now() - 86_400_000).toISOString().slice(0, 10),
+        endAt: today,
+      } as never,
+      staffUserId,
+    );
+    // new Date(today) seul vaudrait 00:00:00 UTC aujourd'hui, déjà dans le
+    // passé pour tout admin situé à l'est de UTC — sans le correctif, ce
+    // coupon serait mort-né.
+    expect(created.endAt.getTime()).toBeGreaterThan(Date.now());
+
+    await prisma.auditLog.deleteMany({ where: { entity: "Coupon", entityId: created.id } });
+    await prisma.coupon.delete({ where: { id: created.id } });
   });
 
   it("records an audit log entry with old/new values on coupon update", async () => {
