@@ -2,13 +2,18 @@
 
 import { useEffect } from "react";
 import { useTranslations } from "next-intl";
+import * as Sentry from "@sentry/nextjs";
 import { Link } from "@/i18n/navigation";
 
 export default function Error({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   const t = useTranslations("errorBoundary");
 
   useEffect(() => {
+    // Les erreurs interceptées par un error boundary React n'atteignent jamais
+    // window.onerror — sans cet appel explicite, l'initialisation Sentry dans
+    // instrumentation-client.ts ne les capturerait jamais.
     console.error(error);
+    Sentry.captureException(error);
   }, [error]);
 
   return (

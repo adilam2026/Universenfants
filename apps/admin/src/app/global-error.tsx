@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect } from "react";
+import * as Sentry from "@sentry/nextjs";
 
 // Filet de sécurité pour une erreur qui échapperait même au layout racine
 // (ex : erreur dans layout.tsx lui-même) — error.tsx seul ne la capture pas.
 export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     console.error(error);
+    Sentry.captureException(error);
   }, [error]);
 
   return (
