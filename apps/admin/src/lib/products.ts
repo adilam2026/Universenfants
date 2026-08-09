@@ -104,6 +104,7 @@ export const adjustStock = (id: string, delta: number, reason: StockAdjustReason
   apiFetch<{ stock: number }>(`/products/${id}/stock`, { method: "POST", body: JSON.stringify({ delta, reason }) });
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api";
+const UPLOAD_TIMEOUT_MS = 30_000;
 
 export async function uploadProductImage(productId: string, file: File): Promise<AdminProductImage[]> {
   const formData = new FormData();
@@ -113,6 +114,7 @@ export async function uploadProductImage(productId: string, file: File): Promise
     method: "POST",
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     body: formData,
+    signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));

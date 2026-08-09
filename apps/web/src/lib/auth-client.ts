@@ -9,6 +9,7 @@ import {
 } from "@/lib/cart-client";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api";
+const FETCH_TIMEOUT_MS = 10_000;
 
 // Jamais de tentative de refresh sur ces routes : un 401 y est une réponse
 // normale (identifiants invalides), pas une expiration de session.
@@ -34,7 +35,7 @@ async function authFetch<T>(path: string, init?: RequestInit, isRetry = false): 
   const token = skipAuth ? getCustomerToken() : await getValidCustomerToken();
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const res = await fetch(`${API_URL}${path}`, { ...init, headers });
+  const res = await fetch(`${API_URL}${path}`, { ...init, headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
 
   // Filet de sécurité si le rafraîchissement proactif ci-dessus a manqué la
   // fenêtre (horloge client décalée, etc.) — /me et /orders utilisent

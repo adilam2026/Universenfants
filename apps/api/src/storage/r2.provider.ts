@@ -18,6 +18,9 @@ export class R2StorageProvider implements StorageProvider {
         accessKeyId: process.env.R2_ACCESS_KEY_ID!,
         secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
       },
+      // Sans ça, un endpoint R2 qui ne répond plus laisse la requête
+      // d'upload d'image produit pendre indéfiniment au lieu d'échouer vite.
+      requestHandler: { connectionTimeout: 5_000, requestTimeout: 15_000 },
     });
   }
 

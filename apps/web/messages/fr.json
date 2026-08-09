@@ -4,6 +4,12 @@
     "titleDefault": "UniversEnfants — Jouets, cadeaux & univers enfants",
     "description": "Jouets, cadeaux et fournitures pour enfants au Maroc. Conseiller Cadeau, liste anniversaire, livraison partout au Maroc, paiement à la livraison."
   },
+  "errorBoundary": {
+    "title": "Une erreur est survenue",
+    "description": "Quelque chose s'est mal passé. Vous pouvez réessayer ou revenir à l'accueil.",
+    "retry": "Réessayer",
+    "home": "Accueil"
+  },
   "promoBar": {
     "text": "🚚 Livraison gratuite partout au Maroc dès <strong>{amount} DH</strong> d'achat"
   },

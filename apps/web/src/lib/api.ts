@@ -1,4 +1,7 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api";
+// Sans timeout, une API qui ne répond plus bloque le rendu SSR (ou l'appel
+// client) indéfiniment au lieu d'échouer et de laisser afficher un fallback.
+const FETCH_TIMEOUT_MS = 10_000;
 
 export interface Category {
   id: string;
@@ -61,6 +64,7 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
     // qu'une requête réseau à chaque rendu — le stock/prix affiché peut
     // avoir jusqu'à 60s de retard, acceptable pour du contenu de navigation.
     next: { revalidate: 60 },
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));

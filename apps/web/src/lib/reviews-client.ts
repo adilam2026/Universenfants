@@ -3,6 +3,7 @@
 import { getCustomerToken } from "@/lib/cart-client";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api";
+const FETCH_TIMEOUT_MS = 10_000;
 
 async function reviewsFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getCustomerToken();
@@ -10,6 +11,7 @@ async function reviewsFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, ...init?.headers },
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));

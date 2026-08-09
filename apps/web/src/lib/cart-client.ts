@@ -4,6 +4,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api";
 const TOKEN_KEY = "ue_cart_token";
 const AUTH_KEY = "ue_customer_token";
 const REFRESH_KEY = "ue_customer_refresh_token";
+const FETCH_TIMEOUT_MS = 10_000;
 
 export const AUTH_CHANGED_EVENT = "ue:auth-changed";
 
@@ -57,6 +58,7 @@ export function refreshCustomerAccessToken(): Promise<string | null> {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refreshToken }),
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
       if (!res.ok) {
         clearCustomerToken();
@@ -129,7 +131,7 @@ async function cartFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const customerToken = await getValidCustomerToken();
   if (customerToken) headers.Authorization = `Bearer ${customerToken}`;
 
-  const res = await fetch(`${API_URL}${path}`, { ...init, headers });
+  const res = await fetch(`${API_URL}${path}`, { ...init, headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
   const returnedToken = res.headers.get("x-cart-token");
   if (returnedToken) window.localStorage.setItem(TOKEN_KEY, returnedToken);
 

@@ -56,6 +56,14 @@ export class ProductsController {
   @UseInterceptors(FileInterceptor("file", { limits: { fileSize: 5 * 1024 * 1024 } }))
   importExcel(@UploadedFile() file?: Express.Multer.File) {
     if (!file) throw new BadRequestException("Fichier requis");
+    const allowedMimeTypes = [
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
+      "application/vnd.ms-excel", // .xls
+      "text/csv",
+    ];
+    if (!allowedMimeTypes.includes(file.mimetype)) {
+      throw new BadRequestException("Le fichier doit être un tableur Excel (.xlsx, .xls) ou CSV");
+    }
     return this.service.importFromExcel(file.buffer);
   }
 

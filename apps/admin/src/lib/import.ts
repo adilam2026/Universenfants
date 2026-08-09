@@ -1,6 +1,9 @@
 import { getStaffToken } from "./api-client";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api";
+// Plus long que le timeout par défaut (10s) : un import Excel volumineux
+// traite les lignes une à une côté API et peut légitimement prendre du temps.
+const UPLOAD_TIMEOUT_MS = 60_000;
 
 export interface ImportRowResult {
   row: number;
@@ -24,6 +27,7 @@ export async function importProductsExcel(file: File): Promise<ImportSummary> {
     method: "POST",
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     body: formData,
+    signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));

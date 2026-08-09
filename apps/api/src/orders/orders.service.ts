@@ -92,8 +92,36 @@ export class OrdersService {
     }));
 
     const order = await this.prisma.$transaction(async (tx) => {
+      // Verrou + re-vérification : sans ça, un double-clic ou un retry après
+      // timeout côté client peut faire passer deux checkout() concurrents sur
+      // le même panier avant qu'aucun n'ait mis à jour son statut, créant
+      // deux commandes distinctes pour un seul panier.
+      const [lockedCart] = await tx.$queryRaw<{ status: string }[]>`
+        SELECT status FROM "Cart" WHERE id = ${cart.id} FOR UPDATE`;
+      if (!lockedCart || lockedCart.status !== "ACTIVE") {
+        throw new BadRequestException("Ce panier a déjà été validé");
+      }
+
       // R3 : verrou de ligne pour empêcher la survente en cas de commandes simultanées.
       await this.products.reserveStock(tx, stockLines);
+
+      // Re-vérification sous verrou : la validation faite plus haut (avant la
+      // transaction) est une réponse rapide pour l'UX, mais ne protège pas
+      // contre deux checkout() concurrents épuisant chacun une limite de
+      // coupon avant qu'aucun des deux n'ait committé.
+      if (coupon) {
+        const [lockedCoupon] = await tx.$queryRaw<{ usedCount: number; maxUses: number | null }[]>`
+          SELECT "usedCount", "maxUses" FROM "Coupon" WHERE id = ${coupon.id} FOR UPDATE`;
+        if (!lockedCoupon || (lockedCoupon.maxUses !== null && lockedCoupon.usedCount >= lockedCoupon.maxUses)) {
+          throw new BadRequestException("Ce coupon a atteint sa limite d'utilisation");
+        }
+        const redemptions = await tx.couponRedemption.count({
+          where: { couponId: coupon.id, customerId: customer.id },
+        });
+        if (redemptions >= coupon.maxUsesPerCustomer) {
+          throw new BadRequestException("Ce coupon a déjà été utilisé");
+        }
+      }
 
       const orderNumber = await this.nextOrderNumber(tx);
 
@@ -283,6 +311,10 @@ export class OrdersService {
       where: { status: filters.status as never, shippingCity: filters.city },
       include: { customer: true },
       orderBy: { createdAt: "desc" },
+      // Filet de sécurité : évite une réponse illimitée si le volume de
+      // commandes grossit fortement ; une vraie pagination Back-Office
+      // pourra être ajoutée plus tard sans changer ce plafond.
+      take: 1000,
     });
   }
 
@@ -462,16 +494,23 @@ export class OrdersService {
   }
 
   async recordPayment(orderId: string, amount: number) {
-    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
-    if (!order) throw new NotFoundException("Commande introuvable");
-    const paidAmount = Number(order.paidAmount) + amount;
-    if (paidAmount > Number(order.total)) {
-      throw new BadRequestException("Le montant encaissé dépasse le total de la commande");
-    }
-    const paymentStatus = paidAmount >= Number(order.total) ? "PAID" : "PARTIAL";
-    return this.prisma.order.update({
-      where: { id: orderId },
-      data: { paidAmount, paymentStatus, paidAt: paymentStatus === "PAID" ? new Date() : order.paidAt },
+    return this.prisma.$transaction(async (tx) => {
+      // Verrou de ligne : deux encaissements concurrents sur la même commande
+      // (double-clic, deux opérateurs) ne doivent pas se baser sur la même
+      // lecture de paidAmount sous peine d'en perdre un silencieusement.
+      const [order] = await tx.$queryRaw<
+        { id: string; paidAmount: unknown; total: unknown; paidAt: Date | null }[]
+      >`SELECT id, "paidAmount", total, "paidAt" FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
+      if (!order) throw new NotFoundException("Commande introuvable");
+      const paidAmount = Number(order.paidAmount) + amount;
+      if (paidAmount > Number(order.total)) {
+        throw new BadRequestException("Le montant encaissé dépasse le total de la commande");
+      }
+      const paymentStatus = paidAmount >= Number(order.total) ? "PAID" : "PARTIAL";
+      return tx.order.update({
+        where: { id: orderId },
+        data: { paidAmount, paymentStatus, paidAt: paymentStatus === "PAID" ? new Date() : order.paidAt },
+      });
     });
   }
 

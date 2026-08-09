@@ -23,6 +23,12 @@ export class EmailService implements OnModuleInit {
         port: Number(process.env.SMTP_PORT ?? 587),
         secure: process.env.SMTP_SECURE === "true",
         auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD } : undefined,
+        // Sans timeouts explicites, un serveur SMTP qui ne répond plus peut
+        // bloquer l'envoi (et donc la requête HTTP qui le déclenche) pendant
+        // plusieurs minutes avant que nodemailer n'abandonne.
+        connectionTimeout: 10_000,
+        greetingTimeout: 10_000,
+        socketTimeout: 15_000,
       });
       this.logger.log(`SMTP transport configured (${process.env.SMTP_HOST})`);
     } else {

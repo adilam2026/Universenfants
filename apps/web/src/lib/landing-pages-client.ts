@@ -1,6 +1,7 @@
 import type { LandingPageBlock } from "@universenfants/shared";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api";
+const FETCH_TIMEOUT_MS = 10_000;
 
 export interface PublicLandingPage {
   id: string;
@@ -33,13 +34,18 @@ export interface PublicLandingPage {
 }
 
 export async function getLandingPageBySlug(slug: string): Promise<PublicLandingPage | null> {
-  const res = await fetch(`${API_URL}/landing-pages/${slug}`, { cache: "no-store" });
+  const res = await fetch(`${API_URL}/landing-pages/${slug}`, {
+    cache: "no-store",
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+  });
   if (!res.ok) return null;
   return res.json();
 }
 
 export function trackLandingPageVisit(slug: string) {
-  fetch(`${API_URL}/landing-pages/${slug}/visit`, { method: "POST" }).catch(() => undefined);
+  fetch(`${API_URL}/landing-pages/${slug}/visit`, { method: "POST", signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) }).catch(
+    () => undefined,
+  );
 }
 
 export interface QuickOrderPayload {
@@ -55,6 +61,7 @@ export async function submitQuickOrder(slug: string, payload: QuickOrderPayload)
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));

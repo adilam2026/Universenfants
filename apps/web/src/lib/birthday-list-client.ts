@@ -3,6 +3,7 @@
 import { getCartToken, getCustomerToken } from "@/lib/cart-client";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api";
+const FETCH_TIMEOUT_MS = 10_000;
 
 async function blFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const headers: Record<string, string> = {
@@ -12,7 +13,7 @@ async function blFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getCustomerToken();
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const res = await fetch(`${API_URL}${path}`, { ...init, headers });
+  const res = await fetch(`${API_URL}${path}`, { ...init, headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.message ?? `Erreur (${res.status})`);

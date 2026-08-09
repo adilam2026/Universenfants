@@ -167,6 +167,10 @@ export class ProductsService {
       where: { categoryId: query.category, status: query.status as never },
       include: { brand: true, category: true, images: { take: 1 } },
       orderBy: { updatedAt: "desc" },
+      // Filet de sécurité : évite une réponse illimitée si le catalogue
+      // grossit fortement ; une vraie pagination Back-Office pourra être
+      // ajoutée plus tard sans changer ce plafond.
+      take: 1000,
     });
     return query.lowStock ? items.filter((p) => p.stock <= p.alertThreshold) : items;
   }
