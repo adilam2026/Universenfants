@@ -85,6 +85,10 @@ export function ProductPurchasePanel({ product }: { product: ProductDetail }) {
           </AddToCartButton>
         )}
       </div>
+      {/* La barre ci-dessus est en `fixed` sur mobile, donc retirée du flux :
+          sans cet espaceur, le contenu suivant (bouton Partager, etc.)
+          remonte dans son espace et se retrouve caché derrière elle. */}
+      <div className="h-24 md:hidden" aria-hidden />
     </div>
   );
 }
