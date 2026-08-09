@@ -1,9 +1,11 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
+import { ThrottlerStorageRedisService } from "@nest-lab/throttler-storage-redis";
 import { APP_GUARD } from "@nestjs/core";
+import type Redis from "ioredis";
 import { PrismaModule } from "./prisma/prisma.module";
-import { RedisModule } from "./redis/redis.module";
+import { RedisModule, REDIS_CLIENT } from "./redis/redis.module";
 import { HealthController } from "./health/health.controller";
 import { AuthModule } from "./auth/auth.module";
 import { CategoriesModule } from "./catalog/categories/categories.module";
@@ -28,7 +30,18 @@ import { EmailModule } from "./email/email.module";
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
+    // Stockage Redis (pas la mémoire par défaut) : indispensable dès que
+    // l'API tourne sur plus d'une instance (déploiements à zéro downtime,
+    // scaling horizontal) — sinon chaque instance compte séparément et la
+    // limite réelle devient limit × nombre d'instances.
+    ThrottlerModule.forRootAsync({
+      imports: [RedisModule],
+      inject: [REDIS_CLIENT],
+      useFactory: (redis: Redis) => ({
+        throttlers: [{ ttl: 60_000, limit: 120 }],
+        storage: new ThrottlerStorageRedisService(redis),
+      }),
+    }),
     PrismaModule,
     RedisModule,
     SearchModule,
