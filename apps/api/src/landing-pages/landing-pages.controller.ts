@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
+import { Throttle } from "@nestjs/throttler";
 import { PermissionCode } from "@universenfants/shared";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { StaffGuard } from "../auth/guards/staff.guard";
@@ -85,6 +86,7 @@ export class LandingPagesController {
   }
 
   @Post(":slug/quick-order")
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   quickOrder(@Param("slug") slug: string, @Body() dto: QuickOrderDto) {
     return this.service.quickOrder(slug, dto);
   }

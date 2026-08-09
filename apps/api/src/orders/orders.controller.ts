@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Headers, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
+import { Throttle } from "@nestjs/throttler";
 import { PermissionCode } from "@universenfants/shared";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CustomerGuard } from "../auth/guards/customer.guard";
@@ -24,6 +25,7 @@ export class OrdersController {
 
   @Post("checkout")
   @UseGuards(OptionalJwtAuthGuard)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   async checkout(
     @Headers("x-cart-token") cartToken: string,
     @CurrentUser() user: RequestUser | null,

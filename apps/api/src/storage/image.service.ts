@@ -12,12 +12,11 @@ export class ImageService {
 
   /** Valide, redimensionne (max 1600px) et ré-encode en WebP — génère aussi une miniature 400px. */
   async processAndUpload(buffer: Buffer, folder: string): Promise<UploadResult & { thumbnailUrl: string }> {
-    let metadata: sharp.Metadata;
-    try {
-      metadata = await sharp(buffer).metadata();
-    } catch {
-      throw new BadRequestException("Fichier image invalide");
-    }
+    const metadata = await sharp(buffer)
+      .metadata()
+      .catch((): never => {
+        throw new BadRequestException("Fichier image invalide");
+      });
     if (!metadata.width || !metadata.height) {
       throw new BadRequestException("Fichier image invalide");
     }
