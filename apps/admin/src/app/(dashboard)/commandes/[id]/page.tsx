@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ORDER_NEXT_STATUS, type OrderStatus } from "@universenfants/shared";
 import { getAdminOrder, updateOrderStatus, recordOrderPayment, type AdminOrderDetail } from "@/lib/orders";
 import { ApiError } from "@/lib/api-client";
 
@@ -20,15 +21,6 @@ const STATUS_LABEL: Record<string, string> = {
   SHIPPED: "Expédiée",
   DELIVERED: "Livrée",
   CANCELLED: "Annulée",
-};
-
-const NEXT_STATUS: Record<string, string[]> = {
-  PENDING: ["CONFIRMED", "CANCELLED"],
-  CONFIRMED: ["PREPARING", "CANCELLED"],
-  PREPARING: ["SHIPPED", "CANCELLED"],
-  SHIPPED: ["DELIVERED"],
-  DELIVERED: [],
-  CANCELLED: [],
 };
 
 export default function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -72,7 +64,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   if (error) return <p className="text-sm text-destructive">{error}</p>;
   if (!order) return <p className="text-sm text-muted-foreground">Chargement…</p>;
 
-  const nextStatuses = NEXT_STATUS[order.status] ?? [];
+  const nextStatuses = ORDER_NEXT_STATUS[order.status as OrderStatus] ?? [];
 
   return (
     <div>

@@ -12,6 +12,10 @@ export class QueryProductsDto {
   @ApiPropertyOptional() @IsOptional() @Type(() => Number) priceMax?: number;
   @ApiPropertyOptional() @IsOptional() @Type(() => Boolean) @IsBoolean() promoOnly?: boolean;
   @ApiPropertyOptional() @IsOptional() @Type(() => Boolean) @IsBoolean() inStockOnly?: boolean;
+  @ApiPropertyOptional({ enum: ["BOY", "GIRL", "UNISEX"] })
+  @IsOptional()
+  @IsIn(["BOY", "GIRL", "UNISEX"])
+  gender?: "BOY" | "GIRL" | "UNISEX";
 
   @ApiPropertyOptional({ enum: ["relevance", "price_asc", "price_desc", "newest", "bestsellers"] })
   @IsOptional()

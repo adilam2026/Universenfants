@@ -14,6 +14,8 @@ export class BrandsController {
   constructor(private readonly service: BrandsService) {}
 
   @Get()
+  @UseGuards(JwtAuthGuard, StaffGuard, PermissionsGuard)
+  @RequirePermissions(PermissionCode.PRODUCT_READ)
   list() {
     return this.service.list();
   }

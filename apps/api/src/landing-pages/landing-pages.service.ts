@@ -112,7 +112,9 @@ export class LandingPagesService {
       include: { product: { include: { images: true } } },
     });
     if (!page || page.status !== "ACTIVE") throw new NotFoundException("Page introuvable");
-    return page;
+    // costPrice/reservedStock = données internes, jamais exposées au Front (cf. ProductsService.toPublicShape).
+    const { costPrice: _costPrice, reservedStock: _reservedStock, ...product } = page.product;
+    return { ...page, product };
   }
 
   async trackVisit(slug: string) {

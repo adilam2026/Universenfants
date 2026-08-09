@@ -23,7 +23,7 @@ export function SiteHeader() {
     { label: t("nav.age6to8"), href: "/recherche?ageMin=6&ageMax=8" },
     { label: t("nav.age9to12"), href: "/recherche?ageMin=9&ageMax=12" },
     { label: t("nav.age12plus"), href: "/recherche?ageMin=12" },
-    { label: t("nav.promotions"), href: "/categorie/construction", accent: true },
+    { label: t("nav.promotions"), href: "/recherche?promo=1", accent: true },
   ];
 
   const DRAWER_LINKS: {
@@ -35,7 +35,7 @@ export function SiteHeader() {
   }[] = [
     { label: t("nav.toysByAge"), href: "/recherche", icon: Cake },
     { label: t("nav.toysByUniverse"), href: "/categorie/construction", icon: ShoppingBag },
-    { label: t("nav.promotions"), href: "/categorie/construction", icon: Tag, accent: true },
+    { label: t("nav.promotions"), href: "/recherche?promo=1", icon: Tag, accent: true },
     { label: t("nav.giftAdvisor"), href: "/conseiller-cadeau", icon: Gift, brand: true },
     { label: t("nav.birthdayList"), href: "/liste-anniversaire", icon: Cake, brand: true },
     { label: t("wishlist.title"), href: "/favoris", icon: Heart },

@@ -4,20 +4,12 @@ import { PrismaService } from "../prisma/prisma.service";
 import { ProductsService, type StockLine } from "../catalog/products/products.service";
 import { SettingsService } from "../settings/settings.service";
 import { EmailService } from "../email/email.service";
-import { ORDER_NUMBER_PREFIX } from "@universenfants/shared";
+import { ORDER_NEXT_STATUS, ORDER_NUMBER_PREFIX } from "@universenfants/shared";
 import type { CheckoutDto } from "./dto/checkout.dto";
 import type { UpdateOrderStatusDto } from "./dto/update-order-status.dto";
 
 // §74 : l'annulation n'est autorisée qu'avant expédition.
 const CANCELLABLE_STATUSES = new Set(["PENDING", "CONFIRMED", "PREPARING"]);
-const NEXT_STATUS: Record<string, string[]> = {
-  PENDING: ["CONFIRMED", "CANCELLED"],
-  CONFIRMED: ["PREPARING", "CANCELLED"],
-  PREPARING: ["SHIPPED", "CANCELLED"],
-  SHIPPED: ["DELIVERED"],
-  DELIVERED: [],
-  CANCELLED: [],
-};
 
 @Injectable()
 export class OrdersService {
@@ -316,7 +308,7 @@ export class OrdersService {
       if (dto.status === "CANCELLED" && !CANCELLABLE_STATUSES.has(order.status)) {
         throw new BadRequestException("Cette commande ne peut plus être annulée (déjà expédiée)");
       }
-      if (dto.status !== "CANCELLED" && !NEXT_STATUS[order.status]?.includes(dto.status)) {
+      if (dto.status !== "CANCELLED" && !ORDER_NEXT_STATUS[order.status].includes(dto.status)) {
         throw new BadRequestException(`Transition ${order.status} → ${dto.status} non autorisée`);
       }
 
@@ -474,6 +466,9 @@ export class OrdersService {
     const order = await this.prisma.order.findUnique({ where: { id: orderId } });
     if (!order) throw new NotFoundException("Commande introuvable");
     const paidAmount = Number(order.paidAmount) + amount;
+    if (paidAmount > Number(order.total)) {
+      throw new BadRequestException("Le montant encaissé dépasse le total de la commande");
+    }
     const paymentStatus = paidAmount >= Number(order.total) ? "PAID" : "PARTIAL";
     return this.prisma.order.update({
       where: { id: orderId },

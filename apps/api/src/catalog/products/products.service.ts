@@ -59,6 +59,8 @@ export class ProductsService {
     if (query.ageMax !== undefined) where.ageMin = { lte: query.ageMax };
     if (query.promoOnly) where.promoPrice = { not: null };
     if (query.inStockOnly) where.stock = { gt: 0 };
+    // Un jouet UNISEX convient aux deux — on ne l'exclut donc pas d'une recherche ciblée.
+    if (query.gender) where.targetGender = query.gender === "UNISEX" ? "UNISEX" : { in: [query.gender, "UNISEX"] };
     if (query.priceMin !== undefined || query.priceMax !== undefined) {
       where.price = {
         ...(query.priceMin !== undefined ? { gte: query.priceMin } : {}),
@@ -126,7 +128,12 @@ export class ProductsService {
         variants: true,
         brand: true,
         category: true,
-        reviews: { where: { status: "APPROVED" }, orderBy: { createdAt: "desc" }, take: 20 },
+        reviews: {
+          where: { status: "APPROVED" },
+          orderBy: { createdAt: "desc" },
+          take: 20,
+          select: { id: true, rating: true, comment: true, adminReply: true, createdAt: true },
+        },
       },
     });
     if (!product || product.status !== "ACTIVE") throw new NotFoundException("Produit introuvable");

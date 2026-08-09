@@ -115,6 +115,7 @@
   },
   "search": {
     "title": "🧸 Tous les jouets",
+    "promoTitle": "🏷️ Toutes les promotions",
     "resultsCount": "{count} produits",
     "noResults": "Aucun résultat."
   },
@@ -349,5 +350,10 @@
     "remove": "Retirer",
     "unavailable": "Indisponible",
     "loginRequired": "Connectez-vous pour retrouver vos favoris sur tous vos appareils."
+  },
+  "notFoundPage": {
+    "title": "Page introuvable",
+    "description": "Cette page n'existe pas ou a été déplacée.",
+    "cta": "Retour à l'accueil"
   }
 }

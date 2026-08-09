@@ -54,12 +54,14 @@ export default function GiftAdvisorPage() {
     setLoading(true);
     const age = AGE_OPTIONS[ageIdx];
     const budget = BUDGET_OPTIONS[budgetIdx];
+    const gender = who === 0 ? "BOY" : who === 1 ? "GIRL" : undefined;
     try {
       const data = await getProducts({
         ageMin: age.ageMin,
         ageMax: age.ageMax,
         priceMin: budget.priceMin,
         priceMax: budget.priceMax,
+        gender,
         limit: 8,
       });
       setResults(data.items);

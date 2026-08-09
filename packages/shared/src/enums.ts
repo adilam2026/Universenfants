@@ -21,6 +21,16 @@ export const ORDER_STATUS_FLOW: OrderStatus[] = [
   OrderStatus.DELIVERED,
 ];
 
+/** Transitions valides depuis chaque statut (§74 : annulation permise avant expédition seulement). */
+export const ORDER_NEXT_STATUS: Record<OrderStatus, OrderStatus[]> = {
+  PENDING: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED],
+  CONFIRMED: [OrderStatus.PREPARING, OrderStatus.CANCELLED],
+  PREPARING: [OrderStatus.SHIPPED, OrderStatus.CANCELLED],
+  SHIPPED: [OrderStatus.DELIVERED],
+  DELIVERED: [],
+  CANCELLED: [],
+};
+
 export const PaymentStatus = {
   PENDING: "PENDING",
   PAID: "PAID",

@@ -3,6 +3,22 @@ import { nanoid } from "nanoid";
 import { PrismaService } from "../prisma/prisma.service";
 import type { CreateBirthdayListDto } from "./dto/birthday-list.dto";
 
+/** costPrice/reservedStock = données internes, jamais exposées au Front. */
+const PRODUCT_ITEM_INCLUDE = {
+  product: {
+    select: {
+      id: true,
+      nameFr: true,
+      nameAr: true,
+      seoUrl: true,
+      price: true,
+      promoPrice: true,
+      stock: true,
+      images: { take: 1 },
+    },
+  },
+} as const;
+
 @Injectable()
 export class BirthdayListService {
   constructor(private readonly prisma: PrismaService) {}
@@ -16,14 +32,14 @@ export class BirthdayListService {
         message: dto.message,
         shareToken: nanoid(12),
       },
-      include: { items: { include: { product: { include: { images: { take: 1 } } } } } },
+      include: { items: { include: PRODUCT_ITEM_INCLUDE } },
     });
   }
 
   async listMine(customerId: string) {
     return this.prisma.birthdayList.findMany({
       where: { customerId },
-      include: { items: { include: { product: { include: { images: { take: 1 } } } } } },
+      include: { items: { include: PRODUCT_ITEM_INCLUDE } },
       orderBy: { createdAt: "desc" },
     });
   }

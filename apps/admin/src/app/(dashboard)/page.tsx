@@ -31,7 +31,7 @@ export default function DashboardPage() {
   }, []);
 
   const pendingOrders = orders?.filter((o) => o.status === "PENDING").length ?? 0;
-  const revenue = orders?.reduce((s, o) => s + Number(o.total), 0) ?? 0;
+  const revenue = orders?.filter((o) => o.status !== "CANCELLED").reduce((s, o) => s + Number(o.total), 0) ?? 0;
   const recentOrders = orders?.slice(0, 8) ?? [];
 
   return (

@@ -29,7 +29,9 @@ export class AnalyticsService {
     for (let d = new Date(since); d <= new Date(); d.setDate(d.getDate() + 1)) {
       revenueByDayMap.set(d.toISOString().slice(0, 10), 0);
     }
-    for (const o of orders) {
+    // Une commande annulée n'est jamais du chiffre d'affaires.
+    const billable = orders.filter((o) => o.status !== "CANCELLED");
+    for (const o of billable) {
       const day = o.createdAt.toISOString().slice(0, 10);
       revenueByDayMap.set(day, (revenueByDayMap.get(day) ?? 0) + Number(o.total));
     }
@@ -37,7 +39,7 @@ export class AnalyticsService {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([date, revenue]) => ({ date, revenue }));
 
-    const totalRevenue = orders.reduce((s, o) => s + Number(o.total), 0);
+    const totalRevenue = billable.reduce((s, o) => s + Number(o.total), 0);
     const totalOrders = orders.length;
 
     return {

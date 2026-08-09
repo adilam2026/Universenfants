@@ -11,7 +11,7 @@ export function SiteFooter() {
       title: t("shop"),
       links: [
         { label: t("catalog"), href: "/recherche" },
-        { label: t("promotions"), href: "/categorie/construction" },
+        { label: t("promotions"), href: "/recherche?promo=1" },
         { label: t("newArrivals"), href: "/recherche" },
       ],
     },

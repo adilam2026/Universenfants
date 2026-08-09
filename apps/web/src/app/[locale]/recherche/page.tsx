@@ -11,16 +11,17 @@ export default async function SearchPage({ params, searchParams }: PageProps<"/[
   const q = typeof sp.q === "string" ? sp.q : undefined;
   const ageMin = typeof sp.ageMin === "string" ? Number(sp.ageMin) : undefined;
   const ageMax = typeof sp.ageMax === "string" ? Number(sp.ageMax) : undefined;
+  const promoOnly = sp.promo === "1" ? true : undefined;
   const t = await getTranslations("search");
 
   const [categories, results] = await Promise.all([
     getCategoryTree(),
-    getProducts({ sort: sort as never, q, ageMin, ageMax }),
+    getProducts({ sort: sort as never, q, ageMin, ageMax, promoOnly }),
   ]);
 
   return (
     <div className="mx-auto max-w-6xl px-4 md:px-7 py-4">
-      <h1 className="font-display text-xl font-extrabold mb-5">{t("title")}</h1>
+      <h1 className="font-display text-xl font-extrabold mb-5">{promoOnly ? t("promoTitle") : t("title")}</h1>
       <div className="flex gap-7">
         <FilterSidebar categories={categories} />
         <div className="flex-1 min-w-0">
