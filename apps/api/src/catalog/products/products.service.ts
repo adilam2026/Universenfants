@@ -315,10 +315,21 @@ export class ProductsService {
 
         const existingId = existingIdBySku.get(sku);
         if (existingId) {
-          await this.prisma.product.update({ where: { id: existingId }, data });
+          // Sans runCatchingDuplicate, une URL SEO en collision avec un
+          // autre produit remontait l'erreur Prisma brute
+          // ("Invalid prisma.product.update()... Unique constraint...")
+          // jusque dans la colonne "Erreur" du résumé d'import, au lieu
+          // d'un message actionnable pour l'admin.
+          await runCatchingDuplicate(
+            () => this.prisma.product.update({ where: { id: existingId }, data }),
+            "SKU ou URL SEO déjà utilisé par un autre produit",
+          );
           results.push({ row: rowNumber, sku, status: "updated" });
         } else {
-          const created = await this.prisma.product.create({ data });
+          const created = await runCatchingDuplicate(
+            () => this.prisma.product.create({ data }),
+            "SKU ou URL SEO déjà utilisé par un autre produit",
+          );
           // Une même feuille peut légitimement contenir deux fois le même
           // SKU (correction en cours de saisie) — sans cette mise à jour,
           // la seconde ligne recréerait un produit en doublon au lieu de
