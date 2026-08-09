@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { nanoid } from "nanoid";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { DEFAULT_SHARED_CART_EXPIRY_DAYS } from "@universenfants/shared";
 import { calculateCouponDiscount } from "../marketing/coupons/coupon-discount.util";
@@ -19,7 +20,21 @@ export class CartService {
 
     let cart = await this.prisma.cart.findUnique({ where: { ownerToken } });
     if (!cart) {
-      cart = await this.prisma.cart.create({ data: { ownerToken, customerId: customerId ?? undefined } });
+      // Le token panier est généré et persisté en localStorage de façon
+      // synchrone dès le premier accès (cart-client.ts#getCartToken), avant
+      // le moindre appel réseau — plusieurs requêtes déclenchées en parallèle
+      // à la toute première visite (icône panier, page panier, etc.)
+      // partagent donc le même token tout neuf. Sans ce filet, la seconde
+      // percute la contrainte unique sur ownerToken et plante avec un 500.
+      try {
+        cart = await this.prisma.cart.create({ data: { ownerToken, customerId: customerId ?? undefined } });
+      } catch (err) {
+        if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+          cart = await this.prisma.cart.findUniqueOrThrow({ where: { ownerToken } });
+        } else {
+          throw err;
+        }
+      }
     } else if (cart.status !== "ACTIVE") {
       // Panier déjà commandé/expiré : on repart d'un panier vierge sur le même token.
       await this.prisma.cartLine.deleteMany({ where: { cartId: cart.id } });

@@ -308,4 +308,27 @@ describe("Checkout concurrency (e2e)", () => {
     await prisma.customer.delete({ where: { id: customer.id } });
     await prisma.product.delete({ where: { id: product.id } });
   });
+
+  it("never crashes when the same brand-new cart token is used by concurrent requests", async () => {
+    // Le token panier est généré et persisté en localStorage de façon
+    // synchrone dès le premier accès (cart-client.ts#getCartToken), avant le
+    // moindre appel réseau — plusieurs requêtes déclenchées en parallèle à la
+    // toute première visite (icône panier, page panier, etc.) partagent donc
+    // le même token tout neuf et peuvent toutes tenter de créer le panier.
+    const brandNewToken = crypto.randomUUID();
+
+    const results = await Promise.allSettled(
+      Array.from({ length: 5 }, () => cartService.resolveCart(brandNewToken, null)),
+    );
+    const fulfilled = results.filter((r) => r.status === "fulfilled");
+    expect(fulfilled).toHaveLength(5);
+
+    const carts = await prisma.cart.findMany({ where: { ownerToken: brandNewToken } });
+    expect(carts).toHaveLength(1);
+    // Toutes les résolutions concurrentes doivent pointer vers le même panier.
+    const ids = new Set((fulfilled as PromiseFulfilledResult<{ id: string }>[]).map((r) => r.value.id));
+    expect(ids.size).toBe(1);
+
+    await prisma.cart.delete({ where: { id: carts[0].id } });
+  });
 });
