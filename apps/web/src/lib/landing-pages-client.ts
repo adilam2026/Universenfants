@@ -65,7 +65,8 @@ export async function submitQuickOrder(slug: string, payload: QuickOrderPayload)
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.message ?? `Erreur (${res.status})`);
+    const message = Array.isArray(body.message) ? body.message.join(" — ") : body.message;
+    throw new Error(message ?? `Erreur (${res.status})`);
   }
   return res.json() as Promise<{ orderNumber: string; total: string }>;
 }

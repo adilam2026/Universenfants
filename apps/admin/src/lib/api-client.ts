@@ -139,7 +139,12 @@ export async function apiFetch<T>(path: string, init?: RequestInit, isRetry = fa
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new ApiError(body.message ?? `Erreur (${res.status})`, res.status);
+    // ValidationPipe (Nest) renvoie `message` en tableau de chaînes dès que
+    // plusieurs champs échouent en même temps — sans jointure explicite, le
+    // constructeur Error() le convertit en un seul bloc de texte collé sans
+    // espaces ("a doit...b doit...") au lieu d'une liste lisible.
+    const message = Array.isArray(body.message) ? body.message.join(" — ") : body.message;
+    throw new ApiError(message ?? `Erreur (${res.status})`, res.status);
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;

@@ -16,7 +16,8 @@ async function blFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, { ...init, headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.message ?? `Erreur (${res.status})`);
+    const message = Array.isArray(body.message) ? body.message.join(" — ") : body.message;
+    throw new Error(message ?? `Erreur (${res.status})`);
   }
   return res.json() as Promise<T>;
 }

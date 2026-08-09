@@ -54,7 +54,11 @@ async function authFetch<T>(path: string, init?: RequestInit, isRetry = false): 
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.message ?? `Erreur (${res.status})`);
+    // ValidationPipe (Nest) renvoie `message` en tableau dès que plusieurs
+    // champs échouent en même temps — sans jointure, Error() le colle en un
+    // seul bloc de texte illisible au lieu d'une liste.
+    const message = Array.isArray(body.message) ? body.message.join(" — ") : body.message;
+    throw new Error(message ?? `Erreur (${res.status})`);
   }
   return res.json() as Promise<T>;
 }

@@ -25,7 +25,8 @@ async function wishlistFetch<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.message ?? `Erreur (${res.status})`);
+    const message = Array.isArray(body.message) ? body.message.join(" — ") : body.message;
+    throw new Error(message ?? `Erreur (${res.status})`);
   }
   return res.json() as Promise<T>;
 }
