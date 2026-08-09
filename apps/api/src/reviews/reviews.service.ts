@@ -1,4 +1,5 @@
 import { ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import type { CreateReviewDto } from "./dto/create-review.dto";
 import type { ModerateReviewDto } from "./dto/moderate-review.dto";
@@ -22,9 +23,20 @@ export class ReviewsService {
     if (existing) throw new ConflictException("Vous avez déjà publié un avis pour ce produit");
 
     // §234 : modération avant publication — statut PENDING par défaut (schema).
-    return this.prisma.review.create({
-      data: { productId: dto.productId, customerId, rating: dto.rating, comment: dto.comment },
-    });
+    // La contrainte unique (productId, customerId) protège déjà l'intégrité
+    // en cas de double-soumission concurrente (deux onglets, double-clic) —
+    // sans ce catch, la seconde requête remonterait un 500 Prisma brut au
+    // lieu du même 409 explicite que la vérification ci-dessus.
+    try {
+      return await this.prisma.review.create({
+        data: { productId: dto.productId, customerId, rating: dto.rating, comment: dto.comment },
+      });
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+        throw new ConflictException("Vous avez déjà publié un avis pour ce produit");
+      }
+      throw err;
+    }
   }
 
   listForAdmin(status?: string) {
