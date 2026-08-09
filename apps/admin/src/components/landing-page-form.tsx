@@ -6,6 +6,7 @@ import {
   LANDING_TEMPLATES,
   LANDING_THEMES,
   defaultBlocksForTemplate,
+  defaultThemeForTemplate,
   type LandingPageBlock,
   type LandingTemplate,
   type LandingTheme,
@@ -25,13 +26,14 @@ import {
 import { ApiError } from "@/lib/api-client";
 
 const TEMPLATE_LABELS: Record<LandingTemplate, string> = {
+  "toy-premium": "Produit Jouet Premium",
+  "flash-promo": "Promotion Flash",
+  viral: "Produit Viral Réseaux Sociaux",
   "single-product": "Produit unique",
-  viral: "Produit viral",
   seasonal: "Produit saisonnier",
   storytelling: "Storytelling",
   "facebook-ads": "Facebook Ads",
   "tiktok-ads": "TikTok Ads",
-  "flash-promo": "Promo flash",
 };
 const THEME_LABELS: Record<LandingTheme, string> = {
   universenfants: "UniversEnfants",
@@ -89,7 +91,10 @@ export function LandingPageForm({ page, initialProductId }: { page?: AdminLandin
 
   function handleTemplateChange(next: LandingTemplate) {
     setTemplate(next);
-    if (!page) setBlocks(defaultBlocksForTemplate(next));
+    if (!page) {
+      setBlocks(defaultBlocksForTemplate(next));
+      setTheme(defaultThemeForTemplate(next));
+    }
   }
 
   async function handleSubmit() {

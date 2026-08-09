@@ -66,7 +66,8 @@ export function QuickOrderForm({
   }
 
   return (
-    <form id="commande" onSubmit={handleSubmit} className="rounded-2xl border border-border bg-white p-5 flex flex-col gap-3">
+    <form id="commande" onSubmit={handleSubmit} className="rounded-2xl border border-border bg-white p-5 shadow-sm flex flex-col gap-3">
+      <h3 className="text-center font-extrabold text-base mb-1">Commandez en 30 secondes</h3>
       <input name="name" required placeholder="Votre nom" className="rounded-lg border border-border px-3 py-2.5 text-sm" />
       <input name="phone" required placeholder="Votre téléphone" className="rounded-lg border border-border px-3 py-2.5 text-sm" />
       <select name="city" required defaultValue="" className="rounded-lg border border-border px-3 py-2.5 text-sm">

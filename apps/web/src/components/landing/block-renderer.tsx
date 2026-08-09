@@ -1,38 +1,15 @@
 import Image from "next/image";
 import { Star, Check, ShieldCheck } from "lucide-react";
-import type { LandingPageBlock } from "@universenfants/shared";
+import type { DescriptionBlock, AdvantagesBlock, TestimonialsBlock, FaqBlock, TrustBlock } from "@universenfants/shared";
 
-export function BlockRenderer({ block }: { block: LandingPageBlock }) {
+export type BodyBlock = DescriptionBlock | AdvantagesBlock | TestimonialsBlock | FaqBlock | TrustBlock;
+
+function initials(name: string) {
+  return name.trim().slice(0, 2).toUpperCase();
+}
+
+export function BlockRenderer({ block }: { block: BodyBlock }) {
   switch (block.type) {
-    case "hero":
-      return (
-        <section className="px-5 py-8 text-center" style={{ background: "var(--lp-primary, #6c5ce7)", color: "white" }}>
-          {block.bannerUrl && (
-            <div className="relative w-full max-w-md mx-auto aspect-video rounded-2xl overflow-hidden mb-5">
-              <Image src={block.bannerUrl} alt="" fill className="object-cover" priority />
-            </div>
-          )}
-          {block.videoUrl && (
-            <video src={block.videoUrl} controls className="w-full max-w-md mx-auto rounded-2xl mb-5" />
-          )}
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-balance">{block.title}</h1>
-          {block.subtitle && <p className="mt-2 text-white/90 max-w-md mx-auto">{block.subtitle}</p>}
-        </section>
-      );
-
-    case "gallery":
-      return (
-        <section className="px-5 py-6">
-          <div className="grid grid-cols-2 gap-3 max-w-md mx-auto">
-            {block.images.map((src, i) => (
-              <div key={i} className="relative aspect-square rounded-xl overflow-hidden bg-secondary">
-                <Image src={src} alt="" fill className="object-cover" />
-              </div>
-            ))}
-          </div>
-        </section>
-      );
-
     case "description":
       return (
         <section className="px-5 py-6 max-w-md mx-auto">
@@ -43,14 +20,19 @@ export function BlockRenderer({ block }: { block: LandingPageBlock }) {
     case "advantages":
       return (
         <section className="px-5 py-6 max-w-md mx-auto">
-          <ul className="flex flex-col gap-2.5">
+          <div className="grid sm:grid-cols-2 gap-3">
             {block.items.map((item, i) => (
-              <li key={i} className="flex items-center gap-2.5 text-sm font-medium">
-                <Check className="size-5 shrink-0" style={{ color: "var(--lp-primary, #6c5ce7)" }} />
-                {item}
-              </li>
+              <div key={i} className="flex items-center gap-2.5 rounded-xl p-3" style={{ background: "var(--lp-soft, #f5f5f5)" }}>
+                <span
+                  className="flex size-7 shrink-0 items-center justify-center rounded-full text-white"
+                  style={{ background: "var(--lp-primary)" }}
+                >
+                  <Check className="size-4" />
+                </span>
+                <span className="text-sm font-bold">{item}</span>
+              </div>
             ))}
-          </ul>
+          </div>
         </section>
       );
 
@@ -58,8 +40,8 @@ export function BlockRenderer({ block }: { block: LandingPageBlock }) {
       return (
         <section className="px-5 py-6 max-w-md mx-auto grid grid-cols-2 gap-3">
           {block.items.map((item, i) => (
-            <div key={i} className="flex items-center gap-2 text-xs font-bold rounded-xl bg-secondary p-3">
-              <ShieldCheck className="size-4 shrink-0" style={{ color: "var(--lp-primary, #6c5ce7)" }} />
+            <div key={i} className="flex items-center gap-2 text-xs font-bold rounded-xl border border-border p-3">
+              <ShieldCheck className="size-4 shrink-0" style={{ color: "var(--lp-primary)" }} />
               {item}
             </div>
           ))}
@@ -67,19 +49,36 @@ export function BlockRenderer({ block }: { block: LandingPageBlock }) {
       );
 
     case "testimonials":
+      if (block.items.length === 0) return null;
       return (
         <section className="px-5 py-6 max-w-md mx-auto">
           <h2 className="text-lg font-extrabold mb-3.5 text-center">Ce qu&apos;en disent nos clients</h2>
           <div className="flex flex-col gap-3">
             {block.items.map((item, i) => (
-              <div key={i} className="rounded-xl border border-border bg-white p-3.5">
-                <div className="flex items-center gap-0.5 text-brand-highlight mb-1">
-                  {Array.from({ length: 5 }).map((_, j) => (
-                    <Star key={j} className="size-3.5" fill={j < item.rating ? "currentColor" : "none"} />
-                  ))}
+              <div key={i} className="rounded-2xl border border-border bg-white p-4 shadow-sm">
+                <div className="flex items-center gap-2.5 mb-2">
+                  {item.photoUrl ? (
+                    <div className="relative size-9 shrink-0 rounded-full overflow-hidden">
+                      <Image src={item.photoUrl} alt="" fill className="object-cover" />
+                    </div>
+                  ) : (
+                    <div
+                      className="flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-extrabold text-white"
+                      style={{ background: "var(--lp-primary)" }}
+                    >
+                      {initials(item.name)}
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-sm font-bold">{item.name}</p>
+                    <div className="flex items-center gap-0.5 text-brand-highlight">
+                      {Array.from({ length: 5 }).map((_, j) => (
+                        <Star key={j} className="size-3" fill={j < item.rating ? "currentColor" : "none"} />
+                      ))}
+                    </div>
+                  </div>
                 </div>
-                <p className="text-sm">{item.comment}</p>
-                <p className="text-xs font-bold text-muted-foreground mt-1">{item.name}</p>
+                <p className="text-sm text-foreground/90">&ldquo;{item.comment}&rdquo;</p>
               </div>
             ))}
           </div>
@@ -87,6 +86,7 @@ export function BlockRenderer({ block }: { block: LandingPageBlock }) {
       );
 
     case "faq":
+      if (block.items.length === 0) return null;
       return (
         <section className="px-5 py-6 max-w-md mx-auto">
           <h2 className="text-lg font-extrabold mb-3.5 text-center">Questions fréquentes</h2>

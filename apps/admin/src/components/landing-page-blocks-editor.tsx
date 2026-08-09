@@ -168,7 +168,7 @@ function BlockFields({ block, onChange }: { block: LandingPageBlock; onChange: (
       return (
         <div className="flex flex-col gap-2.5">
           {block.items.map((item, i) => (
-            <div key={i} className="grid sm:grid-cols-[1fr_80px_2fr_auto] gap-2 items-end">
+            <div key={i} className="grid sm:grid-cols-[1fr_1fr_80px_2fr_auto] gap-2 items-end">
               <div className="flex flex-col gap-1">
                 <Label className="text-xs">Prénom</Label>
                 <Input
@@ -176,6 +176,17 @@ function BlockFields({ block, onChange }: { block: LandingPageBlock; onChange: (
                   onChange={(e) => {
                     const items = [...block.items];
                     items[i] = { ...item, name: e.target.value };
+                    onChange({ ...block, items });
+                  }}
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label className="text-xs">Photo (URL, optionnel)</Label>
+                <Input
+                  value={item.photoUrl ?? ""}
+                  onChange={(e) => {
+                    const items = [...block.items];
+                    items[i] = { ...item, photoUrl: e.target.value || undefined };
                     onChange({ ...block, items });
                   }}
                 />

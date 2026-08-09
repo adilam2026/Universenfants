@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Flame } from "lucide-react";
 
 function timeLeft(endAt: string) {
   const diff = Math.max(0, new Date(endAt).getTime() - Date.now());
@@ -11,7 +12,18 @@ function timeLeft(endAt: string) {
   return { days, hours, minutes, seconds, ended: diff <= 0 };
 }
 
-export function CountdownTimer({ endAt }: { endAt: string }) {
+function Digit({ value, label }: { value: number; label: string }) {
+  return (
+    <div className="flex flex-col items-center">
+      <div className="rounded-lg bg-white/15 px-2.5 py-1.5 text-lg font-extrabold tabular-nums text-white min-w-[2.5rem] text-center">
+        {String(value).padStart(2, "0")}
+      </div>
+      <span className="text-[10px] font-bold text-white/80 mt-0.5 uppercase tracking-wide">{label}</span>
+    </div>
+  );
+}
+
+export function CountdownTimer({ endAt, label }: { endAt: string; label?: string }) {
   const [left, setLeft] = useState(() => timeLeft(endAt));
 
   useEffect(() => {
@@ -22,12 +34,22 @@ export function CountdownTimer({ endAt }: { endAt: string }) {
   if (left.ended) return null;
 
   return (
-    <div className="flex items-center justify-center gap-2 py-2.5 px-4 text-white text-sm font-bold" style={{ background: "var(--lp-cta, #dc2626)" }}>
-      <span>Offre se termine dans :</span>
-      <span className="tabular-nums">
-        {left.days > 0 && `${left.days}j `}
-        {String(left.hours).padStart(2, "0")}h {String(left.minutes).padStart(2, "0")}m {String(left.seconds).padStart(2, "0")}s
+    <div
+      className="flex flex-col items-center gap-2 py-3 px-4 text-center"
+      style={{ background: "var(--lp-primary)" }}
+    >
+      <span className="text-sm font-extrabold text-white flex items-center gap-1.5">
+        <Flame className="size-4" /> {label ?? "Offre spéciale"}
       </span>
+      <div className="flex items-center gap-1.5">
+        <span className="text-xs font-bold text-white/90">Se termine dans :</span>
+        <div className="flex gap-1">
+          {left.days > 0 && <Digit value={left.days} label="j" />}
+          <Digit value={left.hours} label="h" />
+          <Digit value={left.minutes} label="m" />
+          <Digit value={left.seconds} label="s" />
+        </div>
+      </div>
     </div>
   );
 }

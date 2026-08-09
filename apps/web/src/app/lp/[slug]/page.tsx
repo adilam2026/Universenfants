@@ -3,14 +3,11 @@ import type { Metadata } from "next";
 import { LANDING_THEME_STYLES, type LandingTheme } from "@universenfants/shared";
 import { getLandingPageBySlug } from "@/lib/landing-pages-client";
 import { VisitTracker } from "@/components/landing/visit-tracker";
-import { CountdownTimer } from "@/components/landing/countdown-timer";
-import { BlockRenderer } from "@/components/landing/block-renderer";
+import { ProductShowcase } from "@/components/landing/product-showcase";
+import { BlockRenderer, type BodyBlock } from "@/components/landing/block-renderer";
+import { InlineCta } from "@/components/landing/inline-cta";
 import { QuickOrderForm } from "@/components/landing/quick-order-form";
 import { StickyCta } from "@/components/landing/sticky-cta";
-
-function dh(value: string | number) {
-  return `${Number(value).toLocaleString("fr-FR")} DH`;
-}
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
@@ -32,32 +29,50 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
     "--lp-primary": page.primaryColor || themeStyle.primary,
     "--lp-secondary": page.secondaryColor || themeStyle.secondary,
     "--lp-cta": page.ctaColor || themeStyle.cta,
+    "--lp-soft": themeStyle.soft,
   } as React.CSSProperties;
 
-  const showCountdown = page.countdownEnabled && page.countdownEndAt;
+  // "hero" et "gallery" alimentent la vitrine produit fixe en haut de page ;
+  // le reste (description, advantages, trust, testimonials, faq) est le
+  // corps de page, dans l'ordre configuré par l'admin.
+  const hero = page.blocks.find((b) => b.type === "hero");
+  const galleryBlock = page.blocks.find((b) => b.type === "gallery");
+  const bodyBlocks = page.blocks.filter((b): b is BodyBlock => b.type !== "hero" && b.type !== "gallery");
+
+  const galleryImages = galleryBlock?.images.length ? galleryBlock.images : page.product.images.map((i) => i.url);
+  const showcaseTitle = hero?.title || page.product.nameFr;
+
+  // Un 2e CTA après le premier bloc "avantages"/"réassurance" rencontré,
+  // pour que le bouton apparaisse à plusieurs endroits (§CTA et conversion).
+  let inlineCtaInserted = false;
 
   return (
-    <div style={cssVars} className="min-h-screen bg-white pb-24 md:pb-8">
+    <div className="min-h-screen pb-24 md:pb-8" style={{ ...cssVars, background: "var(--lp-soft)" }}>
       <VisitTracker slug={page.slug} />
-      {showCountdown && <CountdownTimer endAt={page.countdownEndAt!} />}
 
-      {page.blocks.map((block, i) => (
-        <BlockRenderer key={i} block={block} />
-      ))}
+      <ProductShowcase
+        images={galleryImages}
+        videoUrl={hero?.videoUrl}
+        title={showcaseTitle}
+        subtitle={hero?.subtitle}
+        price={price}
+        compareAt={compareAt}
+        ctaLabel={ctaLabel}
+        countdownEndAt={page.countdownEnabled ? page.countdownEndAt : null}
+      />
 
-      <section className="px-5 py-6 max-w-md mx-auto text-center">
-        <div className="flex items-baseline justify-center gap-3 mb-1">
-          <span className="text-3xl font-extrabold" style={{ color: "var(--lp-primary)" }}>{dh(price)}</span>
-          {compareAt && compareAt > price && <span className="text-lg text-muted-foreground line-through">{dh(compareAt)}</span>}
-        </div>
-        {compareAt && compareAt > price && (
-          <p className="text-sm font-bold text-brand-success">
-            Économisez {dh(compareAt - price)} (-{Math.round((1 - price / compareAt) * 100)}%)
-          </p>
-        )}
-      </section>
+      {bodyBlocks.map((block, i) => {
+        const shouldInsertCta = !inlineCtaInserted && (block.type === "advantages" || block.type === "trust");
+        if (shouldInsertCta) inlineCtaInserted = true;
+        return (
+          <div key={i}>
+            <BlockRenderer block={block} />
+            {shouldInsertCta && <InlineCta label={ctaLabel} />}
+          </div>
+        );
+      })}
 
-      <section className="px-5 max-w-md mx-auto">
+      <section className="px-5 py-6 max-w-md mx-auto">
         <QuickOrderForm
           slug={page.slug}
           requireAddress={page.requireAddress}
