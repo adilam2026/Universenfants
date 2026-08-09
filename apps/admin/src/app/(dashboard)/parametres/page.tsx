@@ -52,7 +52,7 @@ export default function SettingsPage() {
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="vatRate">Taux de TVA (%)</Label>
-              <Input id="vatRate" name="vatRate" type="number" step="0.1" min={0} defaultValue={settings.vatRate * 100} />
+              <Input id="vatRate" name="vatRate" type="number" step="0.1" min={0} max={100} defaultValue={settings.vatRate * 100} />
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="loyaltyRedeemRate">Points fidélité requis pour 1 DH de réduction</Label>

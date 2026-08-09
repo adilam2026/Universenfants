@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { useTranslations } from "next-intl";
+import { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useTranslations, useLocale } from "next-intl";
 import Image from "next/image";
-import { Minus, Plus, Trash2, Share2, ShoppingBag } from "lucide-react";
+import { Minus, Plus, Trash2, Share2, ShoppingBag, Users } from "lucide-react";
 import { useCart, broadcastCartUpdate } from "@/hooks/use-cart";
 import { useStoreSettings } from "@/hooks/use-store-settings";
-import { updateCartLine, removeCartLine, applyCoupon, removeCoupon, shareCart } from "@/lib/cart-client";
+import { updateCartLine, removeCartLine, applyCoupon, removeCoupon, shareCart, joinSharedCart } from "@/lib/cart-client";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
 
@@ -15,12 +16,33 @@ function dh(value: number) {
 }
 
 export default function CartPage() {
+  // useSearchParams() exige une frontière Suspense en page top-level (voir
+  // mot-de-passe/reinitialiser/page.tsx pour le même motif).
+  return (
+    <Suspense>
+      <CartPageContent />
+    </Suspense>
+  );
+}
+
+function CartPageContent() {
   const t = useTranslations("cart");
-  const { cart, loading, refresh } = useCart();
+  const locale = useLocale();
+  // Le lien de partage pointe vers /panier?shareToken=... — sans le
+  // transmettre à chaque lecture/mutation du panier, un participant qui
+  // ouvre ce lien voyait son propre panier (vide) au lieu du panier
+  // collaboratif : resolveCart() côté API donne pourtant la priorité au
+  // shareToken quand il est fourni.
+  const shareToken = useSearchParams().get("shareToken") ?? undefined;
+  const { cart, loading, refresh } = useCart(shareToken);
   const storeSettings = useStoreSettings();
   const [couponInput, setCouponInput] = useState("");
   const [couponError, setCouponError] = useState<string | null>(null);
   const [shareLink, setShareLink] = useState<string | null>(null);
+  const [joinEmail, setJoinEmail] = useState("");
+  const [joining, setJoining] = useState(false);
+  const [joined, setJoined] = useState(false);
+  const [joinError, setJoinError] = useState<string | null>(null);
   // Verrou par ligne : sans lui, deux clics rapides sur "+" partent tous les
   // deux du même `current` (capturé au rendu précédent) avant que le premier
   // n'ait rafraîchi le panier — un clic sur deux était silencieusement
@@ -35,7 +57,7 @@ export default function CartPage() {
     setPendingLineId(lineId);
     setLineError(null);
     try {
-      await updateCartLine(lineId, next);
+      await updateCartLine(lineId, next, shareToken);
       broadcastCartUpdate();
       refresh();
     } catch (err) {
@@ -50,7 +72,7 @@ export default function CartPage() {
     setPendingLineId(lineId);
     setLineError(null);
     try {
-      await removeCartLine(lineId);
+      await removeCartLine(lineId, shareToken);
       broadcastCartUpdate();
       refresh();
     } catch (err) {
@@ -71,8 +93,26 @@ export default function CartPage() {
   }
 
   async function handleShare() {
-    const { shareToken } = await shareCart();
-    setShareLink(`${window.location.origin}/panier?shareToken=${shareToken}`);
+    const { shareToken: newToken } = await shareCart();
+    // Le lien généré omettait le préfixe de locale (/fr ou /ar) requis par
+    // le routing (localePrefix: "always") : ouvert tel quel, il tombait sur
+    // la page 404 au lieu du panier partagé.
+    setShareLink(`${window.location.origin}/${locale}/panier?shareToken=${newToken}`);
+  }
+
+  async function handleJoin() {
+    if (!shareToken || !joinEmail.trim()) return;
+    setJoining(true);
+    setJoinError(null);
+    try {
+      await joinSharedCart(shareToken, joinEmail.trim());
+      setJoined(true);
+      refresh();
+    } catch (err) {
+      setJoinError(err instanceof Error ? err.message : "Une erreur est survenue");
+    } finally {
+      setJoining(false);
+    }
   }
 
   if (loading) return <div className="mx-auto max-w-6xl px-4 py-16 text-center text-muted-foreground">…</div>;
@@ -90,6 +130,36 @@ export default function CartPage() {
   return (
     <div className="mx-auto max-w-6xl px-4 md:px-7 py-4">
       <h1 className="font-display text-2xl font-extrabold mb-5">{t("title")}</h1>
+
+      {shareToken && cart && (
+        <div className="-mt-2.5 mb-4 rounded-2xl border border-border bg-secondary p-3.5 text-sm flex flex-col gap-2.5">
+          <p className="flex items-center gap-1.5 font-bold">
+            <Users className="size-4" /> {t("sharedNotice")}
+          </p>
+          {cart.participants.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              {t("participants")} : {cart.participants.map((p) => p.email).join(", ")}
+            </p>
+          )}
+          {joined ? (
+            <p className="text-xs font-bold text-brand-success">{t("joinSuccess")}</p>
+          ) : (
+            <div className="flex gap-2">
+              <input
+                type="email"
+                value={joinEmail}
+                onChange={(e) => setJoinEmail(e.target.value)}
+                placeholder={t("joinEmailPlaceholder")}
+                className="flex-1 rounded-lg border border-border px-3 py-2 text-xs"
+              />
+              <Button size="sm" onClick={handleJoin} disabled={joining || !joinEmail.trim()}>
+                {joining ? "…" : t("joinButton")}
+              </Button>
+            </div>
+          )}
+          {joinError && <p className="text-xs text-destructive">{joinError}</p>}
+        </div>
+      )}
 
       {isEmpty ? (
         <div className="py-16 text-center text-muted-foreground">

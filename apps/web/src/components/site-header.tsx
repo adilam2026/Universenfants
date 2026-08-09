@@ -25,6 +25,7 @@ export function SiteHeader() {
   // impossible à utiliser sans souris.
   useEffect(() => {
     if (!open) return;
+    const menuButton = menuButtonRef.current;
     closeButtonRef.current?.focus();
 
     function onKeyDown(e: KeyboardEvent) {
@@ -48,7 +49,7 @@ export function SiteHeader() {
     document.addEventListener("keydown", onKeyDown);
     return () => {
       document.removeEventListener("keydown", onKeyDown);
-      menuButtonRef.current?.focus();
+      menuButton?.focus();
     };
   }, [open]);
 

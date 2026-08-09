@@ -10,18 +10,18 @@ export function broadcastCartUpdate() {
   window.dispatchEvent(new Event(CART_UPDATED_EVENT));
 }
 
-export function useCart() {
+export function useCart(shareToken?: string) {
   const [cart, setCart] = useState<CartData | null>(null);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
     try {
-      const data = await getCart();
+      const data = await getCart(shareToken);
       setCart(data);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [shareToken]);
 
   useEffect(() => {
     refresh();

@@ -143,12 +143,19 @@ async function cartFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export const getCart = () => cartFetch<CartData>("/cart");
+export const getCart = (shareToken?: string) =>
+  cartFetch<CartData>(shareToken ? `/cart?shareToken=${encodeURIComponent(shareToken)}` : "/cart");
+export const joinSharedCart = (shareToken: string, email: string) =>
+  cartFetch<CartData>(`/cart/shared/${encodeURIComponent(shareToken)}/join`, { method: "POST", body: JSON.stringify({ email }) });
 export const addToCart = (productId: string, quantity = 1, variantId?: string) =>
   cartFetch<CartData>("/cart/lines", { method: "POST", body: JSON.stringify({ productId, quantity, variantId }) });
-export const updateCartLine = (lineId: string, quantity: number) =>
-  cartFetch<CartData>(`/cart/lines/${lineId}`, { method: "PATCH", body: JSON.stringify({ quantity }) });
-export const removeCartLine = (lineId: string) => cartFetch<CartData>(`/cart/lines/${lineId}`, { method: "DELETE" });
+export const updateCartLine = (lineId: string, quantity: number, shareToken?: string) =>
+  cartFetch<CartData>(`/cart/lines/${lineId}${shareToken ? `?shareToken=${encodeURIComponent(shareToken)}` : ""}`, {
+    method: "PATCH",
+    body: JSON.stringify({ quantity }),
+  });
+export const removeCartLine = (lineId: string, shareToken?: string) =>
+  cartFetch<CartData>(`/cart/lines/${lineId}${shareToken ? `?shareToken=${encodeURIComponent(shareToken)}` : ""}`, { method: "DELETE" });
 export const applyCoupon = (code: string) => cartFetch<CartData>("/cart/coupon", { method: "POST", body: JSON.stringify({ code }) });
 export const removeCoupon = () => cartFetch<CartData>("/cart/coupon", { method: "DELETE" });
 export const shareCart = () => cartFetch<{ shareToken: string }>("/cart/share", { method: "POST" });
