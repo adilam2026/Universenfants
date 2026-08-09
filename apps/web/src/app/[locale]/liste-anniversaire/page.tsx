@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { Cake, Copy, Check, Trash2, Search } from "lucide-react";
 import { Link } from "@/i18n/navigation";
@@ -138,12 +138,50 @@ function ListItemsPanel({ list, onChanged }: { list: BirthdayList; onChanged: ()
   const locale = useLocale();
   const [copied, setCopied] = useState(false);
   const [picking, setPicking] = useState(false);
+  // Sans ce verrou par ligne, un double-clic rapide sur la corbeille (ou une
+  // requête lente) envoie deux DELETE avant que le premier n'ait répondu : le
+  // second échoue avec un 404 (deleteMany count 0) et l'erreur était jusque-là
+  // avalée silencieusement.
+  const [busyItemId, setBusyItemId] = useState<string | null>(null);
+  // Même logique côté ajout : sans verrou, un double-clic sur "Ajouter" dans
+  // le picker crée deux fois le même article (birthday-list.service.ts#addItem
+  // n'a aucune déduplication).
+  const [adding, setAdding] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleCopy() {
     const url = `${window.location.origin}/${locale}/liste-anniversaire/${list.shareToken}`;
     await navigator.clipboard.writeText(url).catch(() => {});
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
+  }
+
+  async function handleRemove(itemId: string) {
+    if (busyItemId) return;
+    setBusyItemId(itemId);
+    setError(null);
+    try {
+      await removeBirthdayListItem(list.id, itemId);
+      onChanged();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Une erreur est survenue");
+    } finally {
+      setBusyItemId(null);
+    }
+  }
+
+  async function handleAdd(productId: string) {
+    if (adding) return;
+    setAdding(true);
+    setError(null);
+    try {
+      await addBirthdayListItem(list.id, productId);
+      onChanged();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Une erreur est survenue");
+    } finally {
+      setAdding(false);
+    }
   }
 
   return (
@@ -170,8 +208,9 @@ function ListItemsPanel({ list, onChanged }: { list: BirthdayList; onChanged: ()
               </span>
             ) : (
               <button
-                onClick={async () => { await removeBirthdayListItem(list.id, item.id); onChanged(); }}
-                className="flex size-8 items-center justify-center rounded-full text-muted-foreground hover:text-destructive hover:bg-secondary"
+                onClick={() => handleRemove(item.id)}
+                disabled={busyItemId === item.id}
+                className="flex size-8 items-center justify-center rounded-full text-muted-foreground hover:text-destructive hover:bg-secondary disabled:opacity-50"
                 aria-label={t("close")}
               >
                 <Trash2 className="size-4" />
@@ -184,11 +223,10 @@ function ListItemsPanel({ list, onChanged }: { list: BirthdayList; onChanged: ()
         )}
       </div>
 
+      {error && <p className="text-xs text-destructive mt-2">{error}</p>}
+
       {picking ? (
-        <ProductPicker
-          onPick={async (productId) => { await addBirthdayListItem(list.id, productId); onChanged(); }}
-          onClose={() => setPicking(false)}
-        />
+        <ProductPicker onPick={handleAdd} onClose={() => setPicking(false)} adding={adding} />
       ) : (
         <Button variant="ghost" className="w-full mt-3" onClick={() => setPicking(true)}>
           {t("addProduct")}
@@ -198,21 +236,35 @@ function ListItemsPanel({ list, onChanged }: { list: BirthdayList; onChanged: ()
   );
 }
 
-function ProductPicker({ onPick, onClose }: { onPick: (productId: string) => void; onClose: () => void }) {
+function ProductPicker({
+  onPick,
+  onClose,
+  adding,
+}: {
+  onPick: (productId: string) => void;
+  onClose: () => void;
+  adding: boolean;
+}) {
   const t = useTranslations("birthdayList");
   const locale = useLocale();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<ProductSummary[] | null>(null);
   const [loading, setLoading] = useState(false);
+  // Sans compteur de requête, une recherche lente pour "A" peut répondre
+  // après une recherche plus rapide pour "B" et écraser les résultats
+  // affichés avec ceux, périmés, de "A".
+  const requestIdRef = useRef(0);
 
   async function handleSearch(e: FormEvent) {
     e.preventDefault();
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     try {
       const data = await getProducts({ q: query || undefined, limit: 6 });
+      if (requestId !== requestIdRef.current) return;
       setResults(data.items);
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
     }
   }
 
@@ -237,7 +289,7 @@ function ProductPicker({ onPick, onClose }: { onPick: (productId: string) => voi
           {results.map((p) => (
             <div key={p.id} className="flex items-center justify-between gap-2 text-sm">
               <span className="truncate">{localized(p.nameFr, p.nameAr, locale)}</span>
-              <Button size="sm" variant="outline" onClick={() => onPick(p.id)}>{t("add")}</Button>
+              <Button size="sm" variant="outline" disabled={adding} onClick={() => onPick(p.id)}>{t("add")}</Button>
             </div>
           ))}
         </div>
