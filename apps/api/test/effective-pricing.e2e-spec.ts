@@ -148,6 +148,44 @@ describe("Effective pricing engine (e2e)", () => {
     await cleanupProduct(product.id);
   });
 
+  it("includes products under an active category promotion in the promoOnly filter even with no promoPrice of their own", async () => {
+    // products.service.ts#list filtrait promoOnly directement sur la colonne
+    // promoPrice, avant toute résolution des promotions catégorie/marque —
+    // un produit sans promoPrice propre mais dont la catégorie a une promo
+    // active affiche pourtant bien un prix barré sur sa fiche (test
+    // précédent), donc il doit aussi ressortir du rail "Promotions" / du
+    // filtre promo=1, pas en être absent.
+    const unpromotedCategory = await prisma.category.create({
+      data: { nameFr: "Test sans promo", slug: `test-no-promo-${Date.now()}` },
+    });
+    const productWithCategoryPromo = await createProduct(200, null);
+    const productWithNoPromo = await prisma.product.create({
+      data: {
+        sku: `PRICING-NOPROMO-${Date.now()}`,
+        nameFr: "Produit test sans promo",
+        categoryId: unpromotedCategory.id,
+        price: 80,
+        costPrice: 40,
+        seoUrl: `produit-test-no-promo-${Date.now()}`,
+        stock: 20,
+        status: "ACTIVE",
+      },
+    });
+    const categoryPromo = await prisma.promotion.create({
+      data: { name: "Promo catégorie promoOnly", type: "PERCENTAGE", value: 20, scope: "CATEGORY", categoryId, status: "ACTIVE", ...activeWindow() },
+    });
+
+    const listing = await productsService.list({ promoOnly: true } as never);
+    const ids = listing.items.map((i) => i.id);
+    expect(ids).toContain(productWithCategoryPromo.id);
+    expect(ids).not.toContain(productWithNoPromo.id);
+
+    await prisma.promotion.delete({ where: { id: categoryPromo.id } });
+    await cleanupProduct(productWithCategoryPromo.id);
+    await prisma.product.delete({ where: { id: productWithNoPromo.id } });
+    await prisma.category.delete({ where: { id: unpromotedCategory.id } });
+  });
+
   it("applies the resolved promotional price through cart and checkout, with the coupon computed on top of it", async () => {
     const product = await createProduct(200, 150);
     const categoryPromo = await prisma.promotion.create({

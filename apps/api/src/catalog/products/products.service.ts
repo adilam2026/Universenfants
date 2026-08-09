@@ -66,12 +66,30 @@ export class ProductsService {
     const page = query.page ?? 1;
     const limit = Math.min(query.limit ?? 24, 100);
 
+    // Récupéré ici (plutôt que juste avant le mapping plus bas) car promoOnly
+    // en a besoin pour construire son filtre.
+    const active = await this.pricing.getActivePromotions();
+
     const where: Prisma.ProductWhereInput = { status: "ACTIVE" };
     if (query.category) where.category = { slug: query.category };
     if (query.brand) where.brand = { slug: query.brand };
     if (query.ageMin !== undefined) where.ageMax = { gte: query.ageMin };
     if (query.ageMax !== undefined) where.ageMin = { lte: query.ageMax };
-    if (query.promoOnly) where.promoPrice = { not: null };
+    if (query.promoOnly && active.store.length === 0) {
+      // `promoPrice` seul ignore les promotions catégorie/marque actives : un
+      // produit sans promoPrice propre mais dont la catégorie a une promo
+      // active affiche bien un prix barré sur sa fiche (PricingService), donc
+      // il doit aussi apparaître dans "Promotions" / le filtre promo=1. Une
+      // promo boutique active dispense de filtrer : tous les produits actifs
+      // sont alors en promo.
+      const categoryIds = [...active.byCategory.keys()];
+      const brandIds = [...active.byBrand.keys()];
+      where.OR = [
+        { promoPrice: { not: null } },
+        ...(categoryIds.length ? [{ categoryId: { in: categoryIds } }] : []),
+        ...(brandIds.length ? [{ brandId: { in: brandIds } }] : []),
+      ];
+    }
     if (query.inStockOnly) where.stock = { gt: 0 };
     // Un jouet UNISEX convient aux deux — on ne l'exclut donc pas d'une recherche ciblée.
     if (query.gender) where.targetGender = query.gender === "UNISEX" ? "UNISEX" : { in: [query.gender, "UNISEX"] };
@@ -124,8 +142,6 @@ export class ProductsService {
       ranked = [...items].sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
       ranked = ranked.slice((page - 1) * limit, (page - 1) * limit + limit);
     }
-
-    const active = await this.pricing.getActivePromotions();
 
     return {
       items: ranked.map((p) => this.toPublicShape(this.applyEffectivePricing(p, active))),
