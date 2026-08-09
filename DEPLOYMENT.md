@@ -28,6 +28,23 @@ docker run -p 4000:4000 --env-file apps/api/.env universenfants-api
 L'image applique les migrations Prisma (`prisma migrate deploy`) au
 démarrage puis lance `node dist/main.js`.
 
+### Premier déploiement uniquement : amorçage de la base
+
+Les migrations créent les tables mais ne les remplissent pas. Sans cette
+étape, la base de production est vide : aucun rôle/permission, aucun compte
+super-admin (impossible de se connecter au Back-Office), aucune ville
+(frais de livraison vides), aucune catégorie/marque de départ. À exécuter
+**une seule fois**, juste après le tout premier déploiement (script idempotent,
+sans risque de doublons à une exécution ultérieure) :
+
+```bash
+DATABASE_URL="<url de la base de production>" pnpm --filter @universenfants/api prisma:seed
+```
+
+Crée entre autres le compte `admin@universenfants.ma` / `ChangeMe123!` —
+**changer immédiatement ce mot de passe** après la première connexion (voir
+checklist post-déploiement plus bas).
+
 ### Variables d'environnement requises en production
 
 Voir `apps/api/.env.example` pour la liste complète et les commentaires.
