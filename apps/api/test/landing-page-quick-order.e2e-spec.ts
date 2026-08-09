@@ -77,6 +77,25 @@ describe("Landing page quick order (e2e)", () => {
     await prisma.product.delete({ where: { id: productId } });
   }
 
+  it("rejects a countdown whose end precedes its start", async () => {
+    const product = await createProduct(150, 10);
+    await expect(
+      landingPages.create({
+        name: "Landing countdown inversé",
+        slug: `lp-countdown-${Date.now()}`,
+        productId: product.id,
+        template: "flash-promo",
+        theme: "promo-flash",
+        blocks: [],
+        countdownEnabled: true,
+        countdownStartAt: new Date(Date.now() + 86_400_000).toISOString(),
+        countdownEndAt: new Date(Date.now() - 86_400_000).toISOString(),
+      } as never),
+    ).rejects.toThrow(/postérieure à son début/);
+
+    await prisma.product.delete({ where: { id: product.id } });
+  });
+
   it("charges the campaign's displayPrice, not the catalog price, even with an active promotion", async () => {
     const product = await createProduct(200, 10);
     const promo = await prisma.promotion.create({

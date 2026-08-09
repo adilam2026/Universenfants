@@ -29,7 +29,19 @@ export class LandingPagesService {
     return page;
   }
 
+  // Sans ce contrôle, un compte à rebours dont la fin précède le début est
+  // enregistré sans erreur — la landing page publique affiche alors un
+  // minuteur déjà expiré (ou négatif) dès sa mise en ligne, silencieusement.
+  private assertValidCountdown(dto: UpsertLandingPageDto) {
+    if (dto.countdownStartAt && dto.countdownEndAt) {
+      if (new Date(dto.countdownStartAt).getTime() >= new Date(dto.countdownEndAt).getTime()) {
+        throw new BadRequestException("La fin du compte à rebours doit être postérieure à son début");
+      }
+    }
+  }
+
   async create(dto: UpsertLandingPageDto) {
+    this.assertValidCountdown(dto);
     await this.assertSlugAvailable(dto.slug);
     // assertSlugAvailable reste une vérification rapide pour l'UX, mais ne
     // protège pas seule contre deux créations concurrentes sur le même slug
@@ -42,6 +54,7 @@ export class LandingPagesService {
   }
 
   async update(id: string, dto: UpsertLandingPageDto) {
+    this.assertValidCountdown(dto);
     await this.assertSlugAvailable(dto.slug, id);
     const page = await this.prisma.landingPage.findUnique({ where: { id } });
     if (!page) throw new NotFoundException("Landing page introuvable");
