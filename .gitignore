@@ -7,8 +7,8 @@ out/
 coverage/
 *.log
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
 .DS_Store
 .turbo/
 apps/api/generated/

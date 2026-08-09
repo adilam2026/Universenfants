@@ -19,15 +19,21 @@ RUN pnpm --filter @universenfants/shared build \
 # image — les regénérer dans un second `pnpm install` est fragile.
 FROM base AS runtime
 ENV NODE_ENV=production
-COPY --from=build /repo/node_modules node_modules
-COPY --from=build /repo/package.json ./
-COPY --from=build /repo/packages/shared/dist packages/shared/dist
-COPY --from=build /repo/packages/shared/package.json packages/shared/package.json
-COPY --from=build /repo/apps/api/dist apps/api/dist
-COPY --from=build /repo/apps/api/prisma apps/api/prisma
-COPY --from=build /repo/apps/api/package.json apps/api/package.json
-COPY --from=build /repo/apps/api/node_modules apps/api/node_modules
+# L'image officielle node:*-alpine fournit déjà un utilisateur non-root
+# "node" (UID 1000) — l'utiliser plutôt que de tourner en root, qui est le
+# comportement par défaut d'un conteneur Docker sans directive USER.
+COPY --from=build --chown=node:node /repo/node_modules node_modules
+COPY --from=build --chown=node:node /repo/package.json ./
+COPY --from=build --chown=node:node /repo/packages/shared/dist packages/shared/dist
+COPY --from=build --chown=node:node /repo/packages/shared/package.json packages/shared/package.json
+COPY --from=build --chown=node:node /repo/apps/api/dist apps/api/dist
+COPY --from=build --chown=node:node /repo/apps/api/prisma apps/api/prisma
+COPY --from=build --chown=node:node /repo/apps/api/package.json apps/api/package.json
+COPY --from=build --chown=node:node /repo/apps/api/node_modules apps/api/node_modules
 
 WORKDIR /repo/apps/api
+USER node
 EXPOSE 4000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:'+(process.env.PORT||4000)+'/api/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
 CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy && node dist/main.js"]

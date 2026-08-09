@@ -207,6 +207,11 @@ model Product {
   @@index([categoryId])
   @@index([brandId])
   @@index([status])
+  // Le listing public filtre toujours par status puis trie par date ou prix
+  // (products.service.ts list()) — un index composite sert ces deux tris
+  // sans scan complet, contrairement à l'index status seul ci-dessus.
+  @@index([status, createdAt])
+  @@index([status, price])
 }
 
 model ProductImage {

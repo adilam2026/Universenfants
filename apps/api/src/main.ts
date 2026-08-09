@@ -17,6 +17,12 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { cors: false });
   const isProd = process.env.NODE_ENV === "production";
 
+  // Sans ça, Nest n'écoute jamais SIGTERM/SIGINT et les hooks de cycle de vie
+  // (PrismaService.onModuleDestroy, etc.) ne se déclenchent jamais — un arrêt
+  // de conteneur (déploiement, autoscaling) tue le process brutalement sans
+  // laisser les requêtes en cours se terminer ni les connexions DB se fermer.
+  app.enableShutdownHooks();
+
   // Derrière un reverse proxy (Vercel/Nginx) : requis pour que le throttler
   // et les logs voient la vraie IP client plutôt que celle du proxy.
   app.set("trust proxy", 1);
