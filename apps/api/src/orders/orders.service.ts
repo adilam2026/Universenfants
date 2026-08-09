@@ -266,10 +266,13 @@ export class OrdersService {
       where: { OR: [dto.email ? { email: dto.email } : undefined, { phone: dto.phone }].filter(Boolean) as any },
     });
     if (found) {
-      return this.prisma.customer.update({
-        where: { id: found.id },
-        data: { firstName: dto.firstName, lastName: dto.lastName, email: dto.email ?? found.email },
-      });
+      // Rattachement automatique (§65/§239/§240), mais SANS jamais écraser
+      // l'identité du client existant avec ce qu'un invité non authentifié a
+      // simplement tapé au formulaire : sinon, connaître le téléphone d'un
+      // client réel suffisait à réassigner son email (dto.email arbitraire)
+      // sur sa fiche, puis à recevoir à sa place le lien de réinitialisation
+      // de mot de passe — prise de contrôle de compte sans authentification.
+      return found;
     }
     try {
       const created = await this.prisma.customer.create({
