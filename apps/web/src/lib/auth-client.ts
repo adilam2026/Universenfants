@@ -1,8 +1,18 @@
 "use client";
 
-import { getCustomerToken, setCustomerToken, clearCustomerToken } from "@/lib/cart-client";
+import {
+  getCustomerToken,
+  setCustomerToken,
+  clearCustomerToken,
+  refreshCustomerAccessToken,
+  getValidCustomerToken,
+} from "@/lib/cart-client";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api";
+
+// Jamais de tentative de refresh sur ces routes : un 401 y est une réponse
+// normale (identifiants invalides), pas une expiration de session.
+const NO_REFRESH_PATHS = ["/auth/customer/login", "/auth/customer/register", "/auth/customer/refresh"];
 
 export interface CustomerProfile {
   id: string;
@@ -15,15 +25,26 @@ export interface CustomerProfile {
   loyaltyPoints: number;
 }
 
-async function authFetch<T>(path: string, init?: RequestInit): Promise<T> {
+async function authFetch<T>(path: string, init?: RequestInit, isRetry = false): Promise<T> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(init?.headers as Record<string, string>),
   };
-  const token = getCustomerToken();
+  const skipAuth = NO_REFRESH_PATHS.includes(path);
+  const token = skipAuth ? getCustomerToken() : await getValidCustomerToken();
   if (token) headers.Authorization = `Bearer ${token}`;
 
   const res = await fetch(`${API_URL}${path}`, { ...init, headers });
+
+  // Filet de sécurité si le rafraîchissement proactif ci-dessus a manqué la
+  // fenêtre (horloge client décalée, etc.) — /me et /orders utilisent
+  // JwtAuthGuard, qui renvoie bien 401 sur un token expiré (contrairement à
+  // OptionalJwtAuthGuard côté panier/checkout, géré par getValidCustomerToken).
+  if (res.status === 401 && !isRetry && !skipAuth) {
+    const newToken = await refreshCustomerAccessToken();
+    if (newToken) return authFetch<T>(path, init, true);
+  }
+
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.message ?? `Erreur (${res.status})`);
@@ -45,20 +66,20 @@ export interface LoginPayload {
 }
 
 export async function register(payload: RegisterPayload) {
-  const { accessToken } = await authFetch<{ accessToken: string; refreshToken: string }>("/auth/customer/register", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-  setCustomerToken(accessToken);
+  const { accessToken, refreshToken } = await authFetch<{ accessToken: string; refreshToken: string }>(
+    "/auth/customer/register",
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+  setCustomerToken(accessToken, refreshToken);
   return accessToken;
 }
 
 export async function login(payload: LoginPayload) {
-  const { accessToken } = await authFetch<{ accessToken: string; refreshToken: string }>("/auth/customer/login", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-  setCustomerToken(accessToken);
+  const { accessToken, refreshToken } = await authFetch<{ accessToken: string; refreshToken: string }>(
+    "/auth/customer/login",
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+  setCustomerToken(accessToken, refreshToken);
   return accessToken;
 }
 

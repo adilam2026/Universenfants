@@ -10,6 +10,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
       secretOrKey: process.env.JWT_ACCESS_SECRET ?? "dev-access-secret",
+      // Explicite plutôt qu'implicite : empêche qu'un token forgé avec un
+      // autre algorithme (ou "none") soit accepté si le comportement par
+      // défaut de la librairie venait à changer.
+      algorithms: ["HS256"],
     });
   }
 

@@ -3,6 +3,7 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api";
 const TOKEN_KEY = "ue_cart_token";
 const AUTH_KEY = "ue_customer_token";
+const REFRESH_KEY = "ue_customer_refresh_token";
 
 export const AUTH_CHANGED_EVENT = "ue:auth-changed";
 
@@ -21,14 +22,80 @@ export function getCustomerToken(): string | null {
   return window.localStorage.getItem(AUTH_KEY);
 }
 
-export function setCustomerToken(token: string) {
+function getCustomerRefreshToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(REFRESH_KEY);
+}
+
+export function setCustomerToken(token: string, refreshToken?: string) {
   window.localStorage.setItem(AUTH_KEY, token);
+  if (refreshToken) window.localStorage.setItem(REFRESH_KEY, refreshToken);
   window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
 }
 
 export function clearCustomerToken() {
   window.localStorage.removeItem(AUTH_KEY);
+  window.localStorage.removeItem(REFRESH_KEY);
   window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
+}
+
+// L'access token expire au bout de 15 min (JWT_ACCESS_EXPIRES_IN) — sans ce
+// mécanisme, toute session client se termine brutalement après 15 min
+// d'inactivité de requête, même avec un refresh token valide 30 jours.
+// dédupliqué : plusieurs requêtes en 401 simultanées ne déclenchent qu'un
+// seul appel /refresh.
+let refreshInFlight: Promise<string | null> | null = null;
+
+export function refreshCustomerAccessToken(): Promise<string | null> {
+  if (refreshInFlight) return refreshInFlight;
+  const refreshToken = getCustomerRefreshToken();
+  if (!refreshToken) return Promise.resolve(null);
+
+  refreshInFlight = (async () => {
+    try {
+      const res = await fetch(`${API_URL}/auth/customer/refresh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshToken }),
+      });
+      if (!res.ok) {
+        clearCustomerToken();
+        return null;
+      }
+      const data = (await res.json()) as { accessToken: string; refreshToken: string };
+      setCustomerToken(data.accessToken, data.refreshToken);
+      return data.accessToken;
+    } catch {
+      return null;
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+  return refreshInFlight;
+}
+
+function decodeJwtExpiry(token: string): number | null {
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+    return typeof payload.exp === "number" ? payload.exp * 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Rafraîchit *avant* d'envoyer un token expiré plutôt que de réagir à un
+ * 401 : les routes accessibles en invité (panier, checkout) utilisent
+ * OptionalJwtAuthGuard côté API, qui n'échoue jamais sur un token invalide —
+ * il traite juste silencieusement la requête comme anonyme. Sans ce
+ * mécanisme, un client connecté dont le token a expiré verrait sa commande
+ * traitée en invité, sans lien avec son compte, sans aucune erreur visible. */
+export async function getValidCustomerToken(): Promise<string | null> {
+  const token = getCustomerToken();
+  if (!token) return null;
+  const expiresAt = decodeJwtExpiry(token);
+  const expiringSoon = expiresAt !== null && Date.now() >= expiresAt - 30_000;
+  if (expiringSoon) return refreshCustomerAccessToken();
+  return token;
 }
 
 export interface CartLine {
@@ -59,7 +126,7 @@ async function cartFetch<T>(path: string, init?: RequestInit): Promise<T> {
     "x-cart-token": getCartToken(),
     ...(init?.headers as Record<string, string>),
   };
-  const customerToken = getCustomerToken();
+  const customerToken = await getValidCustomerToken();
   if (customerToken) headers.Authorization = `Bearer ${customerToken}`;
 
   const res = await fetch(`${API_URL}${path}`, { ...init, headers });

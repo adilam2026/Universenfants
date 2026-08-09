@@ -58,6 +58,31 @@ export class StaffAuthService {
       },
     });
 
+    return this.issueTokens(staff);
+  }
+
+  /** Émet un nouveau couple de tokens à partir d'un refresh token valide —
+   * sans ça, les sessions expirent brutalement après JWT_ACCESS_EXPIRES_IN
+   * (15 min par défaut) puisque l'access token n'est jamais renouvelé. */
+  async refresh(refreshToken: string) {
+    let payload: JwtPayload;
+    try {
+      payload = this.jwt.verify<JwtPayload>(refreshToken, {
+        secret: process.env.JWT_REFRESH_SECRET,
+        algorithms: ["HS256"],
+      });
+    } catch {
+      throw new UnauthorizedException("Session expirée, merci de vous reconnecter");
+    }
+    if (payload.kind !== "staff") throw new UnauthorizedException("Token invalide");
+
+    const staff = await this.prisma.staffUser.findUnique({ where: { id: payload.sub }, include: { role: true } });
+    if (!staff?.active) throw new UnauthorizedException("Compte introuvable ou désactivé");
+
+    return this.issueTokens(staff);
+  }
+
+  private issueTokens(staff: { id: string; name: string; email: string; role: { code: string } }) {
     const payload: JwtPayload = {
       sub: staff.id,
       kind: "staff",
@@ -68,10 +93,12 @@ export class StaffAuthService {
       accessToken: this.jwt.sign(payload, {
         secret: process.env.JWT_ACCESS_SECRET,
         expiresIn: process.env.JWT_ACCESS_EXPIRES_IN ?? "15m",
+        algorithm: "HS256",
       }),
       refreshToken: this.jwt.sign(payload, {
         secret: process.env.JWT_REFRESH_SECRET,
         expiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? "30d",
+        algorithm: "HS256",
       }),
       user: { id: staff.id, name: staff.name, email: staff.email, role: staff.role.code },
     };

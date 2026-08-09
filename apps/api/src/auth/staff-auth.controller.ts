@@ -4,6 +4,7 @@ import { Throttle } from "@nestjs/throttler";
 import type { Request } from "express";
 import { StaffAuthService } from "./staff-auth.service";
 import { StaffLoginDto } from "./dto/staff-login.dto";
+import { RefreshTokenDto } from "./dto/refresh-token.dto";
 
 @ApiTags("auth-staff")
 @Controller("auth/staff")
@@ -16,5 +17,11 @@ export class StaffAuthController {
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   login(@Body() dto: StaffLoginDto, @Req() req: Request) {
     return this.service.login(dto, req);
+  }
+
+  @Post("refresh")
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  refresh(@Body() dto: RefreshTokenDto) {
+    return this.service.refresh(dto.refreshToken);
   }
 }

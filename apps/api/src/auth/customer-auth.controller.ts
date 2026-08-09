@@ -10,6 +10,7 @@ import { RegisterCustomerDto } from "./dto/register-customer.dto";
 import { LoginDto } from "./dto/login.dto";
 import { ForgotPasswordDto } from "./dto/forgot-password.dto";
 import { ResetPasswordDto } from "./dto/reset-password.dto";
+import { RefreshTokenDto } from "./dto/refresh-token.dto";
 
 @ApiTags("auth-customer")
 @Controller("auth/customer")
@@ -39,6 +40,12 @@ export class CustomerAuthController {
   @Post("reset-password")
   resetPassword(@Body() dto: ResetPasswordDto) {
     return this.service.resetPassword(dto);
+  }
+
+  @Post("refresh")
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  refresh(@Body() dto: RefreshTokenDto) {
+    return this.service.refresh(dto.refreshToken);
   }
 
   @Get("me")
