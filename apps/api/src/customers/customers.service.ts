@@ -18,6 +18,11 @@ export class CustomersService {
         totalSpent: true,
         createdAt: true,
       },
+      // Filet de sécurité : évite une réponse illimitée si la base clients
+      // grossit fortement — une vraie pagination Back-Office pourra être
+      // ajoutée plus tard sans changer ce plafond (même pattern que
+      // products.listForAdmin / orders.listForAdmin).
+      take: 1000,
     });
   }
 

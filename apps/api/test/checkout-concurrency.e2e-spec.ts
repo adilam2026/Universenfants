@@ -249,4 +249,63 @@ describe("Checkout concurrency (e2e)", () => {
     await prisma.cartLine.deleteMany({ where: { productId: product.id } });
     await prisma.product.delete({ where: { id: product.id } });
   });
+
+  it("never lets a loyalty points balance go negative under concurrent redemption", async () => {
+    // Même faille que les coupons, une couche plus loin : le solde de points
+    // était lu avant la transaction puis décrémenté dedans sans jamais être
+    // re-vérifié sous verrou. Deux checkouts concurrents du même client (deux
+    // onglets, deux appareils) utilisant chacun tout son solde de points
+    // pouvaient tous deux lire le même solde de départ et faire passer le
+    // solde final en négatif.
+    const product = await prisma.product.create({
+      data: {
+        sku: `CONC-LOYALTY-${Date.now()}`,
+        nameFr: "Produit test points fidélité",
+        categoryId,
+        price: 1000,
+        costPrice: 500,
+        seoUrl: `produit-test-loyalty-${Date.now()}`,
+        stock: 10,
+        status: "ACTIVE",
+      },
+    });
+
+    const customer = await prisma.customer.create({
+      data: { firstName: "Loyalty", lastName: "Race", phone: `07${Date.now().toString().slice(-8)}` },
+    });
+    // 100 points, redeemRate 1 DH/point (valeur par défaut des Paramètres) —
+    // largement suffisant pour être entièrement consommé par une seule des
+    // deux commandes (chacune de 1000 DH de sous-total).
+    await prisma.loyaltyAccount.create({ data: { customerId: customer.id, pointsBalance: 100 } });
+
+    const cartA = await prisma.cart.create({ data: { ownerToken: crypto.randomUUID(), customerId: customer.id } });
+    const cartB = await prisma.cart.create({ data: { ownerToken: crypto.randomUUID(), customerId: customer.id } });
+    await cartService.addLine(cartA.id, { productId: product.id, quantity: 1 });
+    await cartService.addLine(cartB.id, { productId: product.id, quantity: 1 });
+
+    const dto = (suffix: string) => ({ ...checkoutDto(suffix), useLoyaltyPoints: true });
+    const [a, b] = await Promise.allSettled([
+      ordersService.checkout(cartA.id, dto("88888881")),
+      ordersService.checkout(cartB.id, dto("88888882")),
+    ]);
+
+    const account = await prisma.loyaltyAccount.findUniqueOrThrow({ where: { customerId: customer.id } });
+    expect(account.pointsBalance).toBeGreaterThanOrEqual(0);
+
+    const redeemTx = await prisma.loyaltyTransaction.findMany({ where: { accountId: account.id, type: "REDEEM" } });
+    const totalRedeemed = redeemTx.reduce((sum, t) => sum + Math.abs(t.points), 0);
+    expect(totalRedeemed).toBeLessThanOrEqual(100);
+
+    const orderIds = [a, b]
+      .filter((r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof ordersService.checkout>>> => r.status === "fulfilled")
+      .map((r) => r.value.id);
+    await prisma.loyaltyTransaction.deleteMany({ where: { accountId: account.id } });
+    await prisma.orderLine.deleteMany({ where: { orderId: { in: orderIds } } });
+    await prisma.order.deleteMany({ where: { id: { in: orderIds } } });
+    await prisma.cartLine.deleteMany({ where: { productId: product.id } });
+    await prisma.cart.deleteMany({ where: { id: { in: [cartA.id, cartB.id] } } });
+    await prisma.loyaltyAccount.delete({ where: { customerId: customer.id } });
+    await prisma.customer.delete({ where: { id: customer.id } });
+    await prisma.product.delete({ where: { id: product.id } });
+  });
 });

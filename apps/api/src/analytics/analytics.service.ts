@@ -14,8 +14,13 @@ export class AnalyticsService {
         select: { createdAt: true, total: true, status: true },
         orderBy: { createdAt: "asc" },
       }),
+      // Sans le filtre sur order.createdAt, "meilleures ventes" agrégeait sur
+      // tout l'historique des commandes (incohérent avec le reste du tableau
+      // de bord, limité à 30 jours) et son coût grossit indéfiniment avec le
+      // volume de commandes au fil des années au lieu de rester borné.
       this.prisma.orderLine.groupBy({
         by: ["productNameSnapshot"],
+        where: { order: { createdAt: { gte: since } } },
         _sum: { quantity: true, lineTotal: true },
         orderBy: { _sum: { lineTotal: "desc" } },
         take: 5,

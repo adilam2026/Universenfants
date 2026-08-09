@@ -166,13 +166,23 @@ export class OrdersService {
       }
 
       if (pointsToRedeem > 0) {
-        const account = await tx.loyaltyAccount.findUniqueOrThrow({ where: { customerId: customer.id } });
+        // Verrou + re-vérification : même faille que les coupons — sans ça,
+        // deux checkouts concurrents du même client (deux onglets, deux
+        // appareils) utilisant chacun des points fidélité liraient le même
+        // solde de départ avant qu'aucun n'ait committé, et le solde final
+        // pourrait devenir négatif (decrement atomique côté SQL, mais sans
+        // jamais vérifier qu'il reste suffisamment de points à ce moment-là).
+        const [lockedAccount] = await tx.$queryRaw<{ id: string; pointsBalance: number }[]>`
+          SELECT id, "pointsBalance" FROM "LoyaltyAccount" WHERE "customerId" = ${customer.id} FOR UPDATE`;
+        if (!lockedAccount || lockedAccount.pointsBalance < pointsToRedeem) {
+          throw new BadRequestException("Solde de points fidélité insuffisant, merci de réessayer");
+        }
         await tx.loyaltyAccount.update({
-          where: { id: account.id },
+          where: { id: lockedAccount.id },
           data: { pointsBalance: { decrement: pointsToRedeem } },
         });
         await tx.loyaltyTransaction.create({
-          data: { accountId: account.id, type: "REDEEM", points: -pointsToRedeem, orderId: created.id },
+          data: { accountId: lockedAccount.id, type: "REDEEM", points: -pointsToRedeem, orderId: created.id },
         });
       }
 

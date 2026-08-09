@@ -44,6 +44,10 @@ export class ReviewsService {
       where: status ? { status: status as never } : undefined,
       include: { product: { select: { nameFr: true, seoUrl: true } }, customer: { select: { firstName: true, lastName: true } } },
       orderBy: { createdAt: "desc" },
+      // Filet de sécurité : contrairement aux coupons/promotions/pages
+      // (contenu géré par l'équipe, faible volume), le nombre d'avis grossit
+      // avec le volume de commandes et n'est pas naturellement borné.
+      take: 1000,
     });
   }
 
