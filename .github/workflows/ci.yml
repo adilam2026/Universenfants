@@ -1,0 +1,145 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  NODE_VERSION: "22"
+  PNPM_VERSION: "10.33.0"
+
+jobs:
+  checks:
+    name: Lint, typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @universenfants/api prisma:generate
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck (api + shared)
+        run: pnpm typecheck
+
+  build:
+    name: Full-stack build (with live API for SSG)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: universenfants
+          POSTGRES_PASSWORD: universenfants_ci
+          POSTGRES_DB: universenfants
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U universenfants"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      # Pas de healthcheck ici : l'image officielle n'a pas de binaire HTTP
+      # garanti disponible pour un `--health-cmd`, et ce n'est pas nécessaire
+      # — SearchService.onModuleInit() dégrade proprement (repli Postgres) si
+      # Meilisearch n'est pas encore prêt au démarrage de l'API.
+      meilisearch:
+        image: getmeili/meilisearch:v1.11
+        env:
+          MEILI_MASTER_KEY: ciMasterKey
+          MEILI_NO_ANALYTICS: "true"
+        ports:
+          - 7700:7700
+
+    env:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://universenfants:universenfants_ci@localhost:5432/universenfants?schema=public
+      REDIS_URL: redis://localhost:6379
+      MEILISEARCH_HOST: http://localhost:7700
+      MEILISEARCH_API_KEY: ciMasterKey
+      JWT_ACCESS_SECRET: ci-access-secret-not-for-production
+      JWT_REFRESH_SECRET: ci-refresh-secret-not-for-production
+      CORS_ORIGINS: http://localhost:3000,http://localhost:3001
+      API_PUBLIC_URL: http://localhost:4000
+      WEB_PUBLIC_URL: http://localhost:3000
+      NEXT_PUBLIC_API_URL: http://localhost:4000/api
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+      NEXT_PUBLIC_WEB_URL: http://localhost:3000
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared package
+        run: pnpm --filter @universenfants/shared build
+
+      - name: Prisma generate + migrate + seed
+        run: |
+          pnpm --filter @universenfants/api prisma:generate
+          pnpm --filter @universenfants/api prisma:deploy
+          pnpm db:seed
+
+      - name: Build API
+        run: pnpm --filter @universenfants/api build
+
+      - name: Start API in background
+        run: nohup node apps/api/dist/main.js > api.log 2>&1 & disown
+
+      - name: Wait for API health
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:4000/api/health > /dev/null; then
+              echo "API is up"; exit 0
+            fi
+            sleep 1
+          done
+          echo "API did not become healthy in time"; cat api.log; exit 1
+
+      # apps/web and apps/admin call the live API during `next build` to
+      # statically generate pages (home, category pages, info pages...) — a
+      # down API fails the build outright, so this job doubles as a check
+      # that SSG-dependent pages actually render against a real backend.
+      - name: Build web
+        run: pnpm --filter @universenfants/web build
+
+      - name: Build admin
+        run: pnpm --filter @universenfants/admin build
+
+      - name: Dump API logs on failure
+        if: failure()
+        run: cat api.log || true
