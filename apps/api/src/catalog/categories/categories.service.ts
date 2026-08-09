@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import { runCatchingDuplicate } from "../../common/prisma-errors.util";
 import type { UpsertCategoryDto } from "./dto/upsert-category.dto";
@@ -56,6 +56,17 @@ export class CategoriesService {
 
   async archive(id: string) {
     await this.ensureExists(id);
+    // tree() (navigation catégorie côté Front) ne renvoie que les catégories
+    // ACTIVE — sans ce garde-fou, archiver une catégorie encore utilisée par
+    // des produits actifs les rendait injoignables par la navigation
+    // catégorie (leur fiche produit reste accessible directement, mais plus
+    // aucun chemin de navigation n'y mène), sans le moindre avertissement.
+    const productsUsingCategory = await this.prisma.product.count({ where: { categoryId: id, status: "ACTIVE" } });
+    if (productsUsingCategory > 0) {
+      throw new BadRequestException(
+        `Impossible d'archiver : ${productsUsingCategory} produit(s) actif(s) sont encore rattachés à cette catégorie`,
+      );
+    }
     return this.prisma.category.update({ where: { id }, data: { status: "ARCHIVED" } });
   }
 

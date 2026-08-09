@@ -18,6 +18,8 @@ import {
   Settings,
   LogOut,
   ScrollText,
+  FolderTree,
+  BadgeCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { staffLogout, getStaffToken } from "@/lib/api-client";
@@ -45,6 +47,8 @@ const NAV: { group: string; items: NavItem[] }[] = [
     group: "Catalogue",
     items: [
       { href: "/produits", label: "Produits", icon: PackageSearch, permission: "product.read" },
+      { href: "/categories", label: "Catégories", icon: FolderTree, permission: "product.read" },
+      { href: "/marques", label: "Marques", icon: BadgeCheck, permission: "product.read" },
       { href: "/import", label: "Import Excel", icon: Upload, permission: "product.create" },
     ],
   },
