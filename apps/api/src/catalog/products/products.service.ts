@@ -191,12 +191,23 @@ export class ProductsService {
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json<ImportRow>(sheet, { defval: undefined });
 
-    const [categories, brands] = await Promise.all([
+    // SKUs déjà existants récupérés en une seule requête plutôt qu'un
+    // findUnique par ligne : pour un import de plusieurs centaines de
+    // produits, ça évite autant d'allers-retours DB séquentiels inutiles
+    // (seules les créations/mises à jour elles-mêmes restent ligne par
+    // ligne, pour conserver l'isolation des erreurs par ligne).
+    const skusInFile = rows
+      .map((r) => String(r.SKU ?? "").trim())
+      .filter((sku) => sku.length > 0);
+
+    const [categories, brands, existingProducts] = await Promise.all([
       this.prisma.category.findMany({ select: { id: true, slug: true } }),
       this.prisma.brand.findMany({ select: { id: true, name: true } }),
+      this.prisma.product.findMany({ where: { sku: { in: skusInFile } }, select: { id: true, sku: true } }),
     ]);
     const categoryBySlug = new Map(categories.map((c) => [c.slug, c.id]));
     const brandByName = new Map(brands.map((b) => [b.name.toLowerCase(), b.id]));
+    const existingIdBySku = new Map(existingProducts.map((p) => [p.sku, p.id]));
 
     const results: ImportRowResult[] = [];
 
@@ -245,12 +256,17 @@ export class ProductsService {
           status: status as UpsertProductDto["status"],
         };
 
-        const existing = await this.prisma.product.findUnique({ where: { sku } });
-        if (existing) {
-          await this.prisma.product.update({ where: { id: existing.id }, data });
+        const existingId = existingIdBySku.get(sku);
+        if (existingId) {
+          await this.prisma.product.update({ where: { id: existingId }, data });
           results.push({ row: rowNumber, sku, status: "updated" });
         } else {
-          await this.prisma.product.create({ data });
+          const created = await this.prisma.product.create({ data });
+          // Une même feuille peut légitimement contenir deux fois le même
+          // SKU (correction en cours de saisie) — sans cette mise à jour,
+          // la seconde ligne recréerait un produit en doublon au lieu de
+          // mettre à jour celui que la ligne précédente vient de créer.
+          existingIdBySku.set(sku, created.id);
           results.push({ row: rowNumber, sku, status: "created" });
         }
       } catch (err) {
