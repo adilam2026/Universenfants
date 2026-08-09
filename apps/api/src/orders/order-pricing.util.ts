@@ -18,6 +18,13 @@ export function calculateLoyaltyRedemption(
   pointsBalance: number,
   redeemRate: number,
 ): LoyaltyRedemption {
+  // redeemRate est un diviseur : le champ Paramètres qui le pilote n'autorise
+  // que value >= 0, donc 0 est une valeur saisissable. Sans ce garde-fou,
+  // pointsBalance / 0 vaut Infinity en JS (pas une erreur) et loyaltyDiscount
+  // devient égal au sous-total entier — n'importe quel client avec ne
+  // serait-ce qu'un point de fidélité obtiendrait sa commande gratuite, sans
+  // qu'aucun point ne soit réellement débité (pointsToRedeem = 0).
+  if (redeemRate <= 0) return { loyaltyDiscount: 0, pointsToRedeem: 0 };
   const maxDiscount = Math.max(0, subtotal - couponDiscount);
   const affordable = Math.floor(pointsBalance / redeemRate);
   const loyaltyDiscount = Math.min(affordable, maxDiscount);

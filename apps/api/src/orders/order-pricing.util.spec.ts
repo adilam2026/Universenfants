@@ -54,4 +54,22 @@ describe("calculateLoyaltyRedemption", () => {
       pointsToRedeem: 0,
     });
   });
+
+  it("never divides by zero: a misconfigured redeemRate of 0 must not grant a free order", () => {
+    // Sans le garde-fou : pointsBalance / 0 === Infinity en JS, donc
+    // loyaltyDiscount finirait égal au sous-total entier pour n'importe quel
+    // solde de points strictement positif, sans qu'aucun point ne soit
+    // débité (pointsToRedeem resterait à 0).
+    expect(calculateLoyaltyRedemption(1000, 0, 500, 0)).toEqual({
+      loyaltyDiscount: 0,
+      pointsToRedeem: 0,
+    });
+  });
+
+  it("also guards against a negative redeemRate", () => {
+    expect(calculateLoyaltyRedemption(1000, 0, 500, -5)).toEqual({
+      loyaltyDiscount: 0,
+      pointsToRedeem: 0,
+    });
+  });
 });
