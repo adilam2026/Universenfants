@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from "@nestjs/comm
 import { nanoid } from "nanoid";
 import { PrismaService } from "../prisma/prisma.service";
 import { DEFAULT_SHARED_CART_EXPIRY_DAYS } from "@universenfants/shared";
+import { calculateCouponDiscount } from "../marketing/coupons/coupon-discount.util";
 import type { AddCartLineDto, UpdateCartLineDto } from "./dto/cart.dto";
 
 @Injectable()
@@ -53,11 +54,7 @@ export class CartService {
       return sum + unitPrice * line.quantity;
     }, 0);
 
-    let discount = 0;
-    if (coupon) {
-      if (coupon.type === "PERCENTAGE") discount = Math.round((subtotal * Number(coupon.value)) / 100);
-      else if (coupon.type === "FIXED_AMOUNT") discount = Math.min(Number(coupon.value), subtotal);
-    }
+    const discount = calculateCouponDiscount(subtotal, coupon);
 
     return {
       id: cart.id,

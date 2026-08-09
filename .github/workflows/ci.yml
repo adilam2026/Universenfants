@@ -37,6 +37,9 @@ jobs:
       - name: Typecheck (api + shared)
         run: pnpm typecheck
 
+      - name: Unit tests
+        run: pnpm test
+
   build:
     name: Full-stack build (with live API for SSG)
     runs-on: ubuntu-latest

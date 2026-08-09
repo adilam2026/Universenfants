@@ -4,6 +4,8 @@ import { PrismaService } from "../prisma/prisma.service";
 import { ProductsService, type StockLine } from "../catalog/products/products.service";
 import { SettingsService } from "../settings/settings.service";
 import { EmailService } from "../email/email.service";
+import { calculateCouponDiscount } from "../marketing/coupons/coupon-discount.util";
+import { calculateLoyaltyRedemption, calculateVat } from "./order-pricing.util";
 import { ORDER_NEXT_STATUS, ORDER_NUMBER_PREFIX } from "@universenfants/shared";
 import type { CheckoutDto } from "./dto/checkout.dto";
 import type { UpdateOrderStatusDto } from "./dto/update-order-status.dto";
@@ -59,12 +61,7 @@ export class OrdersService {
       if (redemptions >= coupon.maxUsesPerCustomer) {
         throw new BadRequestException("Ce coupon a déjà été utilisé");
       }
-      couponDiscount =
-        coupon.type === "PERCENTAGE"
-          ? Math.round((subtotal * Number(coupon.value)) / 100)
-          : coupon.type === "FIXED_AMOUNT"
-            ? Math.min(Number(coupon.value), subtotal)
-            : 0;
+      couponDiscount = calculateCouponDiscount(subtotal, coupon);
       if (coupon.type === "FREE_SHIPPING") shipping.fee = 0;
     }
 
@@ -76,15 +73,17 @@ export class OrdersService {
     if (dto.useLoyaltyPoints) {
       const account = await this.prisma.loyaltyAccount.findUnique({ where: { customerId: customer.id } });
       if (account && account.pointsBalance > 0) {
-        const maxDiscount = Math.max(0, subtotal - couponDiscount);
-        const affordable = Math.floor(account.pointsBalance / loyaltyRedeemRate);
-        loyaltyDiscount = Math.min(affordable, maxDiscount);
-        pointsToRedeem = loyaltyDiscount * loyaltyRedeemRate;
+        ({ loyaltyDiscount, pointsToRedeem } = calculateLoyaltyRedemption(
+          subtotal,
+          couponDiscount,
+          account.pointsBalance,
+          loyaltyRedeemRate,
+        ));
       }
     }
 
     const total = Math.max(0, subtotal - couponDiscount - loyaltyDiscount + shipping.fee);
-    const vatAmount = Math.round(total - total / (1 + vatRate));
+    const vatAmount = calculateVat(total, vatRate);
 
     const stockLines: StockLine[] = lines.map((l) => ({
       productId: l.productId,
@@ -408,7 +407,7 @@ export class OrdersService {
     if (subtotal >= shipping.freeFrom) shipping.fee = 0;
 
     const total = subtotal + shipping.fee;
-    const vatAmount = Math.round(total - total / (1 + vatRate));
+    const vatAmount = calculateVat(total, vatRate);
 
     const stockLines: StockLine[] = [{ productId: product.id, variantId: null, quantity }];
 
