@@ -25,25 +25,34 @@ export class CustomerAuthService {
     if (!dto.email && !dto.phone) {
       throw new ConflictException("Email ou téléphone requis");
     }
-    const existing = await this.prisma.customer.findFirst({
-      where: {
-        OR: [dto.email ? { email: dto.email } : undefined, dto.phone ? { phone: dto.phone } : undefined].filter(
-          (x): x is NonNullable<typeof x> => Boolean(x),
-        ),
-      },
-    });
+    const byEmail = dto.email ? await this.prisma.customer.findUnique({ where: { email: dto.email } }) : null;
+    const byPhone = dto.phone ? await this.prisma.customer.findUnique({ where: { phone: dto.phone } }) : null;
 
-    // Rattachement automatique si un compte invité existe déjà avec cet
-    // email/téléphone (§65, §240) plutôt que de créer un doublon.
-    if (existing && existing.passwordHash) {
+    if (byEmail?.passwordHash || byPhone?.passwordHash) {
       throw new ConflictException("Un compte existe déjà avec cet email ou ce numéro");
     }
+    // Un compte invité (sans mot de passe) existe déjà avec CE téléphone,
+    // rattaché à une fiche différente de celle trouvée par email (ou aucune) :
+    // revendiquer une fiche sur la seule base du téléphone — trivialement
+    // plus facile à connaître/deviner pour un tiers que l'email exact d'un
+    // compte — permettrait à n'importe qui de définir un mot de passe sur le
+    // compte d'un autre client (prise de contrôle sans authentification). On
+    // refuse plutôt que de fusionner silencieusement, ce qui évite aussi de
+    // percuter la contrainte unique sur Customer.phone en tombant sur create().
+    if (byPhone && byPhone.id !== byEmail?.id) {
+      throw new ConflictException("Un compte existe déjà avec ce numéro de téléphone");
+    }
+
+    // Rattachement automatique (§65, §240) autorisé uniquement par
+    // correspondance EXACTE d'email — même modèle de confiance que
+    // forgotPassword pour cette fiche.
+    const existing = byEmail;
 
     const passwordHash = await hashPassword(dto.password);
     const customer = existing
       ? await this.prisma.customer.update({
           where: { id: existing.id },
-          data: { passwordHash, firstName: dto.firstName, lastName: dto.lastName },
+          data: { passwordHash, firstName: dto.firstName, lastName: dto.lastName, phone: dto.phone ?? existing.phone },
         })
       : await this.prisma.customer.create({
           data: {
