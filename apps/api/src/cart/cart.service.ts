@@ -112,22 +112,38 @@ export class CartService {
     const product = await this.prisma.product.findUnique({ where: { id: dto.productId } });
     if (!product || product.status !== "ACTIVE") throw new NotFoundException("Produit introuvable");
 
-    const existing = await this.prisma.cartLine.findFirst({
-      where: { cartId, productId: dto.productId, variantId: dto.variantId ?? null },
-    });
-    if (existing) {
-      return this.prisma.cartLine.update({
-        where: { id: existing.id },
-        data: { quantity: existing.quantity + (dto.quantity ?? 1) },
+    return this.prisma.$transaction(async (tx) => {
+      // Verrou consultatif scopé à (cartId, productId, variantId) : sans lui,
+      // deux ajouts RÉELLEMENT concurrents pour le même produit (double-clic
+      // "ajouter au panier", naturel sur mobile) peuvent tous deux voir
+      // "aucune ligne existante" avant qu'aucun n'ait committé, créant
+      // chacune leur propre ligne — le produit apparaît alors deux fois dans
+      // le panier au lieu d'une ligne à quantité 2. CartLine n'a pas de
+      // contrainte unique sur ce triplet (variantId est nullable — une
+      // contrainte classique laisserait passer plusieurs NULL), donc un
+      // verrou consultatif borné à la transaction sérialise même la toute
+      // première création, ce qu'une contrainte + upsert ne couvrirait pas
+      // sans index partiel dédié.
+      const lockKey = `cart-line:${cartId}:${dto.productId}:${dto.variantId ?? ""}`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
+
+      const existing = await tx.cartLine.findFirst({
+        where: { cartId, productId: dto.productId, variantId: dto.variantId ?? null },
       });
-    }
-    return this.prisma.cartLine.create({
-      data: {
-        cartId,
-        productId: dto.productId,
-        variantId: dto.variantId,
-        quantity: dto.quantity ?? 1,
-      },
+      if (existing) {
+        return tx.cartLine.update({
+          where: { id: existing.id },
+          data: { quantity: existing.quantity + (dto.quantity ?? 1) },
+        });
+      }
+      return tx.cartLine.create({
+        data: {
+          cartId,
+          productId: dto.productId,
+          variantId: dto.variantId,
+          quantity: dto.quantity ?? 1,
+        },
+      });
     });
   }
 
