@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { Menu, Search, ShoppingBag, User, X, Gift, Cake, Tag, Mail, Languages, Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -15,6 +15,42 @@ export function SiteHeader() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const cartCount = useCartCount();
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const drawerRef = useRef<HTMLElement>(null);
+
+  // Le tiroir mobile n'avait ni piège à focus ni fermeture au clavier (Échap) :
+  // au clavier, Tab continuait de traverser les éléments du header masqué
+  // derrière l'overlay au lieu de rester dans le tiroir ouvert, le rendant
+  // impossible à utiliser sans souris.
+  useEffect(() => {
+    if (!open) return;
+    closeButtonRef.current?.focus();
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setOpen(false);
+        return;
+      }
+      if (e.key !== "Tab" || !drawerRef.current) return;
+      const focusable = drawerRef.current.querySelectorAll<HTMLElement>('a[href], button:not([disabled])');
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      menuButtonRef.current?.focus();
+    };
+  }, [open]);
 
   const QUICK_NAV: { label: string; href: Parameters<typeof Link>[0]["href"]; strong?: boolean; accent?: boolean }[] = [
     { label: t("nav.allToys"), href: "/recherche", strong: true },
@@ -57,6 +93,7 @@ export function SiteHeader() {
         <div className="mx-auto max-w-6xl px-4 md:px-7">
           <div className="flex items-center gap-2 md:gap-4 py-2.5 md:py-3.5">
             <button
+              ref={menuButtonRef}
               className="md:hidden flex size-9 items-center justify-center rounded-full hover:bg-secondary"
               aria-label={t("nav.menu")}
               onClick={() => setOpen(true)}
@@ -135,6 +172,10 @@ export function SiteHeader() {
         onClick={() => setOpen(false)}
       />
       <aside
+        ref={drawerRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={t("nav.menu")}
         className={cn(
           "fixed inset-y-0 start-0 z-[61] w-[82%] max-w-80 bg-card shadow-xl transition-transform md:hidden",
           open ? "translate-x-0" : "-translate-x-full rtl:translate-x-full",
@@ -145,6 +186,7 @@ export function SiteHeader() {
             Univers<span className="text-brand-cta">Enfants</span>
           </span>
           <button
+            ref={closeButtonRef}
             className="flex size-9 items-center justify-center rounded-full hover:bg-secondary"
             aria-label={t("nav.close")}
             onClick={() => setOpen(false)}
