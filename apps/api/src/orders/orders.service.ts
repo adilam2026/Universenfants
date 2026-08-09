@@ -4,6 +4,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { ProductsService, type StockLine } from "../catalog/products/products.service";
 import { SettingsService } from "../settings/settings.service";
 import { EmailService } from "../email/email.service";
+import { PricingService, type ActivePromotions } from "../catalog/pricing/pricing.service";
 import { calculateCouponDiscount } from "../marketing/coupons/coupon-discount.util";
 import { calculateLoyaltyRedemption, calculateVat } from "./order-pricing.util";
 import { ORDER_NEXT_STATUS, ORDER_NUMBER_PREFIX } from "@universenfants/shared";
@@ -30,7 +31,18 @@ export class OrdersService {
     private readonly products: ProductsService,
     private readonly settings: SettingsService,
     private readonly email: EmailService,
+    private readonly pricing: PricingService,
   ) {}
+
+  /** Même règle que cart.service.ts#resolveLineUnitPrice : la variante (si
+   * sélectionnée) a toujours son propre prix, sinon moteur de prix centralisé. */
+  private resolveLineUnitPrice(
+    line: { variant: { price: unknown } | null; product: { price: unknown; promoPrice: unknown; categoryId: string; brandId: string | null } },
+    active: ActivePromotions,
+  ): number {
+    if (line.variant?.price != null) return Number(line.variant.price);
+    return this.pricing.resolveForProduct(line.product, active).price;
+  }
 
   async checkout(cartId: string, dto: CheckoutDto) {
     const { vatRate, loyaltyRedeemRate, freeShippingThreshold } = await this.settings.get();
@@ -47,6 +59,7 @@ export class OrdersService {
 
     const shipping = await this.resolveShippingFee(dto.city, freeShippingThreshold);
 
+    const activePromotions = await this.pricing.getActivePromotions();
     const lines = cart.lines.map((l) => ({
       productId: l.productId,
       variantId: l.variantId,
@@ -54,7 +67,7 @@ export class OrdersService {
       nameSnapshot: l.product.nameFr,
       skuSnapshot: l.variant?.sku ?? l.product.sku,
       costPriceSnapshot: Number(l.variant?.costPrice ?? l.product.costPrice),
-      sellPriceSnapshot: Number(l.variant?.price ?? l.product.promoPrice ?? l.product.price),
+      sellPriceSnapshot: this.resolveLineUnitPrice(l, activePromotions),
     }));
     const subtotal = lines.reduce((s, l) => s + l.sellPriceSnapshot * l.quantity, 0);
 
@@ -503,7 +516,14 @@ export class OrdersService {
     if (!product || product.status !== "ACTIVE") throw new BadRequestException("Produit indisponible");
 
     const quantity = dto.quantity ?? 1;
-    const unitPrice = Number(landingPage.displayPrice ?? product.promoPrice ?? product.price);
+    // landingPage.displayPrice est un prix spécial choisi explicitement par
+    // l'admin pour CETTE landing page — il prime toujours sur le moteur de
+    // prix centralisé (sans quoi une promotion catalogue non liée à la
+    // campagne pourrait silencieusement changer le prix affiché/facturé).
+    const unitPrice =
+      landingPage.displayPrice != null
+        ? Number(landingPage.displayPrice)
+        : this.pricing.resolveForProduct(product, await this.pricing.getActivePromotions()).price;
     const subtotal = unitPrice * quantity;
 
     const customer = await this.resolveCustomer(null, { firstName: dto.name, lastName: "", phone: dto.phone });

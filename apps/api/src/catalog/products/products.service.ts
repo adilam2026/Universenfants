@@ -4,6 +4,7 @@ import * as XLSX from "xlsx";
 import { PrismaService } from "../../prisma/prisma.service";
 import { SearchService, type ProductSearchDoc } from "../../search/search.service";
 import { ImageService } from "../../storage/image.service";
+import { PricingService, type ActivePromotions } from "../pricing/pricing.service";
 import type { QueryProductsDto } from "./dto/query-products.dto";
 import type { UpsertProductDto } from "./dto/upsert-product.dto";
 import type { AdjustStockDto } from "./dto/adjust-stock.dto";
@@ -46,7 +47,19 @@ export class ProductsService {
     private readonly prisma: PrismaService,
     private readonly search: SearchService,
     private readonly images: ImageService,
+    private readonly pricing: PricingService,
   ) {}
+
+  /** Remplace promoPrice par le prix effectif (promoPrice produit vs
+   * promotions catégorie/marque/boutique actives, la plus avantageuse pour
+   * le client, jamais cumulées) — cf. PricingService. Les variantes ne sont
+   * pas concernées : leur prix propre prime toujours (inchangé). */
+  private applyEffectivePricing<
+    T extends { price: unknown; promoPrice: unknown; categoryId: string; brandId: string | null },
+  >(product: T, active: ActivePromotions): T {
+    const result = this.pricing.resolveForProduct(product, active);
+    return { ...product, promoPrice: (result.compareAtPrice !== null ? result.price : null) as T["promoPrice"] };
+  }
 
   async list(query: QueryProductsDto) {
     const page = query.page ?? 1;
@@ -111,8 +124,10 @@ export class ProductsService {
       ranked = ranked.slice((page - 1) * limit, (page - 1) * limit + limit);
     }
 
+    const active = await this.pricing.getActivePromotions();
+
     return {
-      items: ranked.map((p) => this.toPublicShape(p)),
+      items: ranked.map((p) => this.toPublicShape(this.applyEffectivePricing(p, active))),
       total,
       page,
       limit,
@@ -148,8 +163,9 @@ export class ProductsService {
         ? product.reviews.reduce((s, r) => s + r.rating, 0) / product.reviews.length
         : null;
 
+    const active = await this.pricing.getActivePromotions();
     const variants = product.variants.map((v) => this.toPublicShape(v));
-    return { ...this.toPublicShape(product), variants, reviews: product.reviews, avgRating };
+    return { ...this.toPublicShape(this.applyEffectivePricing(product, active)), variants, reviews: product.reviews, avgRating };
   }
 
   /** Ne renvoie jamais costPrice/reservedStock au Front — marge = donnée interne. */
@@ -324,7 +340,9 @@ export class ProductsService {
   }
 
   private toSearchDoc(
-    product: Prisma.ProductGetPayload<{ include: { category: true; brand: true } }>,
+    product: Omit<Prisma.ProductGetPayload<{ include: { category: true; brand: true } }>, "promoPrice"> & {
+      promoPrice: number | Prisma.Decimal | null;
+    },
   ): ProductSearchDoc {
     return {
       id: product.id,
@@ -352,7 +370,8 @@ export class ProductsService {
       await this.search.removeProduct(id);
       return;
     }
-    await this.search.indexProduct(this.toSearchDoc(product));
+    const active = await this.pricing.getActivePromotions();
+    await this.search.indexProduct(this.toSearchDoc(this.applyEffectivePricing(product, active)));
   }
 
   /** Reconstruit l'index Meilisearch depuis Postgres — après un import en masse ou en maintenance. */
@@ -361,7 +380,8 @@ export class ProductsService {
       where: { status: "ACTIVE" },
       include: { category: true, brand: true },
     });
-    await this.search.indexProducts(products.map((p) => this.toSearchDoc(p)));
+    const active = await this.pricing.getActivePromotions();
+    await this.search.indexProducts(products.map((p) => this.toSearchDoc(this.applyEffectivePricing(p, active))));
     return { indexed: products.length };
   }
 

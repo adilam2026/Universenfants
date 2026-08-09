@@ -4,11 +4,26 @@ import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { DEFAULT_SHARED_CART_EXPIRY_DAYS } from "@universenfants/shared";
 import { calculateCouponDiscount } from "../marketing/coupons/coupon-discount.util";
+import { PricingService, type ActivePromotions } from "../catalog/pricing/pricing.service";
 import type { AddCartLineDto, UpdateCartLineDto } from "./dto/cart.dto";
 
 @Injectable()
 export class CartService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly pricing: PricingService,
+  ) {}
+
+  /** Prix unitaire d'une ligne de panier — la variante (si sélectionnée) a
+   * toujours son propre prix, sinon on passe par le moteur de prix centralisé
+   * (promoPrice produit vs promotions catégorie/marque/boutique). */
+  private resolveLineUnitPrice(
+    line: { variant: { price: unknown } | null; product: { price: unknown; promoPrice: unknown; categoryId: string; brandId: string | null } },
+    active: ActivePromotions,
+  ): number {
+    if (line.variant?.price != null) return Number(line.variant.price);
+    return this.pricing.resolveForProduct(line.product, active).price;
+  }
 
   /** Résout (ou crée) le panier actif pour ce token — lien collaboratif prioritaire (§149). */
   async resolveCart(ownerToken: string, customerId?: string | null, shareToken?: string) {
@@ -64,9 +79,10 @@ export class CartService {
       coupon = await this.prisma.coupon.findUnique({ where: { code: cart.couponCode } });
     }
 
+    const active = await this.pricing.getActivePromotions();
+
     const subtotal = cart.lines.reduce((sum, line) => {
-      const unitPrice = Number(line.variant?.price ?? line.product.promoPrice ?? line.product.price);
-      return sum + unitPrice * line.quantity;
+      return sum + this.resolveLineUnitPrice(line, active) * line.quantity;
     }, 0);
 
     const discount = calculateCouponDiscount(subtotal, coupon);
@@ -82,7 +98,7 @@ export class CartService {
         quantity: l.quantity,
         name: l.product.nameFr,
         image: l.product.images[0]?.url ?? null,
-        unitPrice: Number(l.variant?.price ?? l.product.promoPrice ?? l.product.price),
+        unitPrice: this.resolveLineUnitPrice(l, active),
         variantLabel: l.variant?.label ?? null,
       })),
       couponCode: cart.couponCode,

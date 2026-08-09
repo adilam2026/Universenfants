@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { OrdersService } from "../orders/orders.service";
+import { PricingService } from "../catalog/pricing/pricing.service";
 import type { UpsertLandingPageDto } from "./dto/upsert-landing-page.dto";
 import type { QuickOrderDto } from "./dto/quick-order.dto";
 
@@ -9,6 +10,7 @@ export class LandingPagesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly orders: OrdersService,
+    private readonly pricing: PricingService,
   ) {}
 
   // ---------------------------------------------------------------- admin
@@ -114,7 +116,14 @@ export class LandingPagesService {
     if (!page || page.status !== "ACTIVE") throw new NotFoundException("Page introuvable");
     // costPrice/reservedStock = données internes, jamais exposées au Front (cf. ProductsService.toPublicShape).
     const { costPrice: _costPrice, reservedStock: _reservedStock, ...product } = page.product;
-    return { ...page, product };
+    // page.displayPrice (prix spécial de la campagne, géré côté Front avec
+    // priorité absolue) reste inchangé — seul le prix catalogue de repli
+    // (product.promoPrice) passe par le moteur de prix centralisé, pour que
+    // les pages sans displayPrice explicite reflètent quand même les
+    // promotions catégorie/marque/boutique actives.
+    const active = await this.pricing.getActivePromotions();
+    const effective = this.pricing.resolveForProduct(product, active);
+    return { ...page, product: { ...product, promoPrice: effective.compareAtPrice !== null ? effective.price : null } };
   }
 
   async trackVisit(slug: string) {
