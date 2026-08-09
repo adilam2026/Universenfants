@@ -3,8 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { CheckCircle2, Loader2 } from "lucide-react";
 import { submitQuickOrder } from "@/lib/landing-pages-client";
-
-const CITIES = ["Casablanca", "Rabat", "Marrakech", "Fès", "Tanger", "Agadir"];
+import { useStoreSettings } from "@/hooks/use-store-settings";
 
 export function QuickOrderForm({
   slug,
@@ -24,6 +23,8 @@ export function QuickOrderForm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [orderNumber, setOrderNumber] = useState<string | null>(null);
+  const storeSettings = useStoreSettings();
+  const cities = storeSettings?.cities ?? [];
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -71,9 +72,9 @@ export function QuickOrderForm({
       <input name="name" required placeholder="Votre nom" className="rounded-lg border border-border px-3 py-2.5 text-sm" />
       <input name="phone" required placeholder="Votre téléphone" className="rounded-lg border border-border px-3 py-2.5 text-sm" />
       <select name="city" required defaultValue="" className="rounded-lg border border-border px-3 py-2.5 text-sm">
-        <option value="" disabled>Votre ville</option>
-        {CITIES.map((c) => (
-          <option key={c} value={c}>{c}</option>
+        <option value="" disabled>{storeSettings ? "Votre ville" : "Chargement des villes…"}</option>
+        {cities.map((c) => (
+          <option key={c.name} value={c.name}>{c.name}</option>
         ))}
       </select>
       <input name="quantity" type="number" min={1} defaultValue={1} className="rounded-lg border border-border px-3 py-2.5 text-sm" />
