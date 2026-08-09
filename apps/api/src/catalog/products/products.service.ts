@@ -158,10 +158,16 @@ export class ProductsService {
       this.prisma.productView.create({ data: { productId: product.id, sessionId } }).catch(() => undefined);
     }
 
-    const avgRating =
-      product.reviews.length > 0
-        ? product.reviews.reduce((s, r) => s + r.rating, 0) / product.reviews.length
-        : null;
+    // La note moyenne doit porter sur TOUS les avis approuvés, pas seulement
+    // les 20 plus récents renvoyés ci-dessus pour l'affichage — sinon un
+    // produit avec plus de 20 avis afficherait une moyenne qui dérive de la
+    // vraie moyenne au fil des nouveaux avis.
+    const ratingAgg = await this.prisma.review.aggregate({
+      where: { productId: product.id, status: "APPROVED" },
+      _avg: { rating: true },
+      _count: true,
+    });
+    const avgRating = ratingAgg._count > 0 ? ratingAgg._avg.rating : null;
 
     const active = await this.pricing.getActivePromotions();
     const variants = product.variants.map((v) => this.toPublicShape(v));

@@ -1,9 +1,13 @@
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
+import { PricingService } from "../catalog/pricing/pricing.service";
 
 @Injectable()
 export class WishlistService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly pricing: PricingService,
+  ) {}
 
   private async getOrCreate(customerId: string) {
     return this.prisma.wishlist.upsert({
@@ -20,12 +24,16 @@ export class WishlistService {
       include: { product: { include: { images: { take: 1 } } } },
       orderBy: { addedAt: "desc" },
     });
+    // Le prix affiché doit passer par le moteur de prix centralisé (comme
+    // partout ailleurs) — se fier au seul product.promoPrice ignorait les
+    // promotions catégorie/marque/boutique actives.
+    const active = await this.pricing.getActivePromotions();
     return lines.map((l) => ({
       productId: l.productId,
       addedAt: l.addedAt,
       name: l.product.nameFr,
       nameAr: l.product.nameAr,
-      price: Number(l.product.promoPrice ?? l.product.price),
+      price: this.pricing.resolveForProduct(l.product, active).price,
       image: l.product.images[0]?.url ?? null,
       available: l.product.stock - l.product.reservedStock > 0,
     }));
