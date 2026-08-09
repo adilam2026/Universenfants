@@ -275,19 +275,26 @@ export class OrdersService {
 
   /** §74 / §193 : le client peut annuler lui-même tant que la commande n'a pas été expédiée. */
   async cancelByCustomer(customerId: string, orderId: string) {
-    const order = await this.prisma.order.findUnique({ where: { id: orderId }, include: { lines: true, customer: true } });
-    if (!order || order.customerId !== customerId) throw new NotFoundException("Commande introuvable");
-    if (!CANCELLABLE_STATUSES.has(order.status)) {
-      throw new BadRequestException("Cette commande ne peut plus être annulée (déjà expédiée)");
-    }
+    const order = await this.prisma.$transaction(async (tx) => {
+      // Verrou de ligne : sans lui, un double-clic sur "Annuler" peut faire
+      // passer deux appels concurrents avant qu'aucun n'ait mis à jour le
+      // statut, chacun libérant la réservation de stock — la réservation
+      // serait alors décrémentée deux fois pour une seule commande.
+      const lockRows = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
+      if (lockRows.length === 0) throw new NotFoundException("Commande introuvable");
 
-    const stockLines: StockLine[] = order.lines.map((l) => ({
-      productId: l.productId,
-      variantId: l.variantId,
-      quantity: l.quantity,
-    }));
+      const order = await tx.order.findUnique({ where: { id: orderId }, include: { lines: true, customer: true } });
+      if (!order || order.customerId !== customerId) throw new NotFoundException("Commande introuvable");
+      if (!CANCELLABLE_STATUSES.has(order.status)) {
+        throw new BadRequestException("Cette commande ne peut plus être annulée (déjà expédiée)");
+      }
 
-    await this.prisma.$transaction(async (tx) => {
+      const stockLines: StockLine[] = order.lines.map((l) => ({
+        productId: l.productId,
+        variantId: l.variantId,
+        quantity: l.quantity,
+      }));
+
       await this.products.releaseReservation(tx, stockLines);
       await tx.order.update({
         where: { id: orderId },
@@ -299,6 +306,8 @@ export class OrdersService {
           },
         },
       });
+
+      return order;
     });
 
     if (order.customer.email) void this.email.sendOrderStatusChanged(order.customer.email, order.orderNumber, "CANCELLED");
@@ -333,6 +342,14 @@ export class OrdersService {
 
   async updateStatus(orderId: string, dto: UpdateOrderStatusDto, staffUserId: string) {
     const updated = await this.prisma.$transaction(async (tx) => {
+      // Verrou de ligne : sans lui, deux transitions de statut concurrentes
+      // sur la même commande (double-clic, deux membres du staff traitant la
+      // même commande) peuvent toutes deux lire le même statut de départ et
+      // exécuter chacune leurs effets de bord — libération de stock, déduction
+      // de stock à la livraison, crédit de points fidélité — donc deux fois.
+      const lockRows = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
+      if (lockRows.length === 0) throw new NotFoundException("Commande introuvable");
+
       const order = await tx.order.findUnique({ where: { id: orderId }, include: { lines: true, customer: true } });
       if (!order) throw new NotFoundException("Commande introuvable");
 

@@ -190,4 +190,63 @@ describe("Checkout concurrency (e2e)", () => {
     await prisma.stockMovement.deleteMany({ where: { productId: product.id } });
     await prisma.product.delete({ where: { id: product.id } });
   });
+
+  it("never double-processes a DELIVERED transition under concurrent status updates", async () => {
+    // Même bug que le double-checkout, une couche plus loin : deux appels
+    // updateStatus() concurrents sur la même commande (double-clic Back-Office,
+    // deux membres du staff) sans verrou peuvent tous deux lire le même statut
+    // de départ et exécuter chacun leurs effets de bord — déduction de stock
+    // définitive ET crédit de points fidélité, donc deux fois.
+    const product = await prisma.product.create({
+      data: {
+        sku: `CONC-DELIVER-${Date.now()}`,
+        nameFr: "Produit test livraison concurrente",
+        categoryId,
+        price: 100,
+        costPrice: 50,
+        seoUrl: `produit-test-livraison-${Date.now()}`,
+        stock: 10,
+        status: "ACTIVE",
+      },
+    });
+
+    const cart = await cartService.resolveCart(crypto.randomUUID(), null);
+    await cartService.addLine(cart.id, { productId: product.id, quantity: 2 });
+    const order = await ordersService.checkout(cart.id, checkoutDto("77777777"));
+
+    const customer = await prisma.customer.findFirstOrThrow({ where: { orders: { some: { id: order.id } } } });
+    await prisma.loyaltyAccount.upsert({
+      where: { customerId: customer.id },
+      update: { pointsBalance: 0 },
+      create: { customerId: customer.id, pointsBalance: 0 },
+    });
+    const staff = await prisma.staffUser.findFirstOrThrow();
+
+    // Fait progresser la commande jusqu'à SHIPPED (transitions séquentielles,
+    // non concurrentes) — seule une commande SHIPPED peut passer à DELIVERED.
+    await ordersService.updateStatus(order.id, { status: "CONFIRMED" }, staff.id);
+    await ordersService.updateStatus(order.id, { status: "PREPARING" }, staff.id);
+    await ordersService.updateStatus(order.id, { status: "SHIPPED" }, staff.id);
+
+    const results = await Promise.allSettled([
+      ordersService.updateStatus(order.id, { status: "DELIVERED" }, staff.id),
+      ordersService.updateStatus(order.id, { status: "DELIVERED" }, staff.id),
+    ]);
+    const fulfilled = results.filter((r) => r.status === "fulfilled");
+    expect(fulfilled).toHaveLength(1);
+
+    const updatedProduct = await prisma.product.findUniqueOrThrow({ where: { id: product.id } });
+    expect(updatedProduct.stock).toBe(8); // 10 - 2, pas 10 - 4
+
+    const loyaltyTx = await prisma.loyaltyTransaction.count({ where: { orderId: order.id, type: "EARN" } });
+    expect(loyaltyTx).toBe(1);
+
+    await prisma.loyaltyTransaction.deleteMany({ where: { orderId: order.id } });
+    await prisma.orderStatusHistory.deleteMany({ where: { orderId: order.id } });
+    await prisma.stockMovement.deleteMany({ where: { productId: product.id } });
+    await prisma.orderLine.deleteMany({ where: { orderId: order.id } });
+    await prisma.order.delete({ where: { id: order.id } });
+    await prisma.cartLine.deleteMany({ where: { productId: product.id } });
+    await prisma.product.delete({ where: { id: product.id } });
+  });
 });
