@@ -1,3 +1,15 @@
+/** Échappe toute valeur saisie par un utilisateur (prénom, nom de produit...)
+ * avant interpolation dans un email HTML — ces templates concatènent des
+ * chaînes directement, sans protection XSS/injection de balises intégrée. */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function baseLayout(title: string, bodyHtml: string): string {
   return `<!doctype html>
 <html lang="fr">
@@ -30,7 +42,7 @@ export function accountCreatedEmail(firstName: string | null) {
   const subject = "Bienvenue chez UniversEnfants !";
   const html = baseLayout(
     subject,
-    `<h1 style="font-size:20px;margin:0 0 12px;">Bonjour ${firstName ?? ""} 👋</h1>
+    `<h1 style="font-size:20px;margin:0 0 12px;">Bonjour ${escapeHtml(firstName ?? "")} 👋</h1>
      <p style="font-size:14px;line-height:1.6;">Votre compte UniversEnfants a bien été créé. Vous pouvez dès maintenant parcourir notre catalogue de jouets, suivre vos commandes et profiter de notre programme de fidélité.</p>`,
   );
   return { subject, html };
@@ -61,7 +73,7 @@ function linesTable(lines: OrderEmailLine[]) {
   const rows = lines
     .map(
       (l) => `<tr>
-        <td style="padding:6px 0;font-size:13px;">${l.name} <span style="color:#8a83a3;">× ${l.quantity}</span></td>
+        <td style="padding:6px 0;font-size:13px;">${escapeHtml(l.name)} <span style="color:#8a83a3;">× ${l.quantity}</span></td>
         <td style="padding:6px 0;font-size:13px;text-align:right;">${dh(l.lineTotal)}</td>
       </tr>`,
     )
