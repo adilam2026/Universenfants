@@ -30,6 +30,7 @@ export interface PublicLandingPage {
     price: string;
     promoPrice: string | null;
     images: { url: string; thumbnailUrl: string | null }[];
+    variants: { id: string; label: string; price: string | null; available: number }[];
   };
 }
 
@@ -54,6 +55,7 @@ export interface QuickOrderPayload {
   city: string;
   quantity?: number;
   addressLine?: string;
+  variantId?: string;
 }
 
 export async function submitQuickOrder(slug: string, payload: QuickOrderPayload) {

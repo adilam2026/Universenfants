@@ -77,6 +77,70 @@ describe("Landing page quick order (e2e)", () => {
     await prisma.product.delete({ where: { id: productId } });
   }
 
+  it("rejects a quick order with no variantId when the product has variants", async () => {
+    const product = await prisma.product.create({
+      data: {
+        sku: `LP-QUICK-VAR-${Date.now()}`,
+        nameFr: "Produit test quick order variantes",
+        categoryId,
+        price: 150,
+        costPrice: 75,
+        seoUrl: `produit-test-lp-quick-order-var-${Date.now()}`,
+        stock: 0, // le stock réel vit sur la variante, pas ici
+        status: "ACTIVE",
+        variants: { create: { sku: `LP-QUICK-VAR-V-${Date.now()}`, label: "Taille M", stock: 5 } },
+      },
+    });
+    const page = await createLandingPage(product.id, 149);
+
+    await expect(
+      landingPages.quickOrder(page.slug, {
+        name: "Client Rapide",
+        phone: `06${Date.now().toString().slice(-8)}`,
+        city: "Casablanca",
+        quantity: 1,
+      }),
+    ).rejects.toThrow(/choisir une option/);
+
+    await cleanup(product.id, page.id);
+  });
+
+  it("decrements the selected variant's stock, not the product's own (always 0 when variants exist)", async () => {
+    const product = await prisma.product.create({
+      data: {
+        sku: `LP-QUICK-VAR2-${Date.now()}`,
+        nameFr: "Produit test quick order variantes 2",
+        categoryId,
+        price: 150,
+        costPrice: 75,
+        seoUrl: `produit-test-lp-quick-order-var2-${Date.now()}`,
+        stock: 0,
+        status: "ACTIVE",
+        variants: { create: { sku: `LP-QUICK-VAR2-V-${Date.now()}`, label: "Taille L", stock: 3 } },
+      },
+      include: { variants: true },
+    });
+    const variant = product.variants[0];
+    const page = await createLandingPage(product.id, 149);
+
+    const result = await landingPages.quickOrder(page.slug, {
+      name: "Client Rapide",
+      phone: `06${Date.now().toString().slice(-8)}`,
+      city: "Casablanca",
+      quantity: 2,
+      variantId: variant.id,
+    } as never);
+
+    const updatedVariant = await prisma.productVariant.findUniqueOrThrow({ where: { id: variant.id } });
+    expect(updatedVariant.reservedStock).toBe(2);
+
+    const order = await prisma.order.findFirstOrThrow({ where: { orderNumber: result.orderNumber }, include: { lines: true } });
+    expect(order.lines[0].variantId).toBe(variant.id);
+    expect(order.lines[0].skuSnapshot).toBe(variant.sku);
+
+    await cleanup(product.id, page.id);
+  });
+
   it("rejects a countdown whose end precedes its start", async () => {
     const product = await createProduct(150, 10);
     await expect(

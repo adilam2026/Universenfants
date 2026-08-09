@@ -526,21 +526,38 @@ export class OrdersService {
     id: string;
     productId: string;
     displayPrice: unknown;
-  }, dto: { name: string; phone: string; city: string; quantity?: number; addressLine?: string }) {
+  }, dto: { name: string; phone: string; city: string; quantity?: number; addressLine?: string; variantId?: string }) {
     const { vatRate, freeShippingThreshold } = await this.settings.get();
 
-    const product = await this.prisma.product.findUnique({ where: { id: landingPage.productId } });
+    const product = await this.prisma.product.findUnique({
+      where: { id: landingPage.productId },
+      include: { variants: true },
+    });
     if (!product || product.status !== "ACTIVE") throw new BadRequestException("Produit indisponible");
+
+    // Le stock est géré au niveau variante quand le produit en a (cf.
+    // schema.prisma) — sans ce garde-fou, une commande rapide pour un tel
+    // produit décrémentait toujours Product.stock (resté à 0), rejetant à
+    // tort toute commande faute de "stock", ou pire, décrémentait le mauvais
+    // compteur si Product.stock avait une valeur résiduelle non nulle.
+    const variant = dto.variantId ? product.variants.find((v) => v.id === dto.variantId) : null;
+    if (product.variants.length > 0 && !variant) {
+      throw new BadRequestException("Merci de choisir une option pour ce produit");
+    }
 
     const quantity = dto.quantity ?? 1;
     // landingPage.displayPrice est un prix spécial choisi explicitement par
     // l'admin pour CETTE landing page — il prime toujours sur le moteur de
     // prix centralisé (sans quoi une promotion catalogue non liée à la
     // campagne pourrait silencieusement changer le prix affiché/facturé).
+    // Une variante avec son propre prix passe cependant devant le prix
+    // catalogue de repli, même logique que cart.service.ts#resolveLineUnitPrice.
     const unitPrice =
       landingPage.displayPrice != null
         ? Number(landingPage.displayPrice)
-        : this.pricing.resolveForProduct(product, await this.pricing.getActivePromotions()).price;
+        : variant?.price != null
+          ? Number(variant.price)
+          : this.pricing.resolveForProduct(product, await this.pricing.getActivePromotions()).price;
     const subtotal = unitPrice * quantity;
 
     const customer = await this.resolveCustomer(null, { firstName: dto.name, lastName: "", phone: dto.phone });
@@ -550,7 +567,7 @@ export class OrdersService {
     const total = subtotal + shipping.fee;
     const vatAmount = calculateVat(total, vatRate);
 
-    const stockLines: StockLine[] = [{ productId: product.id, variantId: null, quantity }];
+    const stockLines: StockLine[] = [{ productId: product.id, variantId: variant?.id ?? null, quantity }];
 
     const order = await this.prisma.$transaction(async (tx) => {
       await this.products.reserveStock(tx, stockLines);
@@ -573,9 +590,10 @@ export class OrdersService {
           lines: {
             create: {
               productId: product.id,
+              variantId: variant?.id,
               productNameSnapshot: product.nameFr,
-              skuSnapshot: product.sku,
-              costPriceSnapshot: Number(product.costPrice),
+              skuSnapshot: variant?.sku ?? product.sku,
+              costPriceSnapshot: Number(variant?.costPrice ?? product.costPrice),
               sellPriceSnapshot: unitPrice,
               quantity,
               lineTotal: subtotal,

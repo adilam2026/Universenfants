@@ -76,6 +76,7 @@ export default async function LandingPage({ params }: { params: Promise<{ slug: 
           successPhone={page.successPhone}
           successWhatsapp={page.successWhatsapp}
           successHours={page.successHours}
+          variants={page.product.variants}
         />
       </section>
 

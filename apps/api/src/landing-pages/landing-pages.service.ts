@@ -135,11 +135,20 @@ export class LandingPagesService {
   async findBySlug(slug: string) {
     const page = await this.prisma.landingPage.findUnique({
       where: { slug },
-      include: { product: { include: { images: true } } },
+      include: { product: { include: { images: true, variants: true } } },
     });
     if (!page || page.status !== "ACTIVE") throw new NotFoundException("Page introuvable");
     // costPrice/reservedStock = données internes, jamais exposées au Front (cf. ProductsService.toPublicShape).
-    const { costPrice: _costPrice, reservedStock: _reservedStock, ...product } = page.product;
+    const { costPrice: _costPrice, reservedStock: _reservedStock, variants: rawVariants, ...product } = page.product;
+    // Le stock est géré au niveau variante quand il y en a (cf. schema.prisma) —
+    // sans exposer les variantes ici, le formulaire de commande rapide n'avait
+    // aucun moyen d'en choisir une, et orders.service.ts#quickOrderFromLandingPage
+    // décrémentait toujours le stock produit (toujours à 0 pour ces produits).
+    const variants = rawVariants.map(({ costPrice: _vc, reservedStock: vReserved, stock: vStock, ...v }) => ({
+      ...v,
+      stock: vStock,
+      available: Math.max(0, vStock - vReserved),
+    }));
     // page.displayPrice (prix spécial de la campagne, géré côté Front avec
     // priorité absolue) reste inchangé — seul le prix catalogue de repli
     // (product.promoPrice) passe par le moteur de prix centralisé, pour que
@@ -147,7 +156,10 @@ export class LandingPagesService {
     // promotions catégorie/marque/boutique actives.
     const active = await this.pricing.getActivePromotions();
     const effective = this.pricing.resolveForProduct(product, active);
-    return { ...page, product: { ...product, promoPrice: effective.compareAtPrice !== null ? effective.price : null } };
+    return {
+      ...page,
+      product: { ...product, variants, promoPrice: effective.compareAtPrice !== null ? effective.price : null },
+    };
   }
 
   async trackVisit(slug: string) {

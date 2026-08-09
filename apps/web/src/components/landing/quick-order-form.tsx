@@ -12,6 +12,7 @@ export function QuickOrderForm({
   successPhone,
   successWhatsapp,
   successHours,
+  variants,
 }: {
   slug: string;
   requireAddress: boolean;
@@ -19,6 +20,7 @@ export function QuickOrderForm({
   successPhone: string | null;
   successWhatsapp: string | null;
   successHours: string | null;
+  variants: { id: string; label: string; price: string | null; available: number }[];
 }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,6 +40,11 @@ export function QuickOrderForm({
         city: String(form.get("city")),
         quantity: Number(form.get("quantity") || 1),
         addressLine: String(form.get("addressLine") || "") || undefined,
+        // Le stock de ce produit est géré au niveau variante dès qu'il en a
+        // (schema.prisma) — sans transmettre laquelle, orders.service.ts
+        // décrémentait toujours Product.stock (resté à 0), rejetant à tort
+        // toute commande rapide pour ces produits.
+        variantId: variants.length > 0 ? String(form.get("variantId") || "") || undefined : undefined,
       });
       setOrderNumber(order.orderNumber);
     } catch (err) {
@@ -71,6 +78,17 @@ export function QuickOrderForm({
       <h3 className="text-center font-extrabold text-base mb-1">Commandez en 30 secondes</h3>
       <input name="name" required placeholder="Votre nom" className="rounded-lg border border-border px-3 py-2.5 text-sm" />
       <input name="phone" required placeholder="Votre téléphone" className="rounded-lg border border-border px-3 py-2.5 text-sm" />
+      {variants.length > 0 && (
+        <select name="variantId" required defaultValue="" className="rounded-lg border border-border px-3 py-2.5 text-sm">
+          <option value="" disabled>Choisissez une option</option>
+          {variants.map((v) => (
+            <option key={v.id} value={v.id} disabled={v.available <= 0}>
+              {v.label}
+              {v.available <= 0 ? " (épuisé)" : ""}
+            </option>
+          ))}
+        </select>
+      )}
       <select name="city" required defaultValue="" className="rounded-lg border border-border px-3 py-2.5 text-sm">
         <option value="" disabled>{storeSettings ? "Votre ville" : "Chargement des villes…"}</option>
         {cities.map((c) => (

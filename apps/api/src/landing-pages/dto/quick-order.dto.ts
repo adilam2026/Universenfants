@@ -11,4 +11,5 @@ export class QuickOrderDto {
   @ApiPropertyOptional({ default: 1 }) @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(999) quantity?: number;
 
   @ApiPropertyOptional() @IsOptional() @IsString() addressLine?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() variantId?: string;
 }
