@@ -388,7 +388,14 @@
     "browseCatalog": "Voir le catalogue",
     "remove": "Retirer",
     "unavailable": "Indisponible",
-    "loginRequired": "Connectez-vous pour retrouver vos favoris sur tous vos appareils."
+    "loginRequired": "Connectez-vous pour retrouver vos favoris sur tous vos appareils.",
+    "share": "Partager ma liste",
+    "shareCopied": "Lien copié !",
+    "sharedTitle": "Liste de souhaits",
+    "sharedSubtitle": "Idées cadeaux sélectionnées avec ❤️",
+    "sharedEmpty": "Cette liste ne contient aucun article pour le moment.",
+    "sharedNotFound": "Cette liste est introuvable.",
+    "loading": "Chargement…"
   },
   "notFoundPage": {
     "title": "Page introuvable",

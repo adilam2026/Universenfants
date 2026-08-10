@@ -32,4 +32,21 @@ export class WishlistController {
   remove(@CurrentUser() user: RequestUser, @Param("productId") productId: string) {
     return this.service.remove(user.sub, productId);
   }
+
+  @Post("share")
+  async share(@CurrentUser() user: RequestUser) {
+    const shareToken = await this.service.getShareToken(user.sub);
+    return { shareToken };
+  }
+}
+
+@ApiTags("wishlist")
+@Controller("wishlist/shared")
+export class WishlistPublicController {
+  constructor(private readonly service: WishlistService) {}
+
+  @Get(":shareToken")
+  getShared(@Param("shareToken") shareToken: string) {
+    return this.service.getShared(shareToken);
+  }
 }

@@ -42,3 +42,23 @@ export function addToWishlist(productId: string) {
 export function removeFromWishlist(productId: string) {
   return wishlistFetch<WishlistLine[]>(`/${productId}`, { method: "DELETE" });
 }
+
+export function shareWishlist() {
+  return wishlistFetch<{ shareToken: string }>("/share", { method: "POST" });
+}
+
+export interface SharedWishlistLine {
+  productId: string;
+  name: string;
+  nameAr: string | null;
+  seoUrl: string;
+  price: number;
+  image: string | null;
+  available: boolean;
+}
+
+export async function getSharedWishlist(shareToken: string) {
+  const res = await fetch(`${API_URL}/wishlist/shared/${shareToken}`, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+  if (!res.ok) throw new Error(res.status === 404 ? "NOT_FOUND" : `Erreur (${res.status})`);
+  return res.json() as Promise<SharedWishlistLine[]>;
+}

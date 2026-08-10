@@ -393,6 +393,10 @@ model Wishlist {
   customerId String         @unique
   customer   Customer       @relation(fields: [customerId], references: [id], onDelete: Cascade)
   lines      WishlistLine[]
+  // Généré à la demande (comme Cart.shareToken) plutôt qu'à la création —
+  // la wishlist existe déjà pour chaque client dès l'inscription, avant
+  // même qu'il ne songe à la partager.
+  shareToken String?        @unique
   createdAt  DateTime       @default(now())
 }
 

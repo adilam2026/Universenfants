@@ -1,4 +1,5 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { nanoid } from "nanoid";
 import { PrismaService } from "../prisma/prisma.service";
 import { PricingService } from "../catalog/pricing/pricing.service";
 
@@ -63,5 +64,38 @@ export class WishlistService {
       data: { removedAt: new Date() },
     });
     return this.list(customerId);
+  }
+
+  /** Génère le lien de partage à la demande (comme Cart.shareToken) plutôt
+   * qu'à la création — la wishlist existe déjà pour chaque client depuis
+   * son inscription. */
+  async getShareToken(customerId: string): Promise<string> {
+    const wishlist = await this.getOrCreate(customerId);
+    if (wishlist.shareToken) return wishlist.shareToken;
+    const shareToken = nanoid(12);
+    await this.prisma.wishlist.update({ where: { id: wishlist.id }, data: { shareToken } });
+    return shareToken;
+  }
+
+  /** Fiche publique en lecture seule — jamais l'identité du client, comme
+   * BirthdayList.getShared(). */
+  async getShared(shareToken: string) {
+    const wishlist = await this.prisma.wishlist.findUnique({ where: { shareToken } });
+    if (!wishlist) throw new NotFoundException("Liste introuvable");
+    const lines = await this.prisma.wishlistLine.findMany({
+      where: { wishlistId: wishlist.id, removedAt: null },
+      include: { product: { include: { images: { take: 1 } } } },
+      orderBy: { addedAt: "desc" },
+    });
+    const active = await this.pricing.getActivePromotions();
+    return lines.map((l) => ({
+      productId: l.productId,
+      name: l.product.nameFr,
+      nameAr: l.product.nameAr,
+      seoUrl: l.product.seoUrl,
+      price: this.pricing.resolveForProduct(l.product, active).price,
+      image: l.product.images[0]?.url ?? null,
+      available: l.product.stock - l.product.reservedStock > 0,
+    }));
   }
 }
