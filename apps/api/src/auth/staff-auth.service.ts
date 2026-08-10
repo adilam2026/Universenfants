@@ -1,4 +1,4 @@
-import { Inject, Injectable, UnauthorizedException } from "@nestjs/common";
+import { Inject, Injectable, Logger, UnauthorizedException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { randomBytes } from "node:crypto";
 import type { Request } from "express";
@@ -16,6 +16,8 @@ const LOCKOUT_SECONDS = 15 * 60; // §186, paramétrable plus tard via SystemSet
 
 @Injectable()
 export class StaffAuthService {
+  private readonly logger = new Logger(StaffAuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
@@ -27,7 +29,7 @@ export class StaffAuthService {
     const lockKey = `staff:lockout:${dto.email}`;
     const failKey = `staff:failed:${dto.email}`;
 
-    if (await this.redis.get(lockKey)) {
+    if (await this.isLockedOut(lockKey)) {
       throw new UnauthorizedException("Compte temporairement bloqué suite à trop de tentatives");
     }
 
@@ -38,18 +40,14 @@ export class StaffAuthService {
 
     const valid = staff?.active && (await verifyPassword(staff.passwordHash, dto.password));
     if (!valid) {
-      const attempts = await this.redis.incr(failKey);
-      await this.redis.expire(failKey, LOCKOUT_SECONDS);
-      if (attempts >= MAX_ATTEMPTS) {
-        await this.redis.set(lockKey, "1", "EX", LOCKOUT_SECONDS);
-      }
+      await this.recordFailedAttempt(failKey, lockKey);
       await this.prisma.auditLog.create({
         data: { action: "staff.login.failed", entity: "StaffUser", entityId: dto.email, ipAddress: ip },
       });
       throw new UnauthorizedException("Identifiants invalides");
     }
 
-    await this.redis.del(failKey);
+    await this.clearFailedAttempts(failKey);
     await this.prisma.staffUser.update({ where: { id: staff.id }, data: { lastLoginAt: new Date() } });
     await this.prisma.auditLog.create({
       data: {
@@ -62,6 +60,41 @@ export class StaffAuthService {
     });
 
     return this.issueTokens(staff);
+  }
+
+  /** Le verrouillage anti-bruteforce est une protection en profondeur, pas
+   * un mécanisme dont dépend la disponibilité du Back-Office : sans ce
+   * repli, une panne Redis (ou son absence en environnement minimal, comme
+   * en production sans Redis configuré) rendrait la connexion staff
+   * impossible pour tout le monde plutôt que de simplement désactiver ce
+   * contrôle — même logique que ResilientThrottlerStorageService. */
+  private async isLockedOut(lockKey: string): Promise<boolean> {
+    try {
+      return Boolean(await this.redis.get(lockKey));
+    } catch (err) {
+      this.logger.warn(`Redis indisponible pour le verrouillage anti-bruteforce, connexion autorisée : ${(err as Error).message}`);
+      return false;
+    }
+  }
+
+  private async recordFailedAttempt(failKey: string, lockKey: string): Promise<void> {
+    try {
+      const attempts = await this.redis.incr(failKey);
+      await this.redis.expire(failKey, LOCKOUT_SECONDS);
+      if (attempts >= MAX_ATTEMPTS) {
+        await this.redis.set(lockKey, "1", "EX", LOCKOUT_SECONDS);
+      }
+    } catch (err) {
+      this.logger.warn(`Redis indisponible, comptage des tentatives échouées ignoré : ${(err as Error).message}`);
+    }
+  }
+
+  private async clearFailedAttempts(failKey: string): Promise<void> {
+    try {
+      await this.redis.del(failKey);
+    } catch (err) {
+      this.logger.warn(`Redis indisponible, réinitialisation des tentatives échouées ignorée : ${(err as Error).message}`);
+    }
   }
 
   /** Émet un nouveau couple de tokens à partir d'un refresh token valide —
