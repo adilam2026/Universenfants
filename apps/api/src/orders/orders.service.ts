@@ -412,6 +412,37 @@ export class OrdersService {
     });
   }
 
+  /** Export CSV — aucun moyen d'extraire les commandes hors de
+   * l'interface (comptabilité, analyse externe) jusqu'ici. */
+  async exportToCsv(filters: { status?: string; city?: string }): Promise<string> {
+    const orders = await this.prisma.order.findMany({
+      where: { status: filters.status as never, shippingCity: filters.city },
+      include: { customer: true },
+      orderBy: { createdAt: "desc" },
+      take: 5000,
+    });
+    const header = ["Numéro", "Date", "Client", "Téléphone", "Ville", "Statut", "Paiement", "Sous-total", "Livraison", "Remise", "Total"];
+    const escape = (v: string) => `"${v.replace(/"/g, '""')}"`;
+    const lines = orders.map((o) =>
+      [
+        o.orderNumber,
+        o.createdAt.toISOString().slice(0, 10),
+        `${o.customer.firstName ?? ""} ${o.customer.lastName ?? ""}`.trim(),
+        o.customer.phone ?? "",
+        o.shippingCity,
+        o.status,
+        o.paymentStatus,
+        Number(o.subtotal).toFixed(2),
+        Number(o.shippingFee).toFixed(2),
+        Number(o.discount).toFixed(2),
+        Number(o.total).toFixed(2),
+      ]
+        .map((v) => escape(String(v)))
+        .join(","),
+    );
+    return [header.map(escape).join(","), ...lines].join("\n");
+  }
+
   async findForAdmin(orderId: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },

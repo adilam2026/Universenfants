@@ -19,6 +19,8 @@ import {
   Settings,
   LogOut,
   ScrollText,
+  UserCog,
+  ShieldCheck,
   FolderTree,
   BadgeCheck,
   Menu,
@@ -84,6 +86,8 @@ const NAV: { group: string; items: NavItem[] }[] = [
     group: "Administration",
     items: [
       { href: "/parametres", label: "Paramètres", icon: Settings, permission: null },
+      { href: "/equipe", label: "Équipe", icon: UserCog, permission: "user.manage" },
+      { href: "/roles", label: "Rôles", icon: ShieldCheck, permission: "user.manage" },
       { href: "/audit-logs", label: "Journal d'audit", icon: ScrollText, permission: "user.manage" },
     ],
   },

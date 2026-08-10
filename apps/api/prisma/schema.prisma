@@ -795,6 +795,7 @@ model StaffUser {
   uploadedMedia      Media[]
   orderStatusChanges OrderStatusHistory[]
   stockMovements     StockMovement[]
+  importLogs         ImportLog[]
 
   createdAt DateTime @default(now())
 
@@ -850,6 +851,23 @@ model AuditLog {
   createdAt   DateTime   @default(now())
 
   @@index([entity, entityId])
+  @@index([staffUserId])
+}
+
+// Historique des imports Excel/CSV catalogue — le résumé n'était jusqu'ici
+// renvoyé qu'une fois à l'écran, sans aucune trace persistée de qui a
+// importé quoi, quand, avec quel résultat.
+model ImportLog {
+  id           String     @id @default(cuid())
+  staffUserId  String?
+  staffUser    StaffUser? @relation(fields: [staffUserId], references: [id])
+  fileName     String?
+  createdCount Int
+  updatedCount Int
+  errorCount   Int
+  errors       Json?
+  createdAt    DateTime   @default(now())
+
   @@index([staffUserId])
 }
 

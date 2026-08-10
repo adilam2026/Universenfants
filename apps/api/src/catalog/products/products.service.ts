@@ -245,6 +245,8 @@ export class ProductsService {
   /** Import Excel produits en masse — upsert par SKU, une ligne = un produit. */
   async importFromExcel(
     buffer: Buffer,
+    staffUserId: string,
+    fileName?: string,
   ): Promise<{ results: ImportRowResult[]; created: number; updated: number; errors: number; searchIndexOk: boolean }> {
     const workbook = XLSX.read(buffer, { type: "buffer" });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
@@ -346,13 +348,65 @@ export class ProductsService {
 
     const searchIndexOk = results.some((r) => r.status !== "error") ? (await this.reindexSearch()).searchIndexOk : true;
 
+    const createdCount = results.filter((r) => r.status === "created").length;
+    const updatedCount = results.filter((r) => r.status === "updated").length;
+    const errorRows = results.filter((r) => r.status === "error");
+    // Le résumé n'était jusqu'ici renvoyé qu'une fois à l'écran — aucune
+    // trace de qui a importé quoi, quand, avec quel résultat.
+    await this.prisma.importLog.create({
+      data: {
+        staffUserId,
+        fileName,
+        createdCount,
+        updatedCount,
+        errorCount: errorRows.length,
+        errors: errorRows.length > 0 ? (errorRows as unknown as Prisma.InputJsonValue) : undefined,
+      },
+    });
+
     return {
       results,
-      created: results.filter((r) => r.status === "created").length,
-      updated: results.filter((r) => r.status === "updated").length,
-      errors: results.filter((r) => r.status === "error").length,
+      created: createdCount,
+      updated: updatedCount,
+      errors: errorRows.length,
       searchIndexOk,
     };
+  }
+
+  /** Export au même format que l'import (mêmes en-têtes de colonnes) —
+   * permet un aller-retour édition en masse : exporter, modifier dans un
+   * tableur, réimporter. Jusqu'ici il n'existait aucun moyen d'extraire le
+   * catalogue hors de l'interface produit par produit. */
+  async exportToExcel(): Promise<Buffer> {
+    const products = await this.prisma.product.findMany({
+      include: { category: { select: { slug: true } }, brand: { select: { name: true } } },
+      orderBy: { sku: "asc" },
+    });
+    const rows: ImportRow[] = products.map((p) => ({
+      SKU: p.sku,
+      Nom: p.nameFr,
+      Catégorie: p.category.slug,
+      Marque: p.brand?.name ?? "",
+      Prix: Number(p.price),
+      "Prix de revient": Number(p.costPrice),
+      Stock: p.stock,
+      "URL SEO": p.seoUrl,
+      "Âge min": p.ageMin ?? "",
+      "Âge max": p.ageMax ?? "",
+      Statut: p.status,
+    }));
+    const sheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, sheet, "Produits");
+    return XLSX.write(workbook, { type: "buffer", bookType: "xlsx" }) as Buffer;
+  }
+
+  listImportHistory() {
+    return this.prisma.importLog.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 100,
+      include: { staffUser: { select: { name: true } } },
+    });
   }
 
   async create(dto: UpsertProductDto, staffUserId: string) {

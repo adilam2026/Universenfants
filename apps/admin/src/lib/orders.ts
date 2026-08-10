@@ -1,4 +1,6 @@
-import { apiFetch } from "./api-client";
+import { apiFetch, getStaffToken } from "./api-client";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api";
 
 export interface AdminOrderSummary {
   id: string;
@@ -58,3 +60,22 @@ export const updateOrderStatus = (id: string, status: string, note?: string) =>
 
 export const recordOrderPayment = (id: string, amount: number) =>
   apiFetch<AdminOrderDetail>(`/orders/admin/${id}/payment`, { method: "POST", body: JSON.stringify({ amount }) });
+
+export async function exportOrders(filters: { status?: string; city?: string } = {}) {
+  const qs = new URLSearchParams();
+  if (filters.status) qs.set("status", filters.status);
+  if (filters.city) qs.set("city", filters.city);
+  const query = qs.toString();
+  const token = getStaffToken();
+  const res = await fetch(`${API_URL}/orders/admin/export${query ? `?${query}` : ""}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+  if (!res.ok) throw new Error(`Erreur (${res.status})`);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `commandes-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}

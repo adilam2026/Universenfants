@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { Download } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { listAdminOrders, type AdminOrderSummary } from "@/lib/orders";
+import { Button } from "@/components/ui/button";
+import { listAdminOrders, exportOrders, type AdminOrderSummary } from "@/lib/orders";
 
 function dh(value: string | number) {
   return `${Number(value).toLocaleString("fr-FR")} DH`;
@@ -31,6 +33,18 @@ const STATUS_VARIANT: Record<string, "default" | "primary" | "success" | "warnin
 export default function OrdersListPage() {
   const [orders, setOrders] = useState<AdminOrderSummary[] | null>(null);
   const [status, setStatus] = useState("");
+  const [exporting, setExporting] = useState(false);
+
+  async function handleExport() {
+    setExporting(true);
+    try {
+      await exportOrders({ status: status || undefined });
+    } catch {
+      // silencieux : l'admin peut réessayer, pas d'état d'erreur dédié pour un export
+    } finally {
+      setExporting(false);
+    }
+  }
 
   useEffect(() => {
     // Changer rapidement de filtre déclenche plusieurs requêtes en vol — sans
@@ -50,13 +64,18 @@ export default function OrdersListPage() {
     <div>
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <h1 className="text-xl font-bold">Commandes</h1>
-        <select
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-          className="h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
-        </select>
+        <div className="flex items-center gap-2">
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            className="h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
+          </select>
+          <Button variant="outline" size="sm" onClick={handleExport} disabled={exporting}>
+            <Download className="size-4" /> {exporting ? "…" : "Exporter"}
+          </Button>
+        </div>
       </div>
 
       <div className="rounded-lg border border-border bg-card overflow-x-auto">

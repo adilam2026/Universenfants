@@ -1,5 +1,6 @@
-import { BadRequestException, Body, Controller, Delete, Get, Headers, Param, Patch, Post, Query, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Delete, Get, Headers, Param, Patch, Post, Query, Res, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
+import type { Response } from "express";
 import { ApiTags } from "@nestjs/swagger";
 import { PermissionCode } from "@universenfants/shared";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
@@ -49,6 +50,25 @@ export class ProductsController {
     return this.service.stockValuation();
   }
 
+  @Get("admin/import-history")
+  @UseGuards(JwtAuthGuard, StaffGuard, PermissionsGuard)
+  @RequirePermissions(PermissionCode.PRODUCT_CREATE)
+  importHistory() {
+    return this.service.listImportHistory();
+  }
+
+  @Get("admin/export")
+  @UseGuards(JwtAuthGuard, StaffGuard, PermissionsGuard)
+  @RequirePermissions(PermissionCode.PRODUCT_READ)
+  async exportCatalog(@Res() res: Response) {
+    const buffer = await this.service.exportToExcel();
+    res.set({
+      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Disposition": `attachment; filename="catalogue-${new Date().toISOString().slice(0, 10)}.xlsx"`,
+    });
+    res.send(buffer);
+  }
+
   @Get("admin/:id")
   @UseGuards(JwtAuthGuard, StaffGuard, PermissionsGuard)
   @RequirePermissions(PermissionCode.PRODUCT_READ)
@@ -72,7 +92,7 @@ export class ProductsController {
   @UseGuards(JwtAuthGuard, StaffGuard, PermissionsGuard)
   @RequirePermissions(PermissionCode.PRODUCT_CREATE)
   @UseInterceptors(FileInterceptor("file", { limits: { fileSize: 5 * 1024 * 1024 } }))
-  importExcel(@UploadedFile() file?: Express.Multer.File) {
+  importExcel(@UploadedFile() file: Express.Multer.File | undefined, @CurrentUser() user: RequestUser) {
     if (!file) throw new BadRequestException("Fichier requis");
     const allowedMimeTypes = [
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
@@ -82,7 +102,7 @@ export class ProductsController {
     if (!allowedMimeTypes.includes(file.mimetype)) {
       throw new BadRequestException("Le fichier doit être un tableur Excel (.xlsx, .xls) ou CSV");
     }
-    return this.service.importFromExcel(file.buffer);
+    return this.service.importFromExcel(file.buffer, user.sub, file.originalname);
   }
 
   @Post("admin/reindex-search")

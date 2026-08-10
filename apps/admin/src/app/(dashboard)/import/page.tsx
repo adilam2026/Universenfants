@@ -1,11 +1,11 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { Upload, CheckCircle2, XCircle } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Upload, CheckCircle2, XCircle, Download } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { importProductsExcel, type ImportSummary } from "@/lib/import";
+import { importProductsExcel, listImportHistory, exportCatalog, type ImportSummary, type ImportLogEntry } from "@/lib/import";
 
 const COLUMNS = [
   { name: "SKU", required: true, example: "LEGO-CTY-6012" },
@@ -27,6 +27,13 @@ export default function ImportPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<ImportSummary | null>(null);
+  const [history, setHistory] = useState<ImportLogEntry[] | null>(null);
+  const [exporting, setExporting] = useState(false);
+
+  function refreshHistory() {
+    listImportHistory().then(setHistory);
+  }
+  useEffect(refreshHistory, []);
 
   async function handleSubmit() {
     if (!file) return;
@@ -36,6 +43,7 @@ export default function ImportPage() {
     try {
       const result = await importProductsExcel(file);
       setSummary(result);
+      refreshHistory();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Une erreur est survenue");
     } finally {
@@ -43,9 +51,25 @@ export default function ImportPage() {
     }
   }
 
+  async function handleExport() {
+    setExporting(true);
+    try {
+      await exportCatalog();
+    } catch {
+      setError("Impossible d'exporter le catalogue");
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
     <div>
-      <h1 className="text-xl font-bold mb-5">Import Excel</h1>
+      <div className="flex items-center justify-between mb-5">
+        <h1 className="text-xl font-bold">Import / Export Excel</h1>
+        <Button variant="outline" size="sm" onClick={handleExport} disabled={exporting}>
+          <Download className="size-4" /> {exporting ? "Export en cours…" : "Exporter le catalogue"}
+        </Button>
+      </div>
 
       <Card className="mb-5">
         <CardHeader><CardTitle>Format attendu</CardTitle></CardHeader>
@@ -124,6 +148,31 @@ export default function ImportPage() {
               )}
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      <Card className="mt-5">
+        <CardHeader><CardTitle>Historique des imports</CardTitle></CardHeader>
+        <CardContent className="p-0">
+          <div className="divide-y divide-border">
+            {history?.map((h) => (
+              <div key={h.id} className="px-5 py-2.5 text-sm flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <span className="font-medium">{h.fileName ?? "Fichier"}</span>
+                  <span className="text-xs text-muted-foreground ml-2">
+                    {h.staffUser?.name ?? "—"} · {new Date(h.createdAt).toLocaleString("fr-FR")}
+                  </span>
+                </div>
+                <div className="flex gap-3 text-xs font-bold">
+                  <span className="text-brand-success">{h.createdCount} créé(s)</span>
+                  <span className="text-primary">{h.updatedCount} mis à jour</span>
+                  {h.errorCount > 0 && <span className="text-destructive">{h.errorCount} erreur(s)</span>}
+                </div>
+              </div>
+            ))}
+            {history && history.length === 0 && <p className="text-sm text-muted-foreground text-center py-8">Aucun import pour l&apos;instant.</p>}
+            {!history && <p className="text-sm text-muted-foreground text-center py-8">Chargement…</p>}
+          </div>
         </CardContent>
       </Card>
     </div>

@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Headers, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Headers, Param, Patch, Post, Query, Res, UseGuards } from "@nestjs/common";
+import type { Response } from "express";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
 import { PermissionCode } from "@universenfants/shared";
@@ -63,6 +64,19 @@ export class OrdersController {
   @RequirePermissions(PermissionCode.ORDER_READ)
   adminList(@Query("status") status?: string, @Query("city") city?: string) {
     return this.service.listForAdmin({ status, city });
+  }
+
+  @Get("admin/export")
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, StaffGuard, PermissionsGuard)
+  @RequirePermissions(PermissionCode.ORDER_READ)
+  async exportOrders(@Query("status") status: string | undefined, @Query("city") city: string | undefined, @Res() res: Response) {
+    const csv = await this.service.exportToCsv({ status, city });
+    res.set({
+      "Content-Type": "text/csv; charset=utf-8",
+      "Content-Disposition": `attachment; filename="commandes-${new Date().toISOString().slice(0, 10)}.csv"`,
+    });
+    res.send(`﻿${csv}`);
   }
 
   @Get("admin/:id")
