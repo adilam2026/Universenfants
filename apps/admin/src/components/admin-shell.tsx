@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
   PackageSearch,
@@ -20,6 +20,8 @@ import {
   ScrollText,
   FolderTree,
   BadgeCheck,
+  Menu,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { staffLogout, getStaffToken } from "@/lib/api-client";
@@ -104,6 +106,21 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const user = useStaffUser();
+  // Sous `lg`, la sidebar est un tiroir hors-écran plutôt qu'une colonne
+  // fixe de 240px — sans ça elle prenait une part disproportionnée de la
+  // largeur sur mobile et le contenu (tableaux, formulaires) se retrouvait
+  // écrasé dans le reste, sans aucun moyen de la masquer.
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  // Le tiroir mobile doit se refermer après un clic sur un lien. Ajusté
+  // pendant le rendu plutôt que dans un effet (voir la doc React sur
+  // "adjusting state when a prop changes") : un effet créerait un rendu
+  // intermédiaire visible où l'ancienne page reste affichée tiroir ouvert
+  // avant de se refermer au rendu suivant.
+  const [prevPathname, setPrevPathname] = useState(pathname);
+  if (pathname !== prevPathname) {
+    setPrevPathname(pathname);
+    setMobileNavOpen(false);
+  }
 
   // Vérifie le token directement plutôt que de dépendre de `user` : sur une
   // navigation complète, useSyncExternalStore rend d'abord la valeur serveur
@@ -121,12 +138,34 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen">
-      <aside className="w-60 shrink-0 border-r border-border bg-card flex flex-col sticky top-0 h-screen">
-        <div className="px-4 py-4 border-b border-border">
-          <span className="font-bold text-lg text-primary">
-            Univers<span className="text-brand-cta">Enfants</span>
-          </span>
-          <p className="text-[11px] text-muted-foreground mt-0.5">Back-Office</p>
+      {mobileNavOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/40 lg:hidden"
+          onClick={() => setMobileNavOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+      <aside
+        className={cn(
+          "w-60 shrink-0 border-r border-border bg-card flex flex-col h-screen z-40",
+          "fixed inset-y-0 left-0 rtl:left-auto rtl:right-0 transition-transform lg:sticky lg:top-0 lg:translate-x-0",
+          mobileNavOpen ? "translate-x-0" : "-translate-x-full rtl:translate-x-full",
+        )}
+      >
+        <div className="px-4 py-4 border-b border-border flex items-center justify-between">
+          <div>
+            <span className="font-bold text-lg text-primary">
+              Univers<span className="text-brand-cta">Enfants</span>
+            </span>
+            <p className="text-[11px] text-muted-foreground mt-0.5">Back-Office</p>
+          </div>
+          <button
+            onClick={() => setMobileNavOpen(false)}
+            className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-secondary lg:hidden"
+            aria-label="Fermer le menu"
+          >
+            <X className="size-4" />
+          </button>
         </div>
         <nav className="flex-1 overflow-y-auto py-3">
           {NAV.map((group) => {
@@ -178,18 +217,32 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </aside>
-      <main className="flex-1 min-w-0 overflow-x-hidden">
-        <div className="p-6 max-w-6xl mx-auto">
-          {denied ? (
-            <div className="rounded-lg border border-border bg-card p-6 text-center">
-              <p className="font-bold mb-1">Accès refusé</p>
-              <p className="text-sm text-muted-foreground">Votre rôle ne vous donne pas accès à cette section du Back-Office.</p>
-            </div>
-          ) : (
-            children
-          )}
+      <div className="flex-1 min-w-0 flex flex-col">
+        <div className="lg:hidden sticky top-0 z-20 flex items-center gap-3 border-b border-border bg-card px-4 py-3">
+          <button
+            onClick={() => setMobileNavOpen(true)}
+            className="flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-secondary"
+            aria-label="Ouvrir le menu"
+          >
+            <Menu className="size-5" />
+          </button>
+          <span className="font-bold text-primary">
+            Univers<span className="text-brand-cta">Enfants</span>
+          </span>
         </div>
-      </main>
+        <main className="flex-1 min-w-0 overflow-x-hidden">
+          <div className="p-4 sm:p-6 max-w-6xl mx-auto">
+            {denied ? (
+              <div className="rounded-lg border border-border bg-card p-6 text-center">
+                <p className="font-bold mb-1">Accès refusé</p>
+                <p className="text-sm text-muted-foreground">Votre rôle ne vous donne pas accès à cette section du Back-Office.</p>
+              </div>
+            ) : (
+              children
+            )}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
