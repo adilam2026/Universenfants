@@ -1,7 +1,13 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api";
 // Sans timeout, une API qui ne répond plus bloque le rendu SSR (ou l'appel
 // client) indéfiniment au lieu d'échouer et de laisser afficher un fallback.
-const FETCH_TIMEOUT_MS = 10_000;
+// Plus généreux que les clients côté navigateur (auth/cart/reviews...) : ces
+// appels tournent pendant `next build` (génération statique) ou en
+// revalidation ISR en arrière-plan, jamais devant un utilisateur qui
+// attend — la latence inter-région (ex: build US, base de données en
+// Europe) peut dépasser 10s sur une connexion à froid sans que ce soit un
+// vrai problème.
+const FETCH_TIMEOUT_MS = 25_000;
 
 export interface Category {
   id: string;
