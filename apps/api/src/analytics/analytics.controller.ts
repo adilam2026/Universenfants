@@ -1,5 +1,5 @@
-import { Controller, Get, UseGuards } from "@nestjs/common";
-import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
+import { Controller, Get, Query, UseGuards } from "@nestjs/common";
+import { ApiBearerAuth, ApiQuery, ApiTags } from "@nestjs/swagger";
 import { PermissionCode } from "@universenfants/shared";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { StaffGuard } from "../auth/guards/staff.guard";
@@ -16,7 +16,8 @@ export class AnalyticsController {
   constructor(private readonly service: AnalyticsService) {}
 
   @Get("summary")
-  summary() {
-    return this.service.summary();
+  @ApiQuery({ name: "days", required: false, type: Number, description: "Taille de la fenêtre glissante en jours (défaut 30)" })
+  summary(@Query("days") days?: string) {
+    return this.service.summary(days ? Number(days) : undefined);
   }
 }

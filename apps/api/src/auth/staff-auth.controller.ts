@@ -1,10 +1,15 @@
-import { Body, Controller, Post, Req } from "@nestjs/common";
-import { ApiTags } from "@nestjs/swagger";
+import { Body, Controller, Patch, Post, Req, UseGuards } from "@nestjs/common";
+import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
 import type { Request } from "express";
 import { StaffAuthService } from "./staff-auth.service";
 import { StaffLoginDto } from "./dto/staff-login.dto";
 import { RefreshTokenDto } from "./dto/refresh-token.dto";
+import { ChangeStaffPasswordDto } from "./dto/change-staff-password.dto";
+import { JwtAuthGuard } from "./guards/jwt-auth.guard";
+import { StaffGuard } from "./guards/staff.guard";
+import { CurrentUser } from "./decorators/current-user.decorator";
+import type { RequestUser } from "./types";
 
 @ApiTags("auth-staff")
 @Controller("auth/staff")
@@ -29,5 +34,13 @@ export class StaffAuthController {
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
   logout(@Body() dto: RefreshTokenDto) {
     return this.service.logout(dto.refreshToken);
+  }
+
+  @Patch("me/password")
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, StaffGuard)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  changePassword(@CurrentUser() user: RequestUser, @Body() dto: ChangeStaffPasswordDto) {
+    return this.service.changePassword(user.sub, dto);
   }
 }

@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { TrendingUp, TrendingDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getAnalyticsSummary, type AnalyticsSummary } from "@/lib/analytics";
 
@@ -17,12 +19,30 @@ const STATUS_LABEL: Record<string, string> = {
   CANCELLED: "Annulée",
 };
 
+const RANGE_OPTIONS = [
+  { days: 7, label: "7 jours" },
+  { days: 30, label: "30 jours" },
+  { days: 90, label: "90 jours" },
+];
+
+function ChangeBadge({ pct }: { pct: number | null }) {
+  if (pct === null) return null;
+  const positive = pct >= 0;
+  return (
+    <span className={cn("inline-flex items-center gap-0.5 text-xs font-bold", positive ? "text-primary" : "text-destructive")}>
+      {positive ? <TrendingUp className="size-3.5" /> : <TrendingDown className="size-3.5" />}
+      {positive ? "+" : ""}{pct}%
+    </span>
+  );
+}
+
 export default function AnalyticsPage() {
+  const [days, setDays] = useState(30);
   const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
 
   useEffect(() => {
-    getAnalyticsSummary().then(setSummary);
-  }, []);
+    getAnalyticsSummary(days).then(setSummary);
+  }, [days]);
 
   if (!summary) return <p className="text-sm text-muted-foreground">Chargement…</p>;
 
@@ -30,13 +50,45 @@ export default function AnalyticsPage() {
 
   return (
     <div>
-      <h1 className="text-xl font-bold mb-1">Analytics</h1>
-      <p className="text-sm text-muted-foreground mb-5">30 derniers jours</p>
+      <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
+        <div>
+          <h1 className="text-xl font-bold mb-1">Analytics</h1>
+          <p className="text-sm text-muted-foreground">Derniers {summary.days} jours, vs période précédente équivalente</p>
+        </div>
+        <div className="flex rounded-lg border border-border p-0.5 gap-0.5">
+          {RANGE_OPTIONS.map((opt) => (
+            <button
+              key={opt.days}
+              onClick={() => setDays(opt.days)}
+              className={cn(
+                "px-3 py-1.5 text-xs font-bold rounded-md",
+                days === opt.days ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary",
+              )}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
-      <div className="grid sm:grid-cols-3 gap-3.5 mb-6">
-        <Card><CardContent className="p-5"><p className="text-xs text-muted-foreground font-medium">Chiffre d&apos;affaires</p><p className="text-2xl font-bold mt-1">{dh(summary.totalRevenue)}</p></CardContent></Card>
-        <Card><CardContent className="p-5"><p className="text-xs text-muted-foreground font-medium">Commandes</p><p className="text-2xl font-bold mt-1">{summary.totalOrders}</p></CardContent></Card>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-3.5 mb-6">
+        <Card>
+          <CardContent className="p-5">
+            <p className="text-xs text-muted-foreground font-medium">Chiffre d&apos;affaires</p>
+            <p className="text-2xl font-bold mt-1">{dh(summary.totalRevenue)}</p>
+            <ChangeBadge pct={summary.comparison.revenueChangePct} />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-5">
+            <p className="text-xs text-muted-foreground font-medium">Commandes</p>
+            <p className="text-2xl font-bold mt-1">{summary.totalOrders}</p>
+            <ChangeBadge pct={summary.comparison.ordersChangePct} />
+          </CardContent>
+        </Card>
         <Card><CardContent className="p-5"><p className="text-xs text-muted-foreground font-medium">Panier moyen</p><p className="text-2xl font-bold mt-1">{dh(summary.avgOrderValue)}</p></CardContent></Card>
+        <Card><CardContent className="p-5"><p className="text-xs text-muted-foreground font-medium">Articles / commande</p><p className="text-2xl font-bold mt-1">{summary.avgItemsPerOrder}</p></CardContent></Card>
+        <Card><CardContent className="p-5"><p className="text-xs text-muted-foreground font-medium">Nouveaux clients</p><p className="text-2xl font-bold mt-1">{summary.newCustomers}</p></CardContent></Card>
       </div>
 
       <div className="grid lg:grid-cols-[1fr_320px] gap-5">

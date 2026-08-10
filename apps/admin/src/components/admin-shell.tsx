@@ -121,7 +121,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen">
-      <aside className="w-60 shrink-0 border-r border-border bg-card flex flex-col">
+      <aside className="w-60 shrink-0 border-r border-border bg-card flex flex-col sticky top-0 h-screen">
         <div className="px-4 py-4 border-b border-border">
           <span className="font-bold text-lg text-primary">
             Univers<span className="text-brand-cta">Enfants</span>

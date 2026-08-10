@@ -5,10 +5,11 @@ import type { Request } from "express";
 import type Redis from "ioredis";
 import { PrismaService } from "../prisma/prisma.service";
 import { REDIS_CLIENT } from "../redis/redis.module";
-import { verifyPassword } from "./password.util";
+import { hashPassword, verifyPassword } from "./password.util";
 import { hashRefreshToken } from "./refresh-token.util";
 import { resolveStaffPermissions } from "./staff-permissions.util";
 import type { StaffLoginDto } from "./dto/staff-login.dto";
+import type { ChangeStaffPasswordDto } from "./dto/change-staff-password.dto";
 import type { JwtPayload } from "./types";
 
 const MAX_ATTEMPTS = 5;
@@ -155,6 +156,27 @@ export class StaffAuthService {
     await this.prisma.refreshToken
       .update({ where: { tokenHash: hashRefreshToken(refreshToken) }, data: { revokedAt: new Date() } })
       .catch(() => undefined);
+    return { ok: true };
+  }
+
+  /** Libre-service : un membre du staff change son propre mot de passe.
+   * Révoque les refresh tokens existants — comme lors d'une détection de
+   * rejeu, un changement de mot de passe doit invalider les autres sessions
+   * actives (ex: un appareil volé), pas seulement clôturer poliment celle
+   * en cours. */
+  async changePassword(staffId: string, dto: ChangeStaffPasswordDto) {
+    const staff = await this.prisma.staffUser.findUniqueOrThrow({ where: { id: staffId } });
+    const valid = await verifyPassword(staff.passwordHash, dto.currentPassword);
+    if (!valid) throw new UnauthorizedException("Mot de passe actuel incorrect");
+
+    await this.prisma.staffUser.update({
+      where: { id: staffId },
+      data: { passwordHash: await hashPassword(dto.newPassword) },
+    });
+    await this.prisma.refreshToken.updateMany({
+      where: { subjectId: staffId, kind: "staff", revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
     return { ok: true };
   }
 

@@ -151,6 +151,13 @@ export async function apiFetch<T>(path: string, init?: RequestInit, isRetry = fa
   return res.json() as Promise<T>;
 }
 
+export function changeStaffPassword(currentPassword: string, newPassword: string) {
+  return apiFetch<{ ok: boolean }>("/auth/staff/me/password", {
+    method: "PATCH",
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+}
+
 export async function staffLogin(email: string, password: string) {
   const data = await apiFetch<{ accessToken: string; refreshToken: string; user: StaffUser }>("/auth/staff/login", {
     method: "POST",
