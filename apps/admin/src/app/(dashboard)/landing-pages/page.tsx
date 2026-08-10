@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import useSWR from "swr";
 import Link from "next/link";
 import { Plus, Copy, ExternalLink, Archive } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { TableSkeleton } from "@/components/ui/skeleton";
 import {
   listLandingPages,
   duplicateLandingPage,
@@ -26,12 +27,7 @@ function dh(value: number) {
 }
 
 export default function LandingPagesListPage() {
-  const [pages, setPages] = useState<AdminLandingPage[] | null>(null);
-
-  function refresh() {
-    listLandingPages().then(setPages);
-  }
-  useEffect(refresh, []);
+  const { data: pages, mutate: refresh } = useSWR<AdminLandingPage[]>("/landing-pages/admin", listLandingPages);
 
   async function handleDuplicate(id: string) {
     await duplicateLandingPage(id);
@@ -105,7 +101,7 @@ export default function LandingPagesListPage() {
           </tbody>
         </table>
         {pages && pages.length === 0 && <p className="text-sm text-muted-foreground text-center py-10">Aucune landing page.</p>}
-        {!pages && <p className="text-sm text-muted-foreground text-center py-10">Chargement…</p>}
+        {!pages && <TableSkeleton columns={4} />}
       </div>
     </div>
   );

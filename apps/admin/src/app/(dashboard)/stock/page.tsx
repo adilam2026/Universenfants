@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import useSWR from "swr";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { CardSkeleton } from "@/components/ui/skeleton";
 import { listStockMovements, getStockValuation, type StockMovementEntry, type StockValuation } from "@/lib/products";
 
 function dh(value: number) {
@@ -21,17 +23,18 @@ const REASON_LABEL: Record<string, string> = {
 
 export default function StockPage() {
   const [tab, setTab] = useState<"movements" | "valuation">("movements");
-  const [movements, setMovements] = useState<{ items: StockMovementEntry[]; page: number; totalPages: number } | null>(null);
-  const [valuation, setValuation] = useState<StockValuation | null>(null);
   const [page, setPage] = useState(1);
 
-  useEffect(() => {
-    if (tab === "movements") listStockMovements({ page }).then(setMovements);
-  }, [tab, page]);
-
-  useEffect(() => {
-    if (tab === "valuation" && !valuation) getStockValuation().then(setValuation);
-  }, [tab, valuation]);
+  const { data: movements } = useSWR<{ items: StockMovementEntry[]; page: number; totalPages: number }>(
+    `/products/admin/stock-movements?page=${page}`,
+    () => listStockMovements({ page }),
+  );
+  // Fraîcheur plus longue : la valorisation ne bouge qu'avec le stock
+  // lui-même, pas besoin de la revalider à chaque focus d'onglet.
+  const { data: valuation } = useSWR<StockValuation>("/products/admin/stock-valuation", getStockValuation, {
+    revalidateOnFocus: false,
+    dedupingInterval: 60_000,
+  });
 
   return (
     <div>
@@ -48,7 +51,7 @@ export default function StockPage() {
           <CardHeader><CardTitle>Mouvements de stock</CardTitle></CardHeader>
           <CardContent className="p-0">
             {!movements ? (
-              <p className="text-sm text-muted-foreground text-center py-10">Chargement…</p>
+              <CardSkeleton lines={5} />
             ) : movements.items.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-10">Aucun mouvement enregistré.</p>
             ) : (
@@ -90,7 +93,7 @@ export default function StockPage() {
       {tab === "valuation" && (
         <>
           {!valuation ? (
-            <p className="text-sm text-muted-foreground">Chargement…</p>
+            <Card><CardSkeleton lines={4} /></Card>
           ) : (
             <>
               <div className="grid sm:grid-cols-2 gap-3.5 mb-5">

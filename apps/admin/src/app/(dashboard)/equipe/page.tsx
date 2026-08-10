@@ -1,35 +1,35 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
+import useSWR from "swr";
 import { Plus, KeyRound } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { TableSkeleton } from "@/components/ui/skeleton";
 import {
   listStaffUsers,
   createStaffUser,
   updateStaffUser,
   resetStaffPassword,
-  listRoles,
   type AdminStaffUser,
   type AdminRole,
 } from "@/lib/staff-users";
 import { ApiError } from "@/lib/api-client";
 import { useStaffUser } from "@/hooks/use-staff-user";
+import { useRoles } from "@/hooks/reference-data";
 
 export default function TeamPage() {
   const currentUser = useStaffUser();
-  const [staff, setStaff] = useState<AdminStaffUser[] | null>(null);
-  const [roles, setRoles] = useState<AdminRole[] | null>(null);
+  const { data: staff, mutate: refreshStaff } = useSWR<AdminStaffUser[]>("/staff-users", listStaffUsers);
+  const { data: roles } = useRoles();
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
 
   function refresh() {
-    listStaffUsers().then(setStaff);
-    listRoles().then(setRoles);
+    refreshStaff();
   }
-  useEffect(refresh, []);
 
   async function handleCreate(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -134,7 +134,7 @@ export default function TeamPage() {
             ))}
           </tbody>
         </table>
-        {!staff && <p className="text-sm text-muted-foreground text-center py-10">Chargement…</p>}
+        {!staff && <TableSkeleton columns={4} />}
       </div>
     </div>
   );

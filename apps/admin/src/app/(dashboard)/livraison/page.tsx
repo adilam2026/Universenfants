@@ -1,16 +1,15 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { TableSkeleton } from "@/components/ui/skeleton";
 import {
-  listCities,
   createCity,
   updateCity,
-  listCityGroups,
   createCityGroup,
   updateCityGroup,
   removeCityGroup,
@@ -18,21 +17,21 @@ import {
   type AdminCityGroup,
 } from "@/lib/cities";
 import { ApiError } from "@/lib/api-client";
+import { useCities, useCityGroups } from "@/hooks/reference-data";
 
 function dh(value: string | number) {
   return `${Number(value).toLocaleString("fr-FR")} DH`;
 }
 
 export default function ShippingPage() {
-  const [cities, setCities] = useState<AdminCity[] | null>(null);
-  const [groups, setGroups] = useState<AdminCityGroup[] | null>(null);
+  const { data: cities, mutate: refreshCities } = useCities();
+  const { data: groups, mutate: refreshGroups } = useCityGroups();
   const [error, setError] = useState<string | null>(null);
 
   function refresh() {
-    listCities().then(setCities);
-    listCityGroups().then(setGroups);
+    refreshCities();
+    refreshGroups();
   }
-  useEffect(refresh, []);
 
   async function handleCreate(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -46,12 +45,15 @@ export default function ShippingPage() {
         freeShippingFrom: form.get("freeShippingFrom") ? Number(form.get("freeShippingFrom")) : undefined,
       });
       formEl.reset();
-      refresh();
+      refreshCities();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Une erreur est survenue");
     }
   }
 
+  // Peut changer le groupe de la ville : rafraîchit aussi les groupes (le
+  // compteur "N villes" affiché sur chaque groupe en dépend), pas seulement
+  // les villes.
   async function handleRowSave(city: AdminCity, shippingFee: string, freeShippingFrom: string, active: boolean, groupId: string) {
     try {
       await updateCity(city.id, {
@@ -79,12 +81,14 @@ export default function ShippingPage() {
         freeShippingFrom: form.get("freeShippingFrom") ? Number(form.get("freeShippingFrom")) : undefined,
       });
       formEl.reset();
-      refresh();
+      refreshGroups();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Une erreur est survenue");
     }
   }
 
+  // Supprimer un groupe libère les villes qui y étaient rattachées :
+  // rafraîchit aussi les villes.
   async function handleRemoveGroup(id: string) {
     setError(null);
     try {
@@ -103,7 +107,7 @@ export default function ShippingPage() {
         shippingFee: Number(shippingFee),
         freeShippingFrom: freeShippingFrom ? Number(freeShippingFrom) : undefined,
       });
-      refresh();
+      refreshGroups();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Une erreur est survenue");
     }
@@ -186,7 +190,7 @@ export default function ShippingPage() {
             {cities?.map((c) => <CityRow key={c.id} city={c} groups={groups ?? []} onSave={handleRowSave} />)}
           </tbody>
         </table>
-        {!cities && <p className="text-sm text-muted-foreground text-center py-10">Chargement…</p>}
+        {!cities && <TableSkeleton columns={5} />}
       </div>
     </div>
   );

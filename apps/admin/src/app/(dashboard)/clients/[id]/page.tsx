@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { use, useEffect, useState } from "react";
+import { use } from "react";
+import useSWR from "swr";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { CardSkeleton } from "@/components/ui/skeleton";
 import { getCustomer, type AdminCustomerDetail } from "@/lib/customers";
 
 function dh(value: string | number) {
@@ -19,15 +21,10 @@ const TXN_LABEL: Record<string, string> = {
 
 export default function CustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const [customer, setCustomer] = useState<AdminCustomerDetail | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { data: customer, error } = useSWR<AdminCustomerDetail>(`/customers/${id}`, () => getCustomer(id));
 
-  useEffect(() => {
-    getCustomer(id).then(setCustomer).catch((e) => setError(e instanceof Error ? e.message : "Client introuvable"));
-  }, [id]);
-
-  if (error) return <p className="text-sm text-destructive">{error}</p>;
-  if (!customer) return <p className="text-sm text-muted-foreground">Chargement…</p>;
+  if (error) return <p className="text-sm text-destructive">{error instanceof Error ? error.message : "Client introuvable"}</p>;
+  if (!customer) return <CardSkeleton lines={6} />;
 
   return (
     <div>

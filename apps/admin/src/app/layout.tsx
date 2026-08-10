@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { SwrProvider } from "@/lib/swr-provider";
 
 const fontVars = "[--font-family-sans:-apple-system,BlinkMacSystemFont,'Segoe_UI',Roboto,system-ui,sans-serif]";
 
@@ -14,7 +15,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="fr" className={`h-full antialiased ${fontVars}`}>
-      <body className="min-h-full flex flex-col font-sans">{children}</body>
+      <body className="min-h-full flex flex-col font-sans">
+        <SwrProvider>{children}</SwrProvider>
+      </body>
     </html>
   );
 }

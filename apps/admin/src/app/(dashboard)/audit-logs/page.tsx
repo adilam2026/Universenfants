@@ -1,10 +1,12 @@
 "use client";
 
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useState } from "react";
+import useSWR from "swr";
 import { Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { listAuditLogs, type AuditLogEntry } from "@/lib/audit-logs";
+import { TableSkeleton } from "@/components/ui/skeleton";
+import { listAuditLogs, auditLogsKey, type AuditLogPage } from "@/lib/audit-logs";
 
 function formatValue(value: unknown) {
   if (value === null || value === undefined) return "—";
@@ -12,15 +14,13 @@ function formatValue(value: unknown) {
 }
 
 export default function AuditLogsPage() {
-  const [data, setData] = useState<{ items: AuditLogEntry[]; total: number; page: number; limit: number } | null>(null);
   const [entity, setEntity] = useState("");
   const [action, setAction] = useState("");
   const [page, setPage] = useState(1);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  useEffect(() => {
-    listAuditLogs({ entity: entity || undefined, action: action || undefined, page }).then(setData);
-  }, [entity, action, page]);
+  const filters = { entity: entity || undefined, action: action || undefined, page };
+  const { data } = useSWR<AuditLogPage>(auditLogsKey(filters), () => listAuditLogs(filters));
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.limit)) : 1;
 
@@ -101,7 +101,7 @@ export default function AuditLogsPage() {
             ))}
           </tbody>
         </table>
-        {!data && <p className="text-sm text-muted-foreground text-center py-10">Chargement…</p>}
+        {!data && <TableSkeleton columns={4} />}
         {data && data.items.length === 0 && <p className="text-sm text-muted-foreground text-center py-10">Aucune entrée.</p>}
       </div>
 

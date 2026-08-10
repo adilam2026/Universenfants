@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import useSWR from "swr";
 import { ShoppingCart, Wallet, AlertTriangle, Package } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { listAdminOrders, type AdminOrderSummary } from "@/lib/orders";
-import { listAdminProducts, type AdminProduct } from "@/lib/products";
+import { CardSkeleton, KpiSkeleton } from "@/components/ui/skeleton";
+import { listAdminOrders, getAdminOrderStats, orderListKey, type AdminOrderSummary, type AdminOrderStats } from "@/lib/orders";
+import { listAdminProducts, productListKey, type AdminProduct } from "@/lib/products";
 
 function dh(value: string | number) {
   return `${Number(value).toLocaleString("fr-FR")} DH`;
@@ -21,28 +22,51 @@ const STATUS_VARIANT: Record<string, "default" | "primary" | "success" | "warnin
   CANCELLED: "destructive",
 };
 
+const RECENT_LIMIT = 8;
+
 export default function DashboardPage() {
-  const [orders, setOrders] = useState<AdminOrderSummary[] | null>(null);
-  const [lowStock, setLowStock] = useState<AdminProduct[] | null>(null);
+  // Hooks indépendants plutôt qu'un seul `Promise.all` : un appel lent (ex:
+  // agrégats sur un gros historique) ne doit pas retarder l'affichage d'un
+  // autre bloc, et inversement — chaque bloc du Dashboard arrive dès que sa
+  // propre donnée est prête. Les KPI (totaux, CA, en attente) viennent d'un
+  // endpoint d'agrégats dédié (`count`/`aggregate` côté base) plutôt que de
+  // sommer côté client une liste de commandes — sans ça, afficher 4 nombres
+  // aurait exigé de rapatrier l'historique complet des commandes.
+  const { data: stats } = useSWR<AdminOrderStats>("/orders/admin/stats", getAdminOrderStats);
+  const { data: recentOrdersPage } = useSWR<Awaited<ReturnType<typeof listAdminOrders>>>(orderListKey({ limit: RECENT_LIMIT }), () =>
+    listAdminOrders({ limit: RECENT_LIMIT }),
+  );
+  const lowStockKey = productListKey({ lowStock: true, limit: RECENT_LIMIT });
+  const { data: lowStockPage } = useSWR<Awaited<ReturnType<typeof listAdminProducts>>>(lowStockKey, () =>
+    listAdminProducts({ lowStock: true, limit: RECENT_LIMIT }),
+  );
 
-  useEffect(() => {
-    listAdminOrders().then(setOrders);
-    listAdminProducts({ lowStock: true }).then(setLowStock);
-  }, []);
-
-  const pendingOrders = orders?.filter((o) => o.status === "PENDING").length ?? 0;
-  const revenue = orders?.filter((o) => o.status !== "CANCELLED").reduce((s, o) => s + Number(o.total), 0) ?? 0;
-  const recentOrders = orders?.slice(0, 8) ?? [];
+  const recentOrders: AdminOrderSummary[] = recentOrdersPage?.items ?? [];
+  const lowStock: AdminProduct[] = lowStockPage?.items ?? [];
 
   return (
     <div>
       <h1 className="text-xl font-bold mb-5">Dashboard</h1>
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3.5 mb-6">
-        <KpiCard icon={ShoppingCart} label="Commandes" value={orders ? String(orders.length) : "…"} />
-        <KpiCard icon={Wallet} label="Chiffre d'affaires" value={orders ? dh(revenue) : "…"} />
-        <KpiCard icon={Package} label="En attente" value={String(pendingOrders)} accent="highlight" />
-        <KpiCard icon={AlertTriangle} label="Stock faible" value={lowStock ? String(lowStock.length) : "…"} accent="destructive" />
+        {stats ? (
+          <>
+            <KpiCard icon={ShoppingCart} label="Commandes" value={String(stats.totalOrders)} />
+            <KpiCard icon={Wallet} label="Chiffre d'affaires" value={dh(stats.revenue)} />
+            <KpiCard icon={Package} label="En attente" value={String(stats.pendingOrders)} accent="highlight" />
+          </>
+        ) : (
+          <>
+            <Card><KpiSkeleton /></Card>
+            <Card><KpiSkeleton /></Card>
+            <Card><KpiSkeleton /></Card>
+          </>
+        )}
+        {lowStockPage ? (
+          <KpiCard icon={AlertTriangle} label="Stock faible" value={String(lowStockPage.total)} accent="destructive" />
+        ) : (
+          <Card><KpiSkeleton /></Card>
+        )}
       </div>
 
       <div className="grid lg:grid-cols-[1fr_320px] gap-5">
@@ -52,6 +76,7 @@ export default function DashboardPage() {
             <Link href="/commandes" className="text-xs font-bold text-primary">Voir tout</Link>
           </CardHeader>
           <CardContent className="p-0">
+            {!recentOrdersPage && <CardSkeleton lines={4} />}
             <div className="divide-y divide-border">
               {recentOrders.map((o) => (
                 <Link key={o.id} href={`/commandes/${o.id}`} className="flex items-center justify-between gap-3 px-5 py-3 hover:bg-secondary/50">
@@ -65,7 +90,7 @@ export default function DashboardPage() {
                   </div>
                 </Link>
               ))}
-              {orders && orders.length === 0 && (
+              {recentOrdersPage && recentOrders.length === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-8">Aucune commande.</p>
               )}
             </div>
@@ -78,14 +103,15 @@ export default function DashboardPage() {
             <Link href="/produits" className="text-xs font-bold text-primary">Voir tout</Link>
           </CardHeader>
           <CardContent className="p-0">
+            {!lowStockPage && <CardSkeleton lines={4} />}
             <div className="divide-y divide-border">
-              {lowStock?.map((p) => (
+              {lowStock.map((p) => (
                 <Link key={p.id} href={`/produits/${p.id}`} className="flex items-center justify-between gap-3 px-5 py-3 hover:bg-secondary/50">
                   <span className="text-sm font-medium truncate">{p.nameFr}</span>
                   <Badge variant="warning">{p.stock} / {p.alertThreshold}</Badge>
                 </Link>
               ))}
-              {lowStock && lowStock.length === 0 && (
+              {lowStockPage && lowStock.length === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-8">Aucune alerte.</p>
               )}
             </div>

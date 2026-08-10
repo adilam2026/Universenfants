@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
+import useSWR from "swr";
 import { Plus, Trash2, Search, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { CardSkeleton } from "@/components/ui/skeleton";
 import { listBundles, createBundle, removeBundle, type AdminBundle } from "@/lib/bundles";
 import { searchProducts, type ProductSearchResult } from "@/lib/products";
 import { ApiError } from "@/lib/api-client";
@@ -18,17 +20,12 @@ interface PickedItem {
 }
 
 export default function BundlesPage() {
-  const [bundles, setBundles] = useState<AdminBundle[] | null>(null);
+  const { data: bundles, mutate: refresh } = useSWR<AdminBundle[]>("/bundles", listBundles);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [items, setItems] = useState<PickedItem[]>([]);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<ProductSearchResult[]>([]);
-
-  function refresh() {
-    listBundles().then(setBundles);
-  }
-  useEffect(refresh, []);
 
   async function handleSearch(q: string) {
     setQuery(q);
@@ -160,7 +157,7 @@ export default function BundlesPage() {
           </Card>
         ))}
         {bundles && bundles.length === 0 && <p className="text-sm text-muted-foreground text-center py-8">Aucun lot créé.</p>}
-        {!bundles && <p className="text-sm text-muted-foreground">Chargement…</p>}
+        {!bundles && <Card><CardSkeleton lines={3} /></Card>}
       </div>
     </div>
   );

@@ -1,29 +1,46 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 
 @Injectable()
 export class CustomersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  list() {
-    return this.prisma.customer.findMany({
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        phone: true,
-        ordersCount: true,
-        totalSpent: true,
-        createdAt: true,
-      },
-      // Filet de sécurité : évite une réponse illimitée si la base clients
-      // grossit fortement — une vraie pagination Back-Office pourra être
-      // ajoutée plus tard sans changer ce plafond (même pattern que
-      // products.listForAdmin / orders.listForAdmin).
-      take: 1000,
-    });
+  async list(query: { q?: string; page?: number; limit?: number } = {}) {
+    const page = Math.max(1, query.page ?? 1);
+    const limit = Math.min(200, Math.max(1, query.limit ?? 50));
+    const where: Prisma.CustomerWhereInput = query.q
+      ? {
+          OR: [
+            { firstName: { contains: query.q, mode: "insensitive" } },
+            { lastName: { contains: query.q, mode: "insensitive" } },
+            { email: { contains: query.q, mode: "insensitive" } },
+            { phone: { contains: query.q, mode: "insensitive" } },
+          ],
+        }
+      : {};
+
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.customer.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          phone: true,
+          ordersCount: true,
+          totalSpent: true,
+          createdAt: true,
+        },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.customer.count({ where }),
+    ]);
+
+    return { items, total, page, limit };
   }
 
   async findOne(id: string) {

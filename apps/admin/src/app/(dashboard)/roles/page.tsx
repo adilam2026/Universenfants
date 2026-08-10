@@ -1,14 +1,13 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { Plus, Trash2, ChevronDown } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { CardSkeleton } from "@/components/ui/skeleton";
 import {
-  listRoles,
-  listPermissionOptions,
   createRole,
   updateRole,
   removeRole,
@@ -17,10 +16,11 @@ import {
 } from "@/lib/staff-users";
 import { ApiError } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
+import { useRoles, usePermissionOptions } from "@/hooks/reference-data";
 
 export default function RolesPage() {
-  const [roles, setRoles] = useState<AdminRole[] | null>(null);
-  const [permissions, setPermissions] = useState<PermissionOption[] | null>(null);
+  const { data: roles, mutate: refreshRoles } = useRoles();
+  const { data: permissions } = usePermissionOptions();
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [newCode, setNewCode] = useState("");
@@ -28,10 +28,8 @@ export default function RolesPage() {
   const [newPerms, setNewPerms] = useState<Set<string>>(new Set());
 
   function refresh() {
-    listRoles().then(setRoles);
-    listPermissionOptions().then(setPermissions);
+    refreshRoles();
   }
-  useEffect(refresh, []);
 
   async function handleCreate(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -102,7 +100,7 @@ export default function RolesPage() {
         {roles?.map((r) => (
           <RoleCard key={r.id} role={r} domains={domains} permissions={permissions ?? []} onSave={handleSave} onRemove={handleRemove} />
         ))}
-        {!roles && <p className="text-sm text-muted-foreground">Chargement…</p>}
+        {!roles && <Card><CardSkeleton lines={2} /></Card>}
       </div>
     </div>
   );

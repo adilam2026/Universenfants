@@ -19,11 +19,14 @@ export interface AuditLogPage {
   limit: number;
 }
 
-export function listAuditLogs(filters: { entity?: string; action?: string; page?: number } = {}) {
+export function auditLogsKey(filters: { entity?: string; action?: string; page?: number } = {}) {
   const params = new URLSearchParams();
   if (filters.entity) params.set("entity", filters.entity);
   if (filters.action) params.set("action", filters.action);
   if (filters.page) params.set("page", String(filters.page));
   const query = params.toString();
-  return apiFetch<AuditLogPage>(`/audit-logs${query ? `?${query}` : ""}`);
+  return `/audit-logs${query ? `?${query}` : ""}`;
 }
+
+export const listAuditLogs = (filters: { entity?: string; action?: string; page?: number } = {}) =>
+  apiFetch<AuditLogPage>(auditLogsKey(filters));

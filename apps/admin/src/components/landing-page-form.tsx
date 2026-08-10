@@ -73,7 +73,10 @@ export function LandingPageForm({ page, initialProductId }: { page?: AdminLandin
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    listAdminProducts().then(setProducts);
+    // Sert de sélecteur (retrouver un produit par id pour préremplir le
+    // formulaire) plutôt que d'une vraie liste paginée — une limite large
+    // couvre le catalogue réel sans réclamer de pagination pour ce seul usage.
+    listAdminProducts({ limit: 500 }).then((page) => setProducts(page.items));
   }, []);
 
   // Pré-remplissage ponctuel du formulaire dès que le produit visé (raccourci

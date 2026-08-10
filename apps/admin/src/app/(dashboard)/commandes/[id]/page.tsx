@@ -1,13 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { use, useEffect, useState } from "react";
+import { use, useState } from "react";
+import useSWR, { mutate as globalMutate } from "swr";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { CardSkeleton } from "@/components/ui/skeleton";
 import { ORDER_NEXT_STATUS, type OrderStatus } from "@universenfants/shared";
 import { getAdminOrder, updateOrderStatus, recordOrderPayment, type AdminOrderDetail } from "@/lib/orders";
 import { ApiError } from "@/lib/api-client";
@@ -27,18 +29,20 @@ const STATUS_LABEL: Record<string, string> = {
 
 export default function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const [order, setOrder] = useState<AdminOrderDetail | null>(null);
+  const { data: order, error: fetchError, mutate: refresh } = useSWR<AdminOrderDetail>(`/orders/admin/${id}`, () => getAdminOrder(id));
   const [error, setError] = useState<string | null>(null);
   const [updating, setUpdating] = useState<string | null>(null);
   const [paymentAmount, setPaymentAmount] = useState("");
   const [recordingPayment, setRecordingPayment] = useState(false);
   const [statusNote, setStatusNote] = useState("");
 
-  function refresh() {
-    getAdminOrder(id).then(setOrder).catch((e) => setError(e instanceof Error ? e.message : "Commande introuvable"));
+  // Le statut/paiement affecte aussi les lignes de la liste commandes (statut,
+  // montant encaissé) et les KPI du Dashboard — invalidés ici plutôt que
+  // rechargés localement, pour qu'un retour sur ces écrans montre l'état réel
+  // sans dépendre du hasard d'une fraîcheur de cache pas encore expirée.
+  function invalidateRelated() {
+    globalMutate((key) => typeof key === "string" && (key.startsWith("/orders/admin/list") || key === "/orders/admin/stats"));
   }
-
-  useEffect(refresh, [id]);
 
   async function handleStatusChange(status: string) {
     setUpdating(status);
@@ -47,6 +51,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       await updateOrderStatus(id, status, statusNote.trim() || undefined);
       setStatusNote("");
       refresh();
+      invalidateRelated();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Une erreur est survenue");
     } finally {
@@ -63,6 +68,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       await recordOrderPayment(id, amount);
       setPaymentAmount("");
       refresh();
+      invalidateRelated();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Une erreur est survenue");
     } finally {
@@ -70,8 +76,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     }
   }
 
-  if (error) return <p className="text-sm text-destructive">{error}</p>;
-  if (!order) return <p className="text-sm text-muted-foreground">Chargement…</p>;
+  if (fetchError) return <p className="text-sm text-destructive">{fetchError instanceof Error ? fetchError.message : "Commande introuvable"}</p>;
+  if (!order) return <CardSkeleton lines={6} />;
 
   const nextStatuses = ORDER_NEXT_STATUS[order.status as OrderStatus] ?? [];
 

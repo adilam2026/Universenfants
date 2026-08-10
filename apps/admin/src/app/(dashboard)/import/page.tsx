@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
+import useSWR from "swr";
 import { Upload, CheckCircle2, XCircle, Download } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { CardSkeleton } from "@/components/ui/skeleton";
 import { importProductsExcel, listImportHistory, exportCatalog, type ImportSummary, type ImportLogEntry } from "@/lib/import";
 
 const COLUMNS = [
@@ -27,13 +29,8 @@ export default function ImportPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<ImportSummary | null>(null);
-  const [history, setHistory] = useState<ImportLogEntry[] | null>(null);
   const [exporting, setExporting] = useState(false);
-
-  function refreshHistory() {
-    listImportHistory().then(setHistory);
-  }
-  useEffect(refreshHistory, []);
+  const { data: history, mutate: refreshHistory } = useSWR<ImportLogEntry[]>("/products/admin/import-history", listImportHistory);
 
   async function handleSubmit() {
     if (!file) return;
@@ -171,7 +168,7 @@ export default function ImportPage() {
               </div>
             ))}
             {history && history.length === 0 && <p className="text-sm text-muted-foreground text-center py-8">Aucun import pour l&apos;instant.</p>}
-            {!history && <p className="text-sm text-muted-foreground text-center py-8">Chargement…</p>}
+            {!history && <CardSkeleton lines={3} />}
           </div>
         </CardContent>
       </Card>

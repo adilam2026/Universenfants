@@ -58,12 +58,32 @@ export class OrdersController {
     return this.service.cancelByCustomer(user.sub, id);
   }
 
+  @Get("admin/stats")
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, StaffGuard, PermissionsGuard)
+  @RequirePermissions(PermissionCode.ORDER_READ)
+  adminStats() {
+    return this.service.statsForAdmin();
+  }
+
   @Get("admin/list")
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, StaffGuard, PermissionsGuard)
   @RequirePermissions(PermissionCode.ORDER_READ)
-  adminList(@Query("status") status?: string, @Query("city") city?: string) {
-    return this.service.listForAdmin({ status, city });
+  adminList(
+    @Query("status") status?: string,
+    @Query("city") city?: string,
+    @Query("q") q?: string,
+    @Query("page") page?: string,
+    @Query("limit") limit?: string,
+  ) {
+    return this.service.listForAdmin({
+      status,
+      city,
+      q,
+      page: Math.max(1, Number(page) || 1),
+      limit: Math.min(200, Number(limit) || 50),
+    });
   }
 
   @Get("admin/export")
@@ -76,7 +96,7 @@ export class OrdersController {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="commandes-${new Date().toISOString().slice(0, 10)}.csv"`,
     });
-    res.send(`﻿${csv}`);
+    res.send(`\uFEFF${csv}`);
   }
 
   @Get("admin/:id")

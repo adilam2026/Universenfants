@@ -8,6 +8,16 @@ const FETCH_TIMEOUT_MS = 10_000;
 
 export const STAFF_SESSION_CHANGED_EVENT = "ue:staff-session-changed";
 
+/** Forme commune des listes paginées côté serveur (produits, commandes,
+ * clients...) — `total` permet de calculer le nombre de pages sans devoir
+ * charger toutes les lignes. */
+export interface Paginated<T> {
+  items: T[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
 export interface StaffUser {
   id: string;
   name: string;

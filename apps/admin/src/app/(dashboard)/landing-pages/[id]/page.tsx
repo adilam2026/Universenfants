@@ -1,7 +1,9 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use } from "react";
+import useSWR from "swr";
 import { LandingPageForm } from "@/components/landing-page-form";
+import { CardSkeleton } from "@/components/ui/skeleton";
 import { getLandingPage, getLandingPageAnalytics, type AdminLandingPage, type LandingPageAnalytics } from "@/lib/landing-pages";
 
 function dh(value: number) {
@@ -10,17 +12,11 @@ function dh(value: number) {
 
 export default function EditLandingPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const [page, setPage] = useState<AdminLandingPage | null>(null);
-  const [stats, setStats] = useState<LandingPageAnalytics | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { data: page, error } = useSWR<AdminLandingPage>(`/landing-pages/admin/${id}`, () => getLandingPage(id));
+  const { data: stats } = useSWR<LandingPageAnalytics>(`/landing-pages/admin/${id}/analytics`, () => getLandingPageAnalytics(id));
 
-  useEffect(() => {
-    getLandingPage(id).then(setPage).catch((e) => setError(e instanceof Error ? e.message : "Introuvable"));
-    getLandingPageAnalytics(id).then(setStats).catch(() => undefined);
-  }, [id]);
-
-  if (error) return <p className="text-sm text-destructive">{error}</p>;
-  if (!page) return <p className="text-sm text-muted-foreground">Chargement…</p>;
+  if (error) return <p className="text-sm text-destructive">{error instanceof Error ? error.message : "Introuvable"}</p>;
+  if (!page) return <CardSkeleton lines={5} />;
 
   return (
     <div>

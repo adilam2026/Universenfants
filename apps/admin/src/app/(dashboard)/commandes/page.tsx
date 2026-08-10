@@ -2,10 +2,14 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Download } from "lucide-react";
+import useSWR, { preload } from "swr";
+import { Download, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { listAdminOrders, exportOrders, type AdminOrderSummary } from "@/lib/orders";
+import { Input } from "@/components/ui/input";
+import { TableSkeleton } from "@/components/ui/skeleton";
+import { listAdminOrders, orderListKey, exportOrders } from "@/lib/orders";
+import { LIST_PAGE_SIZE } from "@/lib/list-defaults";
 
 function dh(value: string | number) {
   return `${Number(value).toLocaleString("fr-FR")} DH`;
@@ -31,9 +35,28 @@ const STATUS_VARIANT: Record<string, "default" | "primary" | "success" | "warnin
 };
 
 export default function OrdersListPage() {
-  const [orders, setOrders] = useState<AdminOrderSummary[] | null>(null);
   const [status, setStatus] = useState("");
+  const [queryInput, setQueryInput] = useState("");
+  const [q, setQ] = useState("");
+  const [page, setPage] = useState(1);
   const [exporting, setExporting] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setQ(queryInput);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [queryInput]);
+
+  // Revenir à la page 1 quand le filtre de statut change — ajusté pendant le
+  // rendu plutôt que dans un effet (même pattern que admin-shell.tsx) pour
+  // éviter un rendu intermédiaire sur l'ancienne page avec le nouveau filtre.
+  const [prevStatus, setPrevStatus] = useState(status);
+  if (status !== prevStatus) {
+    setPrevStatus(status);
+    setPage(1);
+  }
 
   async function handleExport() {
     setExporting(true);
@@ -46,25 +69,28 @@ export default function OrdersListPage() {
     }
   }
 
+  const filters = { status: status || undefined, q: q || undefined, page, limit: LIST_PAGE_SIZE };
+  const { data } = useSWR(orderListKey(filters), () => listAdminOrders(filters));
+  const orders = data?.items ?? [];
+  const totalPages = data ? Math.max(1, Math.ceil(data.total / LIST_PAGE_SIZE)) : 1;
+
   useEffect(() => {
-    // Changer rapidement de filtre déclenche plusieurs requêtes en vol — sans
-    // ce garde, une réponse plus lente pour un ancien filtre peut arriver
-    // après une réponse plus récente et écraser la liste avec des résultats
-    // qui ne correspondent plus au filtre affiché.
-    let cancelled = false;
-    listAdminOrders({ status: status || undefined }).then((result) => {
-      if (!cancelled) setOrders(result);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [status]);
+    if (data && page < totalPages) {
+      const nextFilters = { ...filters, page: page + 1 };
+      preload(orderListKey(nextFilters), () => listAdminOrders(nextFilters));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, page, totalPages, status, q]);
 
   return (
     <div>
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <h1 className="text-xl font-bold">Commandes</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+            <Input value={queryInput} onChange={(e) => setQueryInput(e.target.value)} placeholder="Numéro, client, téléphone…" className="pl-9 w-56" />
+          </div>
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value)}
@@ -91,7 +117,7 @@ export default function OrdersListPage() {
             </tr>
           </thead>
           <tbody>
-            {orders?.map((o) => (
+            {orders.map((o) => (
               <tr key={o.id} className="border-b border-border last:border-0 hover:bg-secondary/50">
                 <td className="px-4 py-3">
                   <Link href={`/commandes/${o.id}`} className="font-bold hover:text-primary">{o.orderNumber}</Link>
@@ -105,9 +131,23 @@ export default function OrdersListPage() {
             ))}
           </tbody>
         </table>
-        {orders && orders.length === 0 && <p className="text-sm text-muted-foreground text-center py-10">Aucune commande.</p>}
-        {!orders && <p className="text-sm text-muted-foreground text-center py-10">Chargement…</p>}
+        {data && orders.length === 0 && <p className="text-sm text-muted-foreground text-center py-10">Aucune commande.</p>}
+        {!data && <TableSkeleton columns={6} />}
       </div>
+
+      {data && data.total > 0 && (
+        <div className="flex items-center justify-between mt-3.5 text-sm text-muted-foreground">
+          <p>{data.total} commande{data.total > 1 ? "s" : ""} · page {page} / {totalPages}</p>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
+              <ChevronLeft className="size-4" /> Précédent
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages}>
+              Suivant <ChevronRight className="size-4" />
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

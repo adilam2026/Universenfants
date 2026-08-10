@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
+import useSWR from "swr";
 import { Plus } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { TableSkeleton } from "@/components/ui/skeleton";
 import { listCoupons, createCoupon, updateCoupon, type AdminCoupon } from "@/lib/coupons";
 import { ApiError } from "@/lib/api-client";
 
@@ -17,15 +19,10 @@ const TYPE_LABEL: Record<string, string> = {
 };
 
 export default function CouponsPage() {
-  const [coupons, setCoupons] = useState<AdminCoupon[] | null>(null);
+  const { data: coupons, mutate: refresh } = useSWR<AdminCoupon[]>("/coupons", listCoupons);
   const [type, setType] = useState<AdminCoupon["type"]>("PERCENTAGE");
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
-
-  function refresh() {
-    listCoupons().then(setCoupons);
-  }
-  useEffect(refresh, []);
 
   async function handleCreate(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -147,7 +144,7 @@ export default function CouponsPage() {
           </tbody>
         </table>
         {coupons && coupons.length === 0 && <p className="text-sm text-muted-foreground text-center py-10">Aucun coupon.</p>}
-        {!coupons && <p className="text-sm text-muted-foreground text-center py-10">Chargement…</p>}
+        {!coupons && <TableSkeleton columns={5} />}
       </div>
     </div>
   );

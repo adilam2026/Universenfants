@@ -400,16 +400,49 @@ export class OrdersService {
     return this.findForCustomer(customerId, orderId);
   }
 
-  listForAdmin(filters: { status?: string; city?: string }) {
-    return this.prisma.order.findMany({
-      where: { status: filters.status as never, shippingCity: filters.city },
-      include: { customer: true },
-      orderBy: { createdAt: "desc" },
-      // Filet de sécurité : évite une réponse illimitée si le volume de
-      // commandes grossit fortement ; une vraie pagination Back-Office
-      // pourra être ajoutée plus tard sans changer ce plafond.
-      take: 1000,
-    });
+  /** KPI du Dashboard — agrégats calculés en base (`count`/`aggregate`),
+   * jamais en récupérant les lignes elles-mêmes : un total de commandes ou un
+   * chiffre d'affaires n'a pas besoin de rapatrier chaque commande côté
+   * client pour être compté/sommé. */
+  async statsForAdmin() {
+    const [totalOrders, pendingOrders, revenueAgg] = await this.prisma.$transaction([
+      this.prisma.order.count(),
+      this.prisma.order.count({ where: { status: "PENDING" } }),
+      this.prisma.order.aggregate({ _sum: { total: true }, where: { status: { not: "CANCELLED" } } }),
+    ]);
+    return { totalOrders, pendingOrders, revenue: Number(revenueAgg._sum.total ?? 0) };
+  }
+
+  async listForAdmin(filters: { status?: string; city?: string; q?: string; page?: number; limit?: number }) {
+    const page = Math.max(1, filters.page ?? 1);
+    const limit = Math.min(200, Math.max(1, filters.limit ?? 50));
+    const where: Prisma.OrderWhereInput = {
+      ...(filters.status ? { status: filters.status as never } : {}),
+      ...(filters.city ? { shippingCity: filters.city } : {}),
+      ...(filters.q
+        ? {
+            OR: [
+              { orderNumber: { contains: filters.q, mode: "insensitive" } },
+              { customer: { firstName: { contains: filters.q, mode: "insensitive" } } },
+              { customer: { lastName: { contains: filters.q, mode: "insensitive" } } },
+              { customer: { phone: { contains: filters.q, mode: "insensitive" } } },
+            ],
+          }
+        : {}),
+    };
+
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.order.findMany({
+        where,
+        include: { customer: true },
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.order.count({ where }),
+    ]);
+
+    return { items, total, page, limit };
   }
 
   /** Export CSV — aucun moyen d'extraire les commandes hors de

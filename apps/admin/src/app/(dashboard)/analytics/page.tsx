@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import useSWR from "swr";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { KpiSkeleton, CardSkeleton } from "@/components/ui/skeleton";
 import { getAnalyticsSummary, type AnalyticsSummary } from "@/lib/analytics";
 
 function dh(value: number) {
@@ -38,13 +40,26 @@ function ChangeBadge({ pct }: { pct: number | null }) {
 
 export default function AnalyticsPage() {
   const [days, setDays] = useState(30);
-  const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
+  // `keepPreviousData` (option globale) affiche la période précédente le
+  // temps que la nouvelle se charge plutôt qu'un écran vide à chaque clic sur
+  // 7/30/90 jours ; la clé incluant `days`, chaque période reste sa propre
+  // entrée de cache (retour instantané sur une période déjà consultée).
+  const { data: summary } = useSWR<AnalyticsSummary>(`/analytics/summary?days=${days}`, () => getAnalyticsSummary(days));
 
-  useEffect(() => {
-    getAnalyticsSummary(days).then(setSummary);
-  }, [days]);
-
-  if (!summary) return <p className="text-sm text-muted-foreground">Chargement…</p>;
+  if (!summary) {
+    return (
+      <div>
+        <h1 className="text-xl font-bold mb-5">Analytics</h1>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-6 gap-3.5 mb-6">
+          {Array.from({ length: 6 }).map((_, i) => <Card key={i}><KpiSkeleton /></Card>)}
+        </div>
+        <div className="grid lg:grid-cols-[1fr_320px] gap-5">
+          <Card><CardSkeleton lines={6} /></Card>
+          <Card><CardSkeleton lines={4} /></Card>
+        </div>
+      </div>
+    );
+  }
 
   const maxRevenue = Math.max(1, ...summary.revenueByDay.map((d) => d.revenue));
 

@@ -1,33 +1,26 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
+import useSWR from "swr";
 import { Plus } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { listCategories, listBrands, type AdminCategory, type AdminBrand } from "@/lib/catalog";
+import { TableSkeleton } from "@/components/ui/skeleton";
 import { listPromotions, createPromotion, updatePromotion, type AdminPromotion } from "@/lib/promotions";
 import { ApiError } from "@/lib/api-client";
+import { useCategories, useBrands } from "@/hooks/reference-data";
 
 export default function PromotionsPage() {
-  const [promotions, setPromotions] = useState<AdminPromotion[] | null>(null);
-  const [categories, setCategories] = useState<AdminCategory[]>([]);
-  const [brands, setBrands] = useState<AdminBrand[]>([]);
+  const { data: promotions, mutate: refresh } = useSWR<AdminPromotion[]>("/promotions", listPromotions);
+  const { data: categories = [] } = useCategories();
+  const { data: brands = [] } = useBrands();
   const [scope, setScope] = useState<"CATEGORY" | "BRAND" | "STORE">("STORE");
   const [type, setType] = useState<"PERCENTAGE" | "FIXED_AMOUNT">("PERCENTAGE");
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
-
-  function refresh() {
-    listPromotions().then(setPromotions);
-  }
-  useEffect(() => {
-    refresh();
-    listCategories().then(setCategories);
-    listBrands().then(setBrands);
-  }, []);
 
   async function handleCreate(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -173,7 +166,7 @@ export default function PromotionsPage() {
           </tbody>
         </table>
         {promotions && promotions.length === 0 && <p className="text-sm text-muted-foreground text-center py-10">Aucune promotion.</p>}
-        {!promotions && <p className="text-sm text-muted-foreground text-center py-10">Chargement…</p>}
+        {!promotions && <TableSkeleton columns={6} />}
       </div>
     </div>
   );

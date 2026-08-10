@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { Plus, Archive } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { listCategories, createCategory, updateCategory, archiveCategory, type AdminCategory } from "@/lib/catalog";
+import { TableSkeleton } from "@/components/ui/skeleton";
+import { createCategory, updateCategory, archiveCategory, type AdminCategory } from "@/lib/catalog";
 import { ApiError } from "@/lib/api-client";
+import { useCategories } from "@/hooks/reference-data";
 
 const STATUS_LABEL: Record<AdminCategory["status"], string> = {
   DRAFT: "Brouillon",
@@ -17,14 +19,9 @@ const STATUS_LABEL: Record<AdminCategory["status"], string> = {
 };
 
 export default function CategoriesPage() {
-  const [categories, setCategories] = useState<AdminCategory[] | null>(null);
+  const { data: categories, mutate: refresh } = useCategories();
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
-  function refresh() {
-    listCategories().then(setCategories);
-  }
-  useEffect(refresh, []);
 
   async function handleCreate(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -132,7 +129,7 @@ export default function CategoriesPage() {
             ))}
           </tbody>
         </table>
-        {!categories && <p className="text-sm text-muted-foreground text-center py-10">Chargement…</p>}
+        {!categories && <TableSkeleton columns={6} />}
       </div>
     </div>
   );

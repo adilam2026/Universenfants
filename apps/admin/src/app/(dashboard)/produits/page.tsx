@@ -2,11 +2,14 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Plus, Search } from "lucide-react";
+import useSWR, { preload } from "swr";
+import { Plus, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { listAdminProducts, type AdminProduct } from "@/lib/products";
+import { TableSkeleton } from "@/components/ui/skeleton";
+import { listAdminProducts, productListKey, type AdminProduct } from "@/lib/products";
+import { LIST_PAGE_SIZE } from "@/lib/list-defaults";
 
 function dh(value: string | number) {
   return `${Number(value).toLocaleString("fr-FR")} DH`;
@@ -20,14 +23,36 @@ const STATUS_VARIANT: Record<string, "default" | "primary" | "success" | "warnin
 };
 
 export default function ProductsListPage() {
-  const [products, setProducts] = useState<AdminProduct[] | null>(null);
-  const [query, setQuery] = useState("");
+  const [queryInput, setQueryInput] = useState("");
+  const [q, setQ] = useState("");
+  const [page, setPage] = useState(1);
 
+  // Recherche serveur, débouncée : filtrer côté client n'aurait porté que
+  // sur la page actuellement chargée (50 lignes), pas sur tout le catalogue.
+  // Revenir à la page 1 à chaque nouvelle recherche évite d'atterrir sur une
+  // page qui n'existe plus pour les nouveaux résultats.
   useEffect(() => {
-    listAdminProducts().then(setProducts);
-  }, []);
+    const t = setTimeout(() => {
+      setQ(queryInput);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [queryInput]);
 
-  const filtered = products?.filter((p) => p.nameFr.toLowerCase().includes(query.toLowerCase()) || p.sku.toLowerCase().includes(query.toLowerCase()));
+  const filters = { q: q || undefined, page, limit: LIST_PAGE_SIZE };
+  const { data } = useSWR(productListKey(filters), () => listAdminProducts(filters));
+  const products: AdminProduct[] = data?.items ?? [];
+  const totalPages = data ? Math.max(1, Math.ceil(data.total / LIST_PAGE_SIZE)) : 1;
+
+  // Précharge la page suivante pendant que l'admin regarde la page actuelle
+  // — le clic "Suivant" retrouve alors une donnée déjà en cache.
+  useEffect(() => {
+    if (data && page < totalPages) {
+      const nextFilters = { ...filters, page: page + 1 };
+      preload(productListKey(nextFilters), () => listAdminProducts(nextFilters));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, page, totalPages, q]);
 
   return (
     <div>
@@ -40,7 +65,7 @@ export default function ProductsListPage() {
 
       <div className="relative mb-4 max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-        <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Rechercher par nom ou SKU…" className="pl-9" />
+        <Input value={queryInput} onChange={(e) => setQueryInput(e.target.value)} placeholder="Rechercher par nom ou SKU…" className="pl-9" />
       </div>
 
       <div className="rounded-lg border border-border bg-card overflow-x-auto">
@@ -56,7 +81,7 @@ export default function ProductsListPage() {
             </tr>
           </thead>
           <tbody>
-            {filtered?.map((p) => (
+            {products.map((p) => (
               <tr key={p.id} className="border-b border-border last:border-0 hover:bg-secondary/50">
                 <td className="px-4 py-3">
                   <Link href={`/produits/${p.id}`} className="font-medium hover:text-primary">{p.nameFr}</Link>
@@ -77,11 +102,25 @@ export default function ProductsListPage() {
             ))}
           </tbody>
         </table>
-        {filtered && filtered.length === 0 && (
+        {data && products.length === 0 && (
           <p className="text-sm text-muted-foreground text-center py-10">Aucun produit trouvé.</p>
         )}
-        {!products && <p className="text-sm text-muted-foreground text-center py-10">Chargement…</p>}
+        {!data && <TableSkeleton columns={6} />}
       </div>
+
+      {data && data.total > 0 && (
+        <div className="flex items-center justify-between mt-3.5 text-sm text-muted-foreground">
+          <p>{data.total} produit{data.total > 1 ? "s" : ""} · page {page} / {totalPages}</p>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
+              <ChevronLeft className="size-4" /> Précédent
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages}>
+              Suivant <ChevronRight className="size-4" />
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

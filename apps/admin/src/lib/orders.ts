@@ -1,4 +1,4 @@
-import { apiFetch, getStaffToken } from "./api-client";
+import { apiFetch, getStaffToken, type Paginated } from "./api-client";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api";
 
@@ -45,13 +45,34 @@ export interface AdminOrderDetail extends AdminOrderSummary {
   statusHistory: AdminOrderStatusEntry[];
 }
 
-export const listAdminOrders = (filters: { status?: string; city?: string } = {}) => {
+export interface OrderListFilters {
+  status?: string;
+  city?: string;
+  q?: string;
+  page?: number;
+  limit?: number;
+}
+
+export function orderListKey(filters: OrderListFilters = {}) {
   const qs = new URLSearchParams();
   if (filters.status) qs.set("status", filters.status);
   if (filters.city) qs.set("city", filters.city);
+  if (filters.q) qs.set("q", filters.q);
+  if (filters.page && filters.page > 1) qs.set("page", String(filters.page));
+  if (filters.limit) qs.set("limit", String(filters.limit));
   const query = qs.toString();
-  return apiFetch<AdminOrderSummary[]>(`/orders/admin/list${query ? `?${query}` : ""}`);
-};
+  return `/orders/admin/list${query ? `?${query}` : ""}`;
+}
+
+export const listAdminOrders = (filters: OrderListFilters = {}) => apiFetch<Paginated<AdminOrderSummary>>(orderListKey(filters));
+
+export interface AdminOrderStats {
+  totalOrders: number;
+  pendingOrders: number;
+  revenue: number;
+}
+
+export const getAdminOrderStats = () => apiFetch<AdminOrderStats>("/orders/admin/stats");
 
 export const getAdminOrder = (id: string) => apiFetch<AdminOrderDetail>(`/orders/admin/${id}`);
 

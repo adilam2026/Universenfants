@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   LayoutDashboard,
   PackageSearch,
@@ -31,6 +31,8 @@ import {
 import { cn } from "@/lib/utils";
 import { staffLogout, getStaffToken } from "@/lib/api-client";
 import { useStaffUser } from "@/hooks/use-staff-user";
+import { preloadReferenceData } from "@/hooks/reference-data";
+import { prefetchSecondaryData } from "@/lib/idle-prefetch";
 
 // `permission` reflète exactement le garde serveur (@RequirePermissions) de
 // la route GET/liste de chaque section — sans ça, un membre du staff sans le
@@ -140,6 +142,19 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!getStaffToken()) router.replace("/login");
   }, [router]);
+
+  // Précharge une seule fois par session (pas à chaque changement de route,
+  // AdminShell restant monté tout au long de la navigation dans le groupe
+  // dashboard) : les référentiels légers immédiatement, puis — une fois le
+  // navigateur inactif — les rubriques opérationnelles les plus probables et
+  // le code des routes correspondantes.
+  const preloadedRef = useRef(false);
+  useEffect(() => {
+    if (!user || preloadedRef.current) return;
+    preloadedRef.current = true;
+    preloadReferenceData(user);
+    prefetchSecondaryData(user, router);
+  }, [user, router]);
 
   if (!user) return null;
 

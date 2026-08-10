@@ -232,17 +232,48 @@ export class ProductsService {
   // Back-Office
   // ------------------------------------------------------------------
 
-  async listForAdmin(query: { category?: string; status?: string; lowStock?: boolean }) {
-    const items = await this.prisma.product.findMany({
-      where: { categoryId: query.category, status: query.status as never },
-      include: { brand: true, category: true, images: { take: 1 } },
-      orderBy: { updatedAt: "desc" },
-      // Filet de sécurité : évite une réponse illimitée si le catalogue
-      // grossit fortement ; une vraie pagination Back-Office pourra être
-      // ajoutée plus tard sans changer ce plafond.
-      take: 1000,
-    });
-    return query.lowStock ? items.filter((p) => p.stock <= p.alertThreshold) : items;
+  async listForAdmin(query: { category?: string; status?: string; lowStock?: boolean; q?: string; page?: number; limit?: number }) {
+    const page = Math.max(1, query.page ?? 1);
+    const limit = Math.min(500, Math.max(1, query.limit ?? 50));
+
+    // `stock <= alertThreshold` compare deux colonnes de la même ligne — pas
+    // exprimable dans un `where` Prisma classique (qui ne compare qu'une
+    // colonne à une valeur littérale). Une requête brute ciblée sur les ids
+    // reste bornée et rapide (les deux colonnes sont des entiers indexables)
+    // sans dupliquer la pagination en mémoire.
+    let lowStockIds: string[] | undefined;
+    if (query.lowStock) {
+      const rows = await this.prisma.$queryRaw<{ id: string }[]>`SELECT id FROM "Product" WHERE stock <= "alertThreshold"`;
+      lowStockIds = rows.map((r) => r.id);
+    }
+
+    const where: Prisma.ProductWhereInput = {
+      ...(query.category ? { categoryId: query.category } : {}),
+      ...(query.status ? { status: query.status as never } : {}),
+      ...(lowStockIds ? { id: { in: lowStockIds } } : {}),
+      ...(query.q
+        ? {
+            OR: [
+              { nameFr: { contains: query.q, mode: "insensitive" } },
+              { sku: { contains: query.q, mode: "insensitive" } },
+              { barcode: { contains: query.q, mode: "insensitive" } },
+            ],
+          }
+        : {}),
+    };
+
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.product.findMany({
+        where,
+        include: { brand: true, category: true, images: { take: 1 } },
+        orderBy: { updatedAt: "desc" },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.product.count({ where }),
+    ]);
+
+    return { items, total, page, limit };
   }
 
   /** Contrairement à findBySlug (public), n'importe quel statut est renvoyé — nécessaire pour éditer un brouillon. */

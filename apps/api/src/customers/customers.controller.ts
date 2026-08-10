@@ -1,4 +1,4 @@
-import { Controller, Get, Param, UseGuards } from "@nestjs/common";
+import { Controller, Get, Param, Query, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { PermissionCode } from "@universenfants/shared";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
@@ -16,8 +16,12 @@ export class CustomersController {
   constructor(private readonly service: CustomersService) {}
 
   @Get()
-  list() {
-    return this.service.list();
+  list(@Query("q") q?: string, @Query("page") page?: string, @Query("limit") limit?: string) {
+    return this.service.list({
+      q,
+      page: Math.max(1, Number(page) || 1),
+      limit: Math.min(200, Number(limit) || 50),
+    });
   }
 
   @Get(":id")

@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
+import useSWR from "swr";
 import Image from "next/image";
 import { Plus, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { CardSkeleton } from "@/components/ui/skeleton";
 import {
   listHeroBanners,
   createHeroBanner,
@@ -23,16 +25,11 @@ const STATUS_LABEL: Record<AdminHeroBanner["status"], string> = {
 };
 
 export default function HeroBannersPage() {
-  const [banners, setBanners] = useState<AdminHeroBanner[] | null>(null);
+  const { data: banners, mutate: refresh } = useSWR<AdminHeroBanner[]>("/hero-banners", listHeroBanners);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
-
-  function refresh() {
-    listHeroBanners().then(setBanners);
-  }
-  useEffect(refresh, []);
 
   async function handleCreate(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -147,7 +144,7 @@ export default function HeroBannersPage() {
           </Card>
         ))}
         {banners && banners.length === 0 && <p className="text-sm text-muted-foreground text-center py-8">Aucune bannière — la page d&apos;accueil affiche le carrousel par défaut.</p>}
-        {!banners && <p className="text-sm text-muted-foreground">Chargement…</p>}
+        {!banners && <Card><CardSkeleton lines={3} /></Card>}
       </div>
     </div>
   );

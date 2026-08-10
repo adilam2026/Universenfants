@@ -1,4 +1,4 @@
-import { apiFetch } from "./api-client";
+import { apiFetch, type Paginated } from "./api-client";
 
 export interface AdminCustomerSummary {
   id: string;
@@ -26,5 +26,20 @@ export interface AdminCustomerDetail extends AdminCustomerSummary {
   addresses: { id: string; label: string | null; city: string; addressLine: string }[];
 }
 
-export const listCustomers = () => apiFetch<AdminCustomerSummary[]>("/customers");
+export interface CustomerListFilters {
+  q?: string;
+  page?: number;
+  limit?: number;
+}
+
+export function customerListKey(filters: CustomerListFilters = {}) {
+  const qs = new URLSearchParams();
+  if (filters.q) qs.set("q", filters.q);
+  if (filters.page && filters.page > 1) qs.set("page", String(filters.page));
+  if (filters.limit) qs.set("limit", String(filters.limit));
+  const query = qs.toString();
+  return `/customers${query ? `?${query}` : ""}`;
+}
+
+export const listCustomers = (filters: CustomerListFilters = {}) => apiFetch<Paginated<AdminCustomerSummary>>(customerListKey(filters));
 export const getCustomer = (id: string) => apiFetch<AdminCustomerDetail>(`/customers/${id}`);

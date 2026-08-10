@@ -1,6 +1,7 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use } from "react";
+import useSWR from "swr";
 import Link from "next/link";
 import { Rocket } from "lucide-react";
 import { ProductForm } from "@/components/product-form";
@@ -9,23 +10,21 @@ import { ProductImagesCard } from "@/components/product-images-card";
 import { ProductVariantsCard } from "@/components/product-variants-card";
 import { ProductUpsellsCard } from "@/components/product-upsells-card";
 import { Button } from "@/components/ui/button";
+import { CardSkeleton } from "@/components/ui/skeleton";
 import { getAdminProduct, listProductUpsells, type AdminProduct, type UpsellEntry } from "@/lib/products";
 
 export default function EditProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const [product, setProduct] = useState<AdminProduct | null>(null);
-  const [upsells, setUpsells] = useState<UpsellEntry[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  // `mutate` local (par clé) plutôt qu'un state React séparé : les cartes
+  // enfants (images, variantes, stock) calculent déjà l'objet produit à jour
+  // et le poussent ici — l'écrire dans le cache SWR (sans revalidation)
+  // maintient l'affichage ET une future revisite de cette fiche synchrones,
+  // sans appel réseau supplémentaire.
+  const { data: product, error: productError, mutate: setProduct } = useSWR<AdminProduct>(`/products/admin/${id}`, () => getAdminProduct(id));
+  const { data: upsells = [], mutate: setUpsells } = useSWR<UpsellEntry[]>(`/products/${id}/upsells`, () => listProductUpsells(id));
 
-  useEffect(() => {
-    getAdminProduct(id)
-      .then(setProduct)
-      .catch((e) => setError(e instanceof Error ? e.message : "Produit introuvable"));
-    listProductUpsells(id).then(setUpsells);
-  }, [id]);
-
-  if (error) return <p className="text-sm text-destructive">{error}</p>;
-  if (!product) return <p className="text-sm text-muted-foreground">Chargement…</p>;
+  if (productError) return <p className="text-sm text-destructive">{productError instanceof Error ? productError.message : "Produit introuvable"}</p>;
+  if (!product) return <CardSkeleton lines={6} />;
 
   return (
     <div>
@@ -35,15 +34,15 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
           <ProductImagesCard
             productId={product.id}
             images={product.images}
-            onChanged={(images) => setProduct((prev) => (prev ? { ...prev, images } : prev))}
+            onChanged={(images) => setProduct((prev) => (prev ? { ...prev, images } : prev), { revalidate: false })}
           />
           <ProductForm product={product} />
           <ProductVariantsCard
             productId={product.id}
             variants={product.variants}
-            onChanged={(variants) => setProduct((prev) => (prev ? { ...prev, variants } : prev))}
+            onChanged={(variants) => setProduct((prev) => (prev ? { ...prev, variants } : prev), { revalidate: false })}
           />
-          <ProductUpsellsCard productId={product.id} upsells={upsells} onChanged={setUpsells} />
+          <ProductUpsellsCard productId={product.id} upsells={upsells} onChanged={(next) => setUpsells(next, { revalidate: false })} />
         </div>
         <div className="flex flex-col gap-5">
           <Button asChild variant="outline" className="w-full">
@@ -53,7 +52,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
           </Button>
           <StockAdjustCard
             product={product}
-            onAdjusted={(newStock) => setProduct((prev) => (prev ? { ...prev, stock: newStock } : prev))}
+            onAdjusted={(newStock) => setProduct((prev) => (prev ? { ...prev, stock: newStock } : prev), { revalidate: false })}
           />
         </div>
       </div>

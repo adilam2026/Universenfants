@@ -28,8 +28,22 @@ export class ProductsController {
   @Get("admin")
   @UseGuards(JwtAuthGuard, StaffGuard, PermissionsGuard)
   @RequirePermissions(PermissionCode.PRODUCT_READ)
-  listForAdmin(@Query("category") category?: string, @Query("status") status?: string, @Query("lowStock") lowStock?: string) {
-    return this.service.listForAdmin({ category, status, lowStock: lowStock === "true" });
+  listForAdmin(
+    @Query("category") category?: string,
+    @Query("status") status?: string,
+    @Query("lowStock") lowStock?: string,
+    @Query("q") q?: string,
+    @Query("page") page?: string,
+    @Query("limit") limit?: string,
+  ) {
+    return this.service.listForAdmin({
+      category,
+      status,
+      lowStock: lowStock === "true",
+      q,
+      page: Math.max(1, Number(page) || 1),
+      limit: Math.min(500, Number(limit) || 50),
+    });
   }
 
   @Get("admin/stock-movements")

@@ -1,14 +1,15 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
+import { mutate } from "swr";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { listCategories, listBrands, type AdminCategory, type AdminBrand } from "@/lib/catalog";
 import { createProduct, updateProduct, type AdminProduct, type UpsertProductPayload } from "@/lib/products";
 import { ApiError } from "@/lib/api-client";
+import { useCategories, useBrands } from "@/hooks/reference-data";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -34,15 +35,10 @@ function Select({ name, defaultValue, required, children }: { name: string; defa
 
 export function ProductForm({ product }: { product?: AdminProduct }) {
   const router = useRouter();
-  const [categories, setCategories] = useState<AdminCategory[]>([]);
-  const [brands, setBrands] = useState<AdminBrand[]>([]);
+  const { data: categories = [] } = useCategories();
+  const { data: brands = [] } = useBrands();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    listCategories().then(setCategories);
-    listBrands().then(setBrands);
-  }, []);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -82,8 +78,12 @@ export function ProductForm({ product }: { product?: AdminProduct }) {
       } else {
         await createProduct(payload);
       }
+      // Invalide toute page de la liste produits déjà en cache (peu importe
+      // filtres/pagination) : sans ça, revenir sur /produits juste après
+      // pourrait encore montrer la version pré-modification le temps que la
+      // fraîcheur du cache expire.
+      mutate((key) => typeof key === "string" && key.startsWith("/products/admin"));
       router.push("/produits");
-      router.refresh();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Une erreur est survenue");
       setSubmitting(false);

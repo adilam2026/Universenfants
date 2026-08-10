@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { Plus, Archive } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { listBrands, createBrand, updateBrand, archiveBrand, type AdminBrand } from "@/lib/catalog";
+import { TableSkeleton } from "@/components/ui/skeleton";
+import { createBrand, updateBrand, archiveBrand, type AdminBrand } from "@/lib/catalog";
 import { ApiError } from "@/lib/api-client";
+import { useBrands } from "@/hooks/reference-data";
 
 const STATUS_LABEL: Record<AdminBrand["status"], string> = {
   DRAFT: "Brouillon",
@@ -17,14 +19,9 @@ const STATUS_LABEL: Record<AdminBrand["status"], string> = {
 };
 
 export default function BrandsPage() {
-  const [brands, setBrands] = useState<AdminBrand[] | null>(null);
+  const { data: brands, mutate: refresh } = useBrands();
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
-  function refresh() {
-    listBrands().then(setBrands);
-  }
-  useEffect(refresh, []);
 
   async function handleCreate(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -113,7 +110,7 @@ export default function BrandsPage() {
             {brands?.map((b) => <BrandRow key={b.id} brand={b} onSave={handleRowSave} onArchive={handleArchive} />)}
           </tbody>
         </table>
-        {!brands && <p className="text-sm text-muted-foreground text-center py-10">Chargement…</p>}
+        {!brands && <TableSkeleton columns={4} />}
       </div>
     </div>
   );

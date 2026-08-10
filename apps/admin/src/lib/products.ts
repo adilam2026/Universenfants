@@ -1,4 +1,4 @@
-import { apiFetch, getStaffToken } from "./api-client";
+import { apiFetch, getStaffToken, type Paginated } from "./api-client";
 
 export interface AdminProductImage {
   id: string;
@@ -79,14 +79,28 @@ export interface UpsertProductPayload {
   status?: "DRAFT" | "ACTIVE" | "INACTIVE" | "ARCHIVED";
 }
 
-export const listAdminProducts = (params: { category?: string; status?: string; lowStock?: boolean } = {}) => {
+export interface ProductListFilters {
+  category?: string;
+  status?: string;
+  lowStock?: boolean;
+  q?: string;
+  page?: number;
+  limit?: number;
+}
+
+export function productListKey(params: ProductListFilters = {}) {
   const qs = new URLSearchParams();
   if (params.category) qs.set("category", params.category);
   if (params.status) qs.set("status", params.status);
   if (params.lowStock) qs.set("lowStock", "true");
+  if (params.q) qs.set("q", params.q);
+  if (params.page && params.page > 1) qs.set("page", String(params.page));
+  if (params.limit) qs.set("limit", String(params.limit));
   const query = qs.toString();
-  return apiFetch<AdminProduct[]>(`/products/admin${query ? `?${query}` : ""}`);
-};
+  return `/products/admin${query ? `?${query}` : ""}`;
+}
+
+export const listAdminProducts = (params: ProductListFilters = {}) => apiFetch<Paginated<AdminProduct>>(productListKey(params));
 
 export const getAdminProduct = (id: string) => apiFetch<AdminProduct>(`/products/admin/${id}`);
 

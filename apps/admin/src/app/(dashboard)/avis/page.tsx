@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
+import useSWR from "swr";
 import { Star, Check, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CardSkeleton } from "@/components/ui/skeleton";
 import { listReviews, moderateReview, type AdminReview } from "@/lib/reviews";
 import { ApiError } from "@/lib/api-client";
 
@@ -20,22 +22,15 @@ const STATUS_VARIANT: Record<string, "default" | "primary" | "success" | "destru
 };
 
 export default function ReviewsPage() {
-  const [reviews, setReviews] = useState<AdminReview[] | null>(null);
   const [filter, setFilter] = useState("PENDING");
   const [error, setError] = useState<string | null>(null);
-  // Changer rapidement de filtre (ou modérer un avis juste après avoir
-  // changé de filtre) peut mettre plusieurs requêtes en vol — sans ce garde,
-  // une réponse plus lente arrivant après une réponse plus récente écraserait
-  // la liste avec des résultats qui ne correspondent plus au filtre affiché.
-  const requestIdRef = useRef(0);
-
-  function refresh() {
-    const requestId = ++requestIdRef.current;
-    listReviews(filter || undefined).then((result) => {
-      if (requestIdRef.current === requestId) setReviews(result);
-    });
-  }
-  useEffect(refresh, [filter]);
+  // La clé SWR inclut le filtre : changer de filtre lit/alimente une entrée
+  // de cache distincte, et SWR ignore nativement toute réponse devenue
+  // obsolète si le filtre a de nouveau changé entre-temps.
+  const { data: reviews, mutate: refresh } = useSWR<AdminReview[]>(
+    `/reviews/admin${filter ? `?status=${filter}` : ""}`,
+    () => listReviews(filter || undefined),
+  );
 
   async function handleModerate(id: string, status: "APPROVED" | "REJECTED") {
     setError(null);
@@ -65,8 +60,8 @@ export default function ReviewsPage() {
 
       {error && <p className="text-sm text-destructive mb-3">{error}</p>}
 
-      {reviews === null ? (
-        <p className="text-sm text-muted-foreground">Chargement…</p>
+      {!reviews ? (
+        <CardSkeleton lines={4} />
       ) : reviews.length === 0 ? (
         <p className="text-sm text-muted-foreground">Aucun avis pour ce filtre.</p>
       ) : (
