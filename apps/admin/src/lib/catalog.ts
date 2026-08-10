@@ -7,6 +7,8 @@ export interface AdminCategory {
   slug: string;
   parentId: string | null;
   image: string | null;
+  metaTitle: string | null;
+  metaDescription: string | null;
   status: "DRAFT" | "ACTIVE" | "INACTIVE" | "ARCHIVED";
   order: number;
 }
@@ -18,6 +20,7 @@ export interface AdminBrand {
   logo: string | null;
   description: string | null;
   website: string | null;
+  status: "DRAFT" | "ACTIVE" | "INACTIVE" | "ARCHIVED";
 }
 
 export interface UpsertCategoryPayload {
@@ -26,6 +29,8 @@ export interface UpsertCategoryPayload {
   slug: string;
   parentId?: string;
   image?: string;
+  metaTitle?: string;
+  metaDescription?: string;
   status?: "DRAFT" | "ACTIVE" | "INACTIVE" | "ARCHIVED";
 }
 
@@ -35,6 +40,7 @@ export interface UpsertBrandPayload {
   logo?: string;
   description?: string;
   website?: string;
+  status?: "DRAFT" | "ACTIVE" | "INACTIVE" | "ARCHIVED";
 }
 
 export const listCategories = () => apiFetch<AdminCategory[]>("/categories");
@@ -49,3 +55,4 @@ export const createBrand = (payload: UpsertBrandPayload) =>
   apiFetch<AdminBrand>("/brands", { method: "POST", body: JSON.stringify(payload) });
 export const updateBrand = (id: string, payload: UpsertBrandPayload) =>
   apiFetch<AdminBrand>(`/brands/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
+export const archiveBrand = (id: string) => apiFetch<AdminBrand>(`/brands/${id}`, { method: "DELETE" });

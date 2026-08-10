@@ -1,11 +1,15 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
+import { AuditLogService } from "../../common/audit-log.service";
 import { runCatchingDuplicate } from "../../common/prisma-errors.util";
 import type { UpsertCategoryDto } from "./dto/upsert-category.dto";
 
 @Injectable()
 export class CategoriesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLog: AuditLogService,
+  ) {}
 
   /** Arborescence complète (BO-06 vue arborescente + navigation Front). */
   async tree() {
@@ -26,6 +30,8 @@ export class CategoriesService {
         nameFr: c.nameFr,
         nameAr: c.nameAr,
         image: c.image,
+        metaTitle: c.metaTitle,
+        metaDescription: c.metaDescription,
         productCount: c._count.products,
         children: build(c.id),
       }));
@@ -42,19 +48,26 @@ export class CategoriesService {
     return this.prisma.category.findMany({ orderBy: { order: "asc" } });
   }
 
-  async create(dto: UpsertCategoryDto) {
-    return runCatchingDuplicate(() => this.prisma.category.create({ data: dto }), "Cette URL de catégorie (slug) est déjà utilisée");
+  async create(dto: UpsertCategoryDto, staffUserId: string) {
+    const created = await runCatchingDuplicate(
+      () => this.prisma.category.create({ data: dto }),
+      "Cette URL de catégorie (slug) est déjà utilisée",
+    );
+    await this.auditLog.record({ staffUserId, action: "category.create", entity: "Category", entityId: created.id, newValue: dto });
+    return created;
   }
 
-  async update(id: string, dto: UpsertCategoryDto) {
+  async update(id: string, dto: UpsertCategoryDto, staffUserId: string) {
     await this.ensureExists(id);
-    return runCatchingDuplicate(
+    const updated = await runCatchingDuplicate(
       () => this.prisma.category.update({ where: { id }, data: dto }),
       "Cette URL de catégorie (slug) est déjà utilisée",
     );
+    await this.auditLog.record({ staffUserId, action: "category.update", entity: "Category", entityId: id, newValue: dto });
+    return updated;
   }
 
-  async archive(id: string) {
+  async archive(id: string, staffUserId: string) {
     await this.ensureExists(id);
     // tree() (navigation catégorie côté Front) ne renvoie que les catégories
     // ACTIVE — sans ce garde-fou, archiver une catégorie encore utilisée par
@@ -67,7 +80,9 @@ export class CategoriesService {
         `Impossible d'archiver : ${productsUsingCategory} produit(s) actif(s) sont encore rattachés à cette catégorie`,
       );
     }
-    return this.prisma.category.update({ where: { id }, data: { status: "ARCHIVED" } });
+    const archived = await this.prisma.category.update({ where: { id }, data: { status: "ARCHIVED" } });
+    await this.auditLog.record({ staffUserId, action: "category.archive", entity: "Category", entityId: id });
+    return archived;
   }
 
   private async ensureExists(id: string) {

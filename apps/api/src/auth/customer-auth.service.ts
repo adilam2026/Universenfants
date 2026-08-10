@@ -178,6 +178,17 @@ export class CustomerAuthService {
     };
   }
 
+  /** Historique des gains/dépenses de points — jusqu'ici LoyaltyTransaction
+   * était alimenté à chaque commande mais jamais consultable, ni ici ni côté
+   * admin : le client ne voyait que son solde courant sans détail. */
+  async loyaltyHistory(customerId: string) {
+    const account = await this.prisma.loyaltyAccount.findUnique({
+      where: { customerId },
+      include: { transactions: { orderBy: { createdAt: "desc" }, take: 50, include: { order: { select: { orderNumber: true } } } } },
+    });
+    return account?.transactions ?? [];
+  }
+
   /** Prénom/nom : modification immédiate. Téléphone : ré-authentification
    * requise (voir UpdateProfileDto#password) car il double comme identifiant
    * de connexion (detectIdentifierKind) — le modifier a le même poids

@@ -1,5 +1,5 @@
 import { ApiPropertyOptional, ApiProperty } from "@nestjs/swagger";
-import { IsOptional, IsString, IsUrl } from "class-validator";
+import { IsIn, IsOptional, IsString, IsUrl } from "class-validator";
 
 export class UpsertBrandDto {
   @ApiProperty() @IsString() name!: string;
@@ -7,4 +7,8 @@ export class UpsertBrandDto {
   @ApiPropertyOptional() @IsOptional() @IsString() logo?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() description?: string;
   @ApiPropertyOptional() @IsOptional() @IsUrl() website?: string;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsIn(["DRAFT", "ACTIVE", "INACTIVE", "ARCHIVED"])
+  status?: "DRAFT" | "ACTIVE" | "INACTIVE" | "ARCHIVED";
 }

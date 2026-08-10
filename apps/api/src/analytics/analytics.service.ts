@@ -16,7 +16,7 @@ export class AnalyticsService {
     // plutôt que des chiffres bruts sans point de comparaison.
     const previousSince = new Date(since.getTime() - days * 24 * 60 * 60 * 1000);
 
-    const [orders, orderLines, ordersByStatusRaw, previousOrders, newCustomers] = await Promise.all([
+    const [orders, orderLines, ordersByStatusRaw, previousOrders, newCustomers, marginLines, totalViews, viewSessions, wishlistTopRaw, loyaltyByType] = await Promise.all([
       this.prisma.order.findMany({
         where: { createdAt: { gte: since } },
         select: { createdAt: true, total: true, status: true },
@@ -43,6 +43,25 @@ export class AnalyticsService {
         select: { total: true, status: true },
       }),
       this.prisma.customer.count({ where: { createdAt: { gte: since } } }),
+      // costPriceSnapshot n'était jamais lu par l'analytics malgré sa
+      // présence sur chaque ligne de commande — aucune marge nulle part.
+      this.prisma.orderLine.findMany({
+        where: { order: { createdAt: { gte: since }, status: { not: "CANCELLED" } } },
+        select: { lineTotal: true, costPriceSnapshot: true, quantity: true },
+      }),
+      this.prisma.productView.count({ where: { viewedAt: { gte: since } } }),
+      // Proxy de conversion : commandes / sessions distinctes ayant consulté
+      // au moins une fiche produit sur la période (ProductView est alimenté
+      // mais jusqu'ici jamais agrégé, cf. audit).
+      this.prisma.productView.findMany({ where: { viewedAt: { gte: since } }, select: { sessionId: true }, distinct: ["sessionId"] }),
+      this.prisma.wishlistLine.groupBy({
+        by: ["productId"],
+        where: { removedAt: null },
+        _count: { _all: true },
+        orderBy: { _count: { productId: "desc" } },
+        take: 5,
+      }),
+      this.prisma.loyaltyTransaction.groupBy({ by: ["type"], where: { createdAt: { gte: since } }, _sum: { points: true } }),
     ]);
 
     // Tous les jours de la période sont représentés (même à 0) pour que le
@@ -71,6 +90,22 @@ export class AnalyticsService {
 
     const totalItems = orderLines.reduce((s, l) => s + (l._sum.quantity ?? 0), 0);
 
+    const totalMargin = marginLines.reduce((s, l) => s + (Number(l.lineTotal) - Number(l.costPriceSnapshot) * l.quantity), 0);
+    const marginRate = totalRevenue > 0 ? Math.round((totalMargin / totalRevenue) * 1000) / 10 : 0;
+
+    const wishlistProducts = await this.prisma.product.findMany({
+      where: { id: { in: wishlistTopRaw.map((w) => w.productId) } },
+      select: { id: true, nameFr: true },
+    });
+    const wishlistNameById = new Map(wishlistProducts.map((p) => [p.id, p.nameFr]));
+    const topWishlisted = wishlistTopRaw.map((w) => ({
+      name: wishlistNameById.get(w.productId) ?? w.productId,
+      count: w._count._all,
+    }));
+
+    const loyaltyEarned = loyaltyByType.find((l) => l.type === "EARN")?._sum.points ?? 0;
+    const loyaltyRedeemed = Math.abs(loyaltyByType.find((l) => l.type === "REDEEM")?._sum.points ?? 0);
+
     return {
       days,
       totalRevenue,
@@ -84,6 +119,17 @@ export class AnalyticsService {
       // moyenne exacte sur toutes les commandes.
       avgItemsPerOrder: billable.length > 0 ? Math.round((totalItems / billable.length) * 10) / 10 : 0,
       newCustomers,
+      totalMargin,
+      marginRate,
+      conversion: {
+        productViews: totalViews,
+        viewSessions: viewSessions.length,
+        // sessions ayant vu un produit ET commandé — proxy, pas un vrai
+        // tracking de parcours (aucun lien direct session ↔ commande en base).
+        conversionRatePct: viewSessions.length > 0 ? Math.round((totalOrders / viewSessions.length) * 1000) / 10 : null,
+      },
+      topWishlisted,
+      loyalty: { pointsEarned: loyaltyEarned, pointsRedeemed: loyaltyRedeemed },
       revenueByDay,
       topProducts: orderLines.map((l) => ({
         name: l.productNameSnapshot,

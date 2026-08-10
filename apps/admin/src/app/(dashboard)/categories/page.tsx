@@ -55,6 +55,8 @@ export default function CategoriesPage() {
         nameAr: (patch.nameAr ?? category.nameAr) || undefined,
         slug: patch.slug ?? category.slug,
         parentId: (patch.parentId ?? category.parentId) || undefined,
+        metaTitle: (patch.metaTitle ?? category.metaTitle) || undefined,
+        metaDescription: (patch.metaDescription ?? category.metaDescription) || undefined,
         status: patch.status ?? category.status,
       });
       refresh();
@@ -118,6 +120,8 @@ export default function CategoriesPage() {
               <th className="px-4 py-3">Nom</th>
               <th className="px-4 py-3">Slug</th>
               <th className="px-4 py-3">Parente</th>
+              <th className="px-4 py-3">Titre SEO</th>
+              <th className="px-4 py-3">Description SEO</th>
               <th className="px-4 py-3">Statut</th>
               <th className="px-4 py-3" />
             </tr>
@@ -148,13 +152,15 @@ function CategoryRow({
   const [nameFr, setNameFr] = useState(category.nameFr);
   const [slug, setSlug] = useState(category.slug);
   const [parentId, setParentId] = useState(category.parentId ?? "");
+  const [metaTitle, setMetaTitle] = useState(category.metaTitle ?? "");
+  const [metaDescription, setMetaDescription] = useState(category.metaDescription ?? "");
   const [status, setStatus] = useState(category.status);
   const [saving, setSaving] = useState(false);
   const [archiving, setArchiving] = useState(false);
 
   async function save() {
     setSaving(true);
-    await onSave(category, { nameFr, slug, parentId: parentId || null, status });
+    await onSave(category, { nameFr, slug, parentId: parentId || null, metaTitle: metaTitle || null, metaDescription: metaDescription || null, status });
     setSaving(false);
   }
 
@@ -177,6 +183,8 @@ function CategoryRow({
           ))}
         </select>
       </td>
+      <td className="px-4 py-2.5"><Input value={metaTitle} onChange={(e) => setMetaTitle(e.target.value)} className="w-40" placeholder={category.nameFr} /></td>
+      <td className="px-4 py-2.5"><Input value={metaDescription} onChange={(e) => setMetaDescription(e.target.value)} className="w-56" placeholder="Description affichée sur Google" /></td>
       <td className="px-4 py-2.5">
         <select
           value={status}

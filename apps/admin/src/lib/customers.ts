@@ -11,9 +11,18 @@ export interface AdminCustomerSummary {
   createdAt: string;
 }
 
+export interface LoyaltyTransactionEntry {
+  id: string;
+  type: "EARN" | "REDEEM" | "CANCEL" | "EXPIRE";
+  points: number;
+  reason: string | null;
+  createdAt: string;
+  order: { orderNumber: string } | null;
+}
+
 export interface AdminCustomerDetail extends AdminCustomerSummary {
   orders: { id: string; orderNumber: string; status: string; total: string; createdAt: string }[];
-  loyaltyAccount: { pointsBalance: number } | null;
+  loyaltyAccount: { pointsBalance: number; transactions: LoyaltyTransactionEntry[] } | null;
   addresses: { id: string; label: string | null; city: string; addressLine: string }[];
 }
 

@@ -138,3 +138,33 @@ export const updateVariant = (productId: string, variantId: string, payload: Var
 
 export const removeVariant = (productId: string, variantId: string) =>
   apiFetch<AdminProductVariant[]>(`/products/${productId}/variants/${variantId}`, { method: "DELETE" });
+
+export interface StockMovementEntry {
+  id: string;
+  previousStock: number;
+  newStock: number;
+  reason: string;
+  createdAt: string;
+  product: { nameFr: string; sku: string };
+  variant: { label: string; sku: string } | null;
+  staffUser: { name: string } | null;
+  order: { orderNumber: string } | null;
+}
+
+export const listStockMovements = (params: { productId?: string; page?: number } = {}) => {
+  const search = new URLSearchParams();
+  if (params.productId) search.set("productId", params.productId);
+  if (params.page) search.set("page", String(params.page));
+  const query = search.toString();
+  return apiFetch<{ items: StockMovementEntry[]; total: number; page: number; limit: number; totalPages: number }>(
+    `/products/admin/stock-movements${query ? `?${query}` : ""}`,
+  );
+};
+
+export interface StockValuation {
+  totalValue: number;
+  totalUnits: number;
+  lines: { productId: string; name: string; sku: string; stock: number; costPrice: number; value: number }[];
+}
+
+export const getStockValuation = () => apiFetch<StockValuation>("/products/admin/stock-valuation");

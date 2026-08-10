@@ -5,6 +5,7 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { SearchService, type ProductSearchDoc } from "../../search/search.service";
 import { ImageService } from "../../storage/image.service";
 import { PricingService, type ActivePromotions } from "../pricing/pricing.service";
+import { AuditLogService } from "../../common/audit-log.service";
 import { runCatchingDuplicate } from "../../common/prisma-errors.util";
 import type { QueryProductsDto } from "./dto/query-products.dto";
 import type { UpsertProductDto } from "./dto/upsert-product.dto";
@@ -49,6 +50,7 @@ export class ProductsService {
     private readonly search: SearchService,
     private readonly images: ImageService,
     private readonly pricing: PricingService,
+    private readonly auditLog: AuditLogService,
   ) {}
 
   /** Remplace promoPrice par le prix effectif (promoPrice produit vs
@@ -353,11 +355,12 @@ export class ProductsService {
     };
   }
 
-  async create(dto: UpsertProductDto) {
+  async create(dto: UpsertProductDto, staffUserId: string) {
     const created = await runCatchingDuplicate(
       () => this.prisma.product.create({ data: dto }),
       "Un produit avec ce SKU ou cette URL SEO existe déjà",
     );
+    await this.auditLog.record({ staffUserId, action: "product.create", entity: "Product", entityId: created.id, newValue: dto });
     await this.syncToSearch(created.id);
     return created;
   }
@@ -388,10 +391,11 @@ export class ProductsService {
     return updated;
   }
 
-  async archive(id: string) {
+  async archive(id: string, staffUserId: string) {
     const found = await this.prisma.product.findUnique({ where: { id } });
     if (!found) throw new NotFoundException("Produit introuvable");
     const archived = await this.prisma.product.update({ where: { id }, data: { status: "ARCHIVED" } });
+    await this.auditLog.record({ staffUserId, action: "product.archive", entity: "Product", entityId: id, oldValue: { status: found.status } });
     await this.search.removeProduct(id);
     return archived;
   }
@@ -538,21 +542,100 @@ export class ProductsService {
     }
   }
 
-  /** Commande livrée (§194) : le stock physique est décrémenté définitivement. */
-  async deductOnDelivery(tx: Tx, lines: StockLine[]): Promise<void> {
+  /** Commande livrée (§194) : le stock physique est décrémenté définitivement.
+   * Trace chaque déduction dans StockMovement (orderId lié) — jusqu'ici
+   * seuls les ajustements manuels créaient une ligne, rendant l'historique
+   * de stock incomplet pour la majorité des mouvements réels. */
+  async deductOnDelivery(tx: Tx, lines: StockLine[], orderId: string): Promise<void> {
     for (const line of lines) {
       if (line.variantId) {
+        const [row] = await tx.$queryRaw<{ stock: number }[]>`
+          SELECT stock FROM "ProductVariant" WHERE id = ${line.variantId} FOR UPDATE`;
+        const previousStock = row?.stock ?? 0;
+        const newStock = previousStock - line.quantity;
         await tx.productVariant.update({
           where: { id: line.variantId },
           data: { stock: { decrement: line.quantity }, reservedStock: { decrement: line.quantity } },
         });
+        await tx.stockMovement.create({
+          data: { productId: line.productId, variantId: line.variantId, previousStock, newStock, reason: "ORDER_DELIVERED_DEDUCTION", orderId },
+        });
       } else {
+        const [row] = await tx.$queryRaw<{ stock: number }[]>`
+          SELECT stock FROM "Product" WHERE id = ${line.productId} FOR UPDATE`;
+        const previousStock = row?.stock ?? 0;
+        const newStock = previousStock - line.quantity;
         await tx.product.update({
           where: { id: line.productId },
           data: { stock: { decrement: line.quantity }, reservedStock: { decrement: line.quantity } },
         });
+        await tx.stockMovement.create({
+          data: { productId: line.productId, previousStock, newStock, reason: "ORDER_DELIVERED_DEDUCTION", orderId },
+        });
       }
     }
+  }
+
+  /** Historique des mouvements de stock — jusqu'ici la table StockMovement
+   * était alimentée mais totalement illisible depuis le Back-Office. */
+  async stockMovements(params: { productId?: string; page: number; limit: number }) {
+    const where = params.productId ? { productId: params.productId } : {};
+    const [items, total] = await Promise.all([
+      this.prisma.stockMovement.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip: (params.page - 1) * params.limit,
+        take: params.limit,
+        include: {
+          product: { select: { nameFr: true, sku: true } },
+          variant: { select: { label: true, sku: true } },
+          staffUser: { select: { name: true } },
+          order: { select: { orderNumber: true } },
+        },
+      }),
+      this.prisma.stockMovement.count({ where }),
+    ]);
+    return { items, total, page: params.page, limit: params.limit, totalPages: Math.max(1, Math.ceil(total / params.limit)) };
+  }
+
+  /** Valeur du stock immobilisé = Σ (stock × coût d'achat), produit par
+   * produit puis par variante — costPrice était saisi partout mais jamais
+   * agrégé nulle part dans le code. */
+  async stockValuation() {
+    const products = await this.prisma.product.findMany({
+      where: { status: { not: "ARCHIVED" } },
+      select: {
+        id: true,
+        nameFr: true,
+        sku: true,
+        stock: true,
+        costPrice: true,
+        variants: { select: { id: true, label: true, sku: true, stock: true, costPrice: true } },
+      },
+    });
+
+    let totalValue = 0;
+    let totalUnits = 0;
+    const lines = [];
+    for (const p of products) {
+      if (p.variants.length > 0) {
+        for (const v of p.variants) {
+          const cost = Number(v.costPrice ?? p.costPrice ?? 0);
+          const value = cost * v.stock;
+          totalValue += value;
+          totalUnits += v.stock;
+          if (v.stock > 0) lines.push({ productId: p.id, name: `${p.nameFr} — ${v.label}`, sku: v.sku, stock: v.stock, costPrice: cost, value });
+        }
+      } else {
+        const cost = Number(p.costPrice ?? 0);
+        const value = cost * p.stock;
+        totalValue += value;
+        totalUnits += p.stock;
+        if (p.stock > 0) lines.push({ productId: p.id, name: p.nameFr, sku: p.sku, stock: p.stock, costPrice: cost, value });
+      }
+    }
+    lines.sort((a, b) => b.value - a.value);
+    return { totalValue, totalUnits, lines: lines.slice(0, 200) };
   }
 
   // ------------------------------------------------------------------

@@ -455,7 +455,7 @@ export class OrdersService {
         await this.products.releaseReservation(tx, stockLines);
       }
       if (dto.status === "DELIVERED") {
-        await this.products.deductOnDelivery(tx, stockLines);
+        await this.products.deductOnDelivery(tx, stockLines, orderId);
         // §218 : les points de fidélité ne sont crédités qu'à la livraison.
         const account = await tx.loyaltyAccount.findUnique({ where: { customerId: order.customerId } });
         if (account) {

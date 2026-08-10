@@ -10,6 +10,13 @@ function dh(value: string | number) {
   return `${Number(value).toLocaleString("fr-FR")} DH`;
 }
 
+const TXN_LABEL: Record<string, string> = {
+  EARN: "Gagnés",
+  REDEEM: "Utilisés",
+  CANCEL: "Annulés",
+  EXPIRE: "Expirés",
+};
+
 export default function CustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const [customer, setCustomer] = useState<AdminCustomerDetail | null>(null);
@@ -57,6 +64,28 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
               <p className="text-muted-foreground">Points fidélité : {customer.loyaltyAccount?.pointsBalance ?? 0}</p>
             </CardContent>
           </Card>
+
+          {customer.loyaltyAccount && customer.loyaltyAccount.transactions.length > 0 && (
+            <Card>
+              <CardHeader><CardTitle>Transactions fidélité</CardTitle></CardHeader>
+              <CardContent className="p-0">
+                <div className="divide-y divide-border">
+                  {customer.loyaltyAccount.transactions.map((t) => (
+                    <div key={t.id} className="px-5 py-2.5 text-sm flex items-center justify-between">
+                      <div>
+                        <span>{TXN_LABEL[t.type] ?? t.type}</span>
+                        {t.order && <span className="text-xs text-muted-foreground"> · {t.order.orderNumber}</span>}
+                        <p className="text-[11px] text-muted-foreground">{new Date(t.createdAt).toLocaleDateString("fr-FR")}</p>
+                      </div>
+                      <span className={`font-bold ${t.points >= 0 ? "text-brand-success" : "text-destructive"}`}>
+                        {t.points >= 0 ? "+" : ""}{t.points}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {customer.addresses.length > 0 && (
             <Card>

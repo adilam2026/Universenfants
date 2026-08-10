@@ -15,11 +15,16 @@ export async function generateMetadata({ params }: PageProps<"/[locale]/categori
   const current = categories.find((c) => c.slug === slug);
   if (!current) return {};
   const name = localized(current.nameFr, current.nameAr, locale);
+  // Le SEO manuel (metaTitle/metaDescription, saisi dans l'admin) prime sur
+  // la description générée automatiquement — sans ce repli, les champs SEO
+  // remplis côté admin catégorie n'avaient jamais d'effet sur le HTML rendu.
+  const title = (locale === "ar" ? undefined : current.metaTitle) || name;
   const description =
-    locale === "ar"
+    current.metaDescription ||
+    (locale === "ar"
       ? `اكتشف تشكيلتنا من ${name} للأطفال — التوصيل في جميع أنحاء المغرب.`
-      : `Découvrez notre sélection de ${name.toLowerCase()} pour enfants — livraison partout au Maroc.`;
-  return { title: name, description, openGraph: { title: name, description } };
+      : `Découvrez notre sélection de ${name.toLowerCase()} pour enfants — livraison partout au Maroc.`);
+  return { title, description, openGraph: { title, description } };
 }
 
 export default async function CategoryPage({

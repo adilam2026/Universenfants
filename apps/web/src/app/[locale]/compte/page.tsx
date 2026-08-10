@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { useTranslations } from "next-intl";
-import { Star, Package, LogOut, User, Pencil } from "lucide-react";
+import { Star, Package, LogOut, User, Pencil, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
 import {
@@ -12,7 +12,9 @@ import {
   me,
   updateProfile,
   requestEmailChange,
+  loyaltyHistory,
   type CustomerProfile,
+  type LoyaltyTransactionEntry,
 } from "@/lib/auth-client";
 import { useIsLoggedIn } from "@/hooks/use-is-logged-in";
 import { useStoreSettings } from "@/hooks/use-store-settings";
@@ -60,6 +62,8 @@ export default function AccountPage() {
         </Button>
       </div>
 
+      <LoyaltyHistorySection />
+
       <div className="grid sm:grid-cols-2 gap-3.5 mb-5">
         <Link href="/compte/commandes" className="rounded-2xl border border-border bg-card p-4 flex items-center gap-3 hover:shadow-md transition-shadow">
           <div className="flex size-10 items-center justify-center rounded-full bg-brand-primary-soft text-primary">
@@ -93,6 +97,55 @@ export default function AccountPage() {
       >
         <LogOut className="size-4" /> {t("logout")}
       </Button>
+    </div>
+  );
+}
+
+const TXN_LABEL_KEY: Record<LoyaltyTransactionEntry["type"], "loyaltyEarn" | "loyaltyRedeem" | "loyaltyCancel" | "loyaltyExpire"> = {
+  EARN: "loyaltyEarn",
+  REDEEM: "loyaltyRedeem",
+  CANCEL: "loyaltyCancel",
+  EXPIRE: "loyaltyExpire",
+};
+
+function LoyaltyHistorySection() {
+  const t = useTranslations("account");
+  const [open, setOpen] = useState(false);
+  const [entries, setEntries] = useState<LoyaltyTransactionEntry[] | null>(null);
+
+  function toggle() {
+    setOpen((v) => !v);
+    if (!entries) loyaltyHistory().then(setEntries).catch(() => setEntries([]));
+  }
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-4 mb-5">
+      <button onClick={toggle} className="flex items-center justify-between w-full text-sm font-bold">
+        {t("loyaltyHistoryTitle")}
+        <ChevronDown className={`size-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="mt-3 pt-3 border-t border-border flex flex-col gap-2">
+          {!entries ? (
+            <p className="text-xs text-muted-foreground">{t("loading")}</p>
+          ) : entries.length === 0 ? (
+            <p className="text-xs text-muted-foreground">{t("loyaltyHistoryEmpty")}</p>
+          ) : (
+            entries.map((e) => (
+              <div key={e.id} className="flex items-center justify-between text-sm">
+                <div>
+                  <span>{t(TXN_LABEL_KEY[e.type])}</span>
+                  {e.order && <span className="text-xs text-muted-foreground"> · {e.order.orderNumber}</span>}
+                  <p className="text-[11px] text-muted-foreground">{new Date(e.createdAt).toLocaleDateString("fr-FR")}</p>
+                </div>
+                <span className={`font-bold ${e.points >= 0 ? "text-brand-success" : "text-destructive"}`}>
+                  {e.points >= 0 ? "+" : ""}{e.points}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+      )}
     </div>
   );
 }

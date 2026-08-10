@@ -71,7 +71,7 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-3.5 mb-6">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-6 gap-3.5 mb-6">
         <Card>
           <CardContent className="p-5">
             <p className="text-xs text-muted-foreground font-medium">Chiffre d&apos;affaires</p>
@@ -87,6 +87,7 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
         <Card><CardContent className="p-5"><p className="text-xs text-muted-foreground font-medium">Panier moyen</p><p className="text-2xl font-bold mt-1">{dh(summary.avgOrderValue)}</p></CardContent></Card>
+        <Card><CardContent className="p-5"><p className="text-xs text-muted-foreground font-medium">Marge brute</p><p className="text-2xl font-bold mt-1">{dh(summary.totalMargin)}</p><p className="text-xs text-muted-foreground mt-0.5">{summary.marginRate}% du CA</p></CardContent></Card>
         <Card><CardContent className="p-5"><p className="text-xs text-muted-foreground font-medium">Articles / commande</p><p className="text-2xl font-bold mt-1">{summary.avgItemsPerOrder}</p></CardContent></Card>
         <Card><CardContent className="p-5"><p className="text-xs text-muted-foreground font-medium">Nouveaux clients</p><p className="text-2xl font-bold mt-1">{summary.newCustomers}</p></CardContent></Card>
       </div>
@@ -141,6 +142,43 @@ export default function AnalyticsPage() {
             </CardContent>
           </Card>
         </div>
+      </div>
+
+      <div className="grid sm:grid-cols-3 gap-3.5 mt-5">
+        <Card>
+          <CardHeader><CardTitle>Conversion</CardTitle></CardHeader>
+          <CardContent className="flex flex-col gap-2 text-sm">
+            <div className="flex justify-between"><span className="text-muted-foreground">Fiches produit vues</span><span className="font-bold">{summary.conversion.productViews}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Visiteurs uniques</span><span className="font-bold">{summary.conversion.viewSessions}</span></div>
+            <div className="flex justify-between pt-2 border-t border-border">
+              <span className="text-muted-foreground">Taux de conversion</span>
+              <span className="font-bold">{summary.conversion.conversionRatePct === null ? "—" : `${summary.conversion.conversionRatePct}%`}</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle>Top wishlist</CardTitle></CardHeader>
+          <CardContent className="p-0">
+            <div className="divide-y divide-border">
+              {summary.topWishlisted.map((w) => (
+                <div key={w.name} className="flex justify-between px-5 py-2.5 text-sm">
+                  <span className="truncate">{w.name}</span>
+                  <span className="font-bold shrink-0 ml-2">{w.count}</span>
+                </div>
+              ))}
+              {summary.topWishlisted.length === 0 && <p className="text-sm text-muted-foreground text-center py-6">Aucune donnée.</p>}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle>Fidélité</CardTitle></CardHeader>
+          <CardContent className="flex flex-col gap-2 text-sm">
+            <div className="flex justify-between"><span className="text-muted-foreground">Points gagnés</span><span className="font-bold text-brand-success">+{summary.loyalty.pointsEarned}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Points utilisés</span><span className="font-bold text-destructive">-{summary.loyalty.pointsRedeemed}</span></div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

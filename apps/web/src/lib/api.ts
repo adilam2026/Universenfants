@@ -17,6 +17,8 @@ export interface Category {
   descriptionFr?: string | null;
   descriptionAr?: string | null;
   image: string | null;
+  metaTitle?: string | null;
+  metaDescription?: string | null;
   productCount: number;
   children: Category[];
 }

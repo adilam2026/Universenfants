@@ -7,6 +7,11 @@ export interface AnalyticsSummary {
   avgOrderValue: number;
   avgItemsPerOrder: number;
   newCustomers: number;
+  totalMargin: number;
+  marginRate: number;
+  conversion: { productViews: number; viewSessions: number; conversionRatePct: number | null };
+  topWishlisted: { name: string; count: number }[];
+  loyalty: { pointsEarned: number; pointsRedeemed: number };
   revenueByDay: { date: string; revenue: number }[];
   topProducts: { name: string; quantity: number; revenue: number }[];
   ordersByStatus: Record<string, number>;

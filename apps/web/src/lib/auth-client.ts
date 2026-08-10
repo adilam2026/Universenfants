@@ -141,6 +141,19 @@ export function updateProfile(payload: UpdateProfilePayload) {
   return authFetch<CustomerProfile>("/auth/customer/me", { method: "PATCH", body: JSON.stringify(payload) });
 }
 
+export interface LoyaltyTransactionEntry {
+  id: string;
+  type: "EARN" | "REDEEM" | "CANCEL" | "EXPIRE";
+  points: number;
+  reason: string | null;
+  createdAt: string;
+  order: { orderNumber: string } | null;
+}
+
+export function loyaltyHistory() {
+  return authFetch<LoyaltyTransactionEntry[]>("/auth/customer/me/loyalty");
+}
+
 export function requestEmailChange(newEmail: string, password: string) {
   return authFetch<{ ok: true }>("/auth/customer/me/email/request-change", {
     method: "POST",

@@ -31,6 +31,24 @@ export class ProductsController {
     return this.service.listForAdmin({ category, status, lowStock: lowStock === "true" });
   }
 
+  @Get("admin/stock-movements")
+  @UseGuards(JwtAuthGuard, StaffGuard, PermissionsGuard)
+  @RequirePermissions(PermissionCode.PRODUCT_READ)
+  stockMovements(@Query("productId") productId?: string, @Query("page") page?: string, @Query("limit") limit?: string) {
+    return this.service.stockMovements({
+      productId,
+      page: Math.max(1, Number(page) || 1),
+      limit: Math.min(100, Number(limit) || 50),
+    });
+  }
+
+  @Get("admin/stock-valuation")
+  @UseGuards(JwtAuthGuard, StaffGuard, PermissionsGuard)
+  @RequirePermissions(PermissionCode.PRODUCT_READ)
+  stockValuation() {
+    return this.service.stockValuation();
+  }
+
   @Get("admin/:id")
   @UseGuards(JwtAuthGuard, StaffGuard, PermissionsGuard)
   @RequirePermissions(PermissionCode.PRODUCT_READ)
@@ -46,8 +64,8 @@ export class ProductsController {
   @Post()
   @UseGuards(JwtAuthGuard, StaffGuard, PermissionsGuard)
   @RequirePermissions(PermissionCode.PRODUCT_CREATE)
-  create(@Body() dto: UpsertProductDto) {
-    return this.service.create(dto);
+  create(@Body() dto: UpsertProductDto, @CurrentUser() user: RequestUser) {
+    return this.service.create(dto, user.sub);
   }
 
   @Post("import")
@@ -84,8 +102,8 @@ export class ProductsController {
   @Patch(":id/archive")
   @UseGuards(JwtAuthGuard, StaffGuard, PermissionsGuard)
   @RequirePermissions(PermissionCode.PRODUCT_DELETE)
-  archive(@Param("id") id: string) {
-    return this.service.archive(id);
+  archive(@Param("id") id: string, @CurrentUser() user: RequestUser) {
+    return this.service.archive(id, user.sub);
   }
 
   @Post(":id/stock")

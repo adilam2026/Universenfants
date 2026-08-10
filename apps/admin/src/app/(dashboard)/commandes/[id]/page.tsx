@@ -6,6 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { ORDER_NEXT_STATUS, type OrderStatus } from "@universenfants/shared";
 import { getAdminOrder, updateOrderStatus, recordOrderPayment, type AdminOrderDetail } from "@/lib/orders";
 import { ApiError } from "@/lib/api-client";
@@ -30,6 +32,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const [updating, setUpdating] = useState<string | null>(null);
   const [paymentAmount, setPaymentAmount] = useState("");
   const [recordingPayment, setRecordingPayment] = useState(false);
+  const [statusNote, setStatusNote] = useState("");
 
   function refresh() {
     getAdminOrder(id).then(setOrder).catch((e) => setError(e instanceof Error ? e.message : "Commande introuvable"));
@@ -41,7 +44,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     setUpdating(status);
     setError(null);
     try {
-      await updateOrderStatus(id, status);
+      await updateOrderStatus(id, status, statusNote.trim() || undefined);
+      setStatusNote("");
       refresh();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Une erreur est survenue");
@@ -111,9 +115,12 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             <CardContent className="p-0">
               <div className="divide-y divide-border">
                 {order.statusHistory.map((h) => (
-                  <div key={h.id} className="px-5 py-3 text-sm flex justify-between">
-                    <span>{h.fromStatus ? `${STATUS_LABEL[h.fromStatus]} → ` : ""}{STATUS_LABEL[h.toStatus] ?? h.toStatus}</span>
-                    <span className="text-muted-foreground text-xs">{new Date(h.createdAt).toLocaleString("fr-FR")}</span>
+                  <div key={h.id} className="px-5 py-3 text-sm">
+                    <div className="flex justify-between">
+                      <span>{h.fromStatus ? `${STATUS_LABEL[h.fromStatus]} → ` : ""}{STATUS_LABEL[h.toStatus] ?? h.toStatus}</span>
+                      <span className="text-muted-foreground text-xs">{new Date(h.createdAt).toLocaleString("fr-FR")}</span>
+                    </div>
+                    {h.note && <p className="text-xs text-muted-foreground mt-1 italic">« {h.note} »</p>}
                   </div>
                 ))}
               </div>
@@ -136,6 +143,16 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             <Card>
               <CardHeader><CardTitle>Changer le statut</CardTitle></CardHeader>
               <CardContent className="flex flex-col gap-2">
+                <div className="flex flex-col gap-1.5 mb-1">
+                  <Label htmlFor="statusNote" className="text-xs text-muted-foreground">Note interne (optionnelle)</Label>
+                  <Textarea
+                    id="statusNote"
+                    rows={2}
+                    placeholder="Visible uniquement par l'équipe, ex: client injoignable, colis retourné…"
+                    value={statusNote}
+                    onChange={(e) => setStatusNote(e.target.value)}
+                  />
+                </div>
                 {nextStatuses.map((s) => (
                   <Button
                     key={s}

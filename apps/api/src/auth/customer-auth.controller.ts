@@ -71,6 +71,13 @@ export class CustomerAuthController {
     return this.service.updateProfile(user.sub, dto);
   }
 
+  @Get("me/loyalty")
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, CustomerGuard)
+  loyaltyHistory(@CurrentUser() user: RequestUser) {
+    return this.service.loyaltyHistory(user.sub);
+  }
+
   @Post("me/email/request-change")
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, CustomerGuard)

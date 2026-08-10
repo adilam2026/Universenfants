@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
   PackageSearch,
+  Boxes,
   Upload,
   ShoppingCart,
   Users,
@@ -49,6 +50,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
     group: "Catalogue",
     items: [
       { href: "/produits", label: "Produits", icon: PackageSearch, permission: "product.read" },
+      { href: "/stock", label: "Stock", icon: Boxes, permission: "product.read" },
       { href: "/categories", label: "Catégories", icon: FolderTree, permission: "product.read" },
       { href: "/marques", label: "Marques", icon: BadgeCheck, permission: "product.read" },
       { href: "/import", label: "Import Excel", icon: Upload, permission: "product.create" },

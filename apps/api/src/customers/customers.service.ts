@@ -31,7 +31,7 @@ export class CustomersService {
       where: { id },
       include: {
         orders: { orderBy: { createdAt: "desc" }, take: 20 },
-        loyaltyAccount: true,
+        loyaltyAccount: { include: { transactions: { orderBy: { createdAt: "desc" }, take: 50 } } },
         addresses: true,
       },
     });
