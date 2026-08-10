@@ -7,18 +7,21 @@ import { ProductForm } from "@/components/product-form";
 import { StockAdjustCard } from "@/components/stock-adjust-card";
 import { ProductImagesCard } from "@/components/product-images-card";
 import { ProductVariantsCard } from "@/components/product-variants-card";
+import { ProductUpsellsCard } from "@/components/product-upsells-card";
 import { Button } from "@/components/ui/button";
-import { getAdminProduct, type AdminProduct } from "@/lib/products";
+import { getAdminProduct, listProductUpsells, type AdminProduct, type UpsellEntry } from "@/lib/products";
 
 export default function EditProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const [product, setProduct] = useState<AdminProduct | null>(null);
+  const [upsells, setUpsells] = useState<UpsellEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     getAdminProduct(id)
       .then(setProduct)
       .catch((e) => setError(e instanceof Error ? e.message : "Produit introuvable"));
+    listProductUpsells(id).then(setUpsells);
   }, [id]);
 
   if (error) return <p className="text-sm text-destructive">{error}</p>;
@@ -40,6 +43,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
             variants={product.variants}
             onChanged={(variants) => setProduct((prev) => (prev ? { ...prev, variants } : prev))}
           />
+          <ProductUpsellsCard productId={product.id} upsells={upsells} onChanged={setUpsells} />
         </div>
         <div className="flex flex-col gap-5">
           <Button asChild variant="outline" className="w-full">

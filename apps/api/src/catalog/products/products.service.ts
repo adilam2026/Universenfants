@@ -206,7 +206,20 @@ export class ProductsService {
 
     const active = await this.pricing.getActivePromotions();
     const variants = product.variants.map((v) => this.toPublicShape(v));
-    return { ...this.toPublicShape(this.applyEffectivePricing(product, active)), variants, reviews: product.reviews, avgRating };
+
+    // Upsell/cross-sell réel (association manuelle produit → produit) —
+    // distinct des "produits similaires" affichés par ailleurs (simple
+    // requête par catégorie, sans relation dédiée).
+    const upsells = await this.prisma.upsell.findMany({
+      where: { mainProductId: product.id },
+      orderBy: { order: "asc" },
+      include: { suggestedProduct: { include: { images: { take: 1, orderBy: { order: "asc" } } } } },
+    });
+    const upsellProducts = upsells
+      .filter((u) => u.suggestedProduct.status === "ACTIVE")
+      .map((u) => this.toPublicShape(this.applyEffectivePricing(u.suggestedProduct, active)));
+
+    return { ...this.toPublicShape(this.applyEffectivePricing(product, active)), variants, reviews: product.reviews, avgRating, upsells: upsellProducts };
   }
 
   /** Ne renvoie jamais costPrice/reservedStock au Front — marge = donnée interne. */
@@ -690,6 +703,37 @@ export class ProductsService {
     }
     lines.sort((a, b) => b.value - a.value);
     return { totalValue, totalUnits, lines: lines.slice(0, 200) };
+  }
+
+  // ------------------------------------------------------------------
+  // Upsell / cross-sell (association manuelle produit → produit)
+  // ------------------------------------------------------------------
+
+  listUpsells(productId: string) {
+    return this.prisma.upsell.findMany({
+      where: { mainProductId: productId },
+      orderBy: { order: "asc" },
+      include: { suggestedProduct: { select: { id: true, nameFr: true, sku: true, images: { take: 1 } } } },
+    });
+  }
+
+  async addUpsell(productId: string, suggestedProductId: string, staffUserId: string) {
+    if (productId === suggestedProductId) throw new BadRequestException("Un produit ne peut pas se suggérer lui-même");
+    const suggested = await this.prisma.product.findUnique({ where: { id: suggestedProductId } });
+    if (!suggested) throw new NotFoundException("Produit suggéré introuvable");
+    await runCatchingDuplicate(
+      () => this.prisma.upsell.create({ data: { mainProductId: productId, suggestedProductId } }),
+      "Ce produit est déjà suggéré pour cette fiche",
+    );
+    await this.auditLog.record({ staffUserId, action: "upsell.create", entity: "Product", entityId: productId, newValue: { suggestedProductId } });
+    return this.listUpsells(productId);
+  }
+
+  async removeUpsell(productId: string, upsellId: string, staffUserId: string) {
+    const { count } = await this.prisma.upsell.deleteMany({ where: { id: upsellId, mainProductId: productId } });
+    if (count === 0) throw new NotFoundException("Association introuvable");
+    await this.auditLog.record({ staffUserId, action: "upsell.delete", entity: "Product", entityId: productId, oldValue: { upsellId } });
+    return this.listUpsells(productId);
   }
 
   // ------------------------------------------------------------------

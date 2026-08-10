@@ -103,16 +103,24 @@ export default async function ProductPage({ params }: PageProps<"/[locale]/produ
         <WriteReviewForm productId={product.id} />
       </section>
 
-      {similar.items.length > 0 && (
-        <section className="mt-12">
-          <h2 className="font-display text-xl font-extrabold mb-3.5">{t("similar")}</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3.5">
-            {similar.items.filter((p) => p.id !== product.id).slice(0, 4).map((p) => (
-              <ProductCard key={p.id} product={p} />
-            ))}
-          </div>
-        </section>
-      )}
+      {(() => {
+        // Upsell/cross-sell curé par l'admin (Produits associés) prime sur
+        // le repli par catégorie — plus pertinent qu'un simple "même
+        // catégorie" quand il a été configuré côté Back-Office.
+        const recommended = product.upsells.length > 0 ? product.upsells : similar.items.filter((p) => p.id !== product.id);
+        return (
+          recommended.length > 0 && (
+            <section className="mt-12">
+              <h2 className="font-display text-xl font-extrabold mb-3.5">{t("similar")}</h2>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3.5">
+                {recommended.slice(0, 4).map((p) => (
+                  <ProductCard key={p.id} product={p} />
+                ))}
+              </div>
+            </section>
+          )
+        );
+      })()}
     </div>
   );
 }

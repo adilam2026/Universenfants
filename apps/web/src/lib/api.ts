@@ -62,6 +62,7 @@ export interface ProductDetail extends ProductSummary {
   variants: { id: string; sku: string; label: string; price: string | null; stock: number; available: number; image: string | null }[];
   reviews: { id: string; rating: number; comment: string | null; createdAt: string }[];
   avgRating: number | null;
+  upsells: ProductSummary[];
 }
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
@@ -101,4 +102,42 @@ export function getProducts(params: Record<string, string | number | boolean | u
 
 export function getProductBySlug(slug: string) {
   return apiFetch<ProductDetail>(`/products/${slug}`);
+}
+
+export interface HeroBanner {
+  id: string;
+  titleFr: string;
+  titleAr: string | null;
+  subtitleFr: string | null;
+  subtitleAr: string | null;
+  imageDesktop: string;
+  imageMobile: string;
+  link: string | null;
+}
+
+export function getActiveHeroBanners() {
+  return apiFetch<HeroBanner[]>("/hero-banners/active");
+}
+
+export interface BundleItemView {
+  productId: string;
+  nameFr: string;
+  nameAr: string | null;
+  seoUrl: string;
+  image: string | null;
+  quantity: number;
+  unitPrice: number;
+}
+
+export interface Bundle {
+  id: string;
+  name: string;
+  bundlePrice: number;
+  individualTotal: number;
+  savings: number;
+  items: BundleItemView[];
+}
+
+export function getActiveBundles() {
+  return apiFetch<Bundle[]>("/bundles/active");
 }

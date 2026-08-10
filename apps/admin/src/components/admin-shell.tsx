@@ -14,6 +14,8 @@ import {
   Ticket,
   Star,
   Rocket,
+  Image as ImageIcon,
+  PackagePlus,
   Truck,
   LineChart,
   Settings,
@@ -72,6 +74,8 @@ const NAV: { group: string; items: NavItem[] }[] = [
       { href: "/coupons", label: "Coupons", icon: Ticket, permission: "coupon.create" },
       { href: "/avis", label: "Avis", icon: Star, permission: "product.update" },
       { href: "/landing-pages", label: "Landing Pages", icon: Rocket, permission: "promotion.create" },
+      { href: "/bannieres", label: "Bannières", icon: ImageIcon, permission: "promotion.create" },
+      { href: "/bundles", label: "Lots (bundles)", icon: PackagePlus, permission: "promotion.create" },
     ],
   },
   {

@@ -1,7 +1,7 @@
 import { Truck, Wallet, RotateCcw, Star, Gift, Cake, ArrowRight } from "lucide-react";
 import { getTranslations, getLocale } from "next-intl/server";
 import { setRequestLocale } from "next-intl/server";
-import { getCategoryTree, getProducts } from "@/lib/api";
+import { getCategoryTree, getProducts, getActiveHeroBanners } from "@/lib/api";
 import { localized } from "@/lib/localized";
 import { ProductCard } from "@/components/product-card";
 import { HeroCarousel } from "@/components/hero-carousel";
@@ -38,12 +38,15 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
   const tNav = await getTranslations("nav");
   const currentLocale = await getLocale();
 
-  const [categories, trending, promo, bestSellers, newest] = await Promise.all([
+  const [categories, trending, promo, bestSellers, newest, heroBanners] = await Promise.all([
     getCategoryTree(),
     getProducts({ sort: "newest", limit: 4 }),
     getProducts({ promoOnly: true, limit: 4 }),
     getProducts({ sort: "bestsellers", limit: 4 }),
     getProducts({ sort: "newest", limit: 4, page: 1 }),
+    // Pas de fallback statique nécessaire côté page : HeroCarousel retombe
+    // déjà sur ses slides codées en dur si aucune bannière n'est active.
+    getActiveHeroBanners().catch(() => []),
   ]);
 
   const AGE_TILES = [
@@ -56,7 +59,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
 
   return (
     <div className="mx-auto max-w-6xl px-4 md:px-7 py-3 flex flex-col gap-7">
-      <HeroCarousel />
+      <HeroCarousel banners={heroBanners} />
 
       <section className="grid grid-cols-2 md:grid-cols-4 gap-2">
         {[

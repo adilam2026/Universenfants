@@ -397,6 +397,13 @@
     "sharedNotFound": "Cette liste est introuvable.",
     "loading": "Chargement…"
   },
+  "bundles": {
+    "title": "🎁 Lots à composer",
+    "subtitle": "Des produits sélectionnés qui vont bien ensemble.",
+    "empty": "Aucun lot disponible pour le moment.",
+    "loading": "Chargement…",
+    "addAll": "Tout ajouter au panier"
+  },
   "notFoundPage": {
     "title": "Page introuvable",
     "description": "Cette page n'existe pas ou a été déplacée.",

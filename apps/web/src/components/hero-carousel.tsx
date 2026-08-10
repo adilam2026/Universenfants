@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useTranslations } from "next-intl";
+import Image from "next/image";
+import { useTranslations, useLocale } from "next-intl";
 import { Gift, Cake, Sparkles, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
+import { localized } from "@/lib/localized";
 import { cn } from "@/lib/utils";
+import type { HeroBanner } from "@/lib/api";
 
 interface Slide {
   key: "giftAdvisor" | "birthdayList" | "promotions";
@@ -35,14 +38,55 @@ const SLIDES: Slide[] = [
   },
 ];
 
-export function HeroCarousel() {
+/** Sans aucune bannière configurée dans le Back-Office (nouveau site, ou
+ * admin n'ayant pas encore rempli la section Bannières), la home retombe
+ * sur ces 3 cartes illustrées plutôt que d'afficher un espace vide. */
+export function HeroCarousel({ banners = [] }: { banners?: HeroBanner[] }) {
   const t = useTranslations("hero");
+  const locale = useLocale();
   const [index, setIndex] = useState(0);
+  const count = banners.length > 0 ? banners.length : SLIDES.length;
 
   useEffect(() => {
-    const id = setInterval(() => setIndex((i) => (i + 1) % SLIDES.length), 5000);
+    const id = setInterval(() => setIndex((i) => (i + 1) % count), 5000);
     return () => clearInterval(id);
-  }, []);
+  }, [count]);
+
+  if (banners.length > 0) {
+    return (
+      <div className="relative h-[250px] md:h-[340px] overflow-hidden rounded-3xl">
+        {banners.map((banner, i) => {
+          const title = localized(banner.titleFr, banner.titleAr, locale);
+          const subtitle = localized(banner.subtitleFr ?? "", banner.subtitleAr, locale);
+          const content = (
+            <div
+              className={cn(
+                "absolute inset-0 transition-opacity duration-700",
+                i === index ? "opacity-100" : "opacity-0 pointer-events-none",
+              )}
+            >
+              <Image src={banner.imageDesktop} alt={title} fill sizes="100vw" className="object-cover" priority={i === 0} />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+              <div className="relative z-10 h-full flex items-end px-6 md:px-12 pb-8 max-w-md text-white">
+                <div>
+                  <h1 className="font-display text-2xl md:text-4xl font-extrabold text-balance">{title}</h1>
+                  {subtitle && <p className="mt-2 text-sm text-white/90">{subtitle}</p>}
+                </div>
+              </div>
+            </div>
+          );
+          return banner.link ? (
+            <Link key={banner.id} href={banner.link} className="absolute inset-0">
+              {content}
+            </Link>
+          ) : (
+            <div key={banner.id}>{content}</div>
+          );
+        })}
+        <CarouselDots count={banners.length} index={index} onSelect={setIndex} t={t} />
+      </div>
+    );
+  }
 
   return (
     <div className="relative h-[250px] md:h-[340px] overflow-hidden rounded-3xl">
@@ -70,16 +114,32 @@ export function HeroCarousel() {
           </div>
         </div>
       ))}
-      <div className="absolute bottom-4 left-6 rtl:left-auto rtl:right-6 z-10 flex gap-1.5">
-        {SLIDES.map((slide, i) => (
-          <button
-            key={slide.key}
-            onClick={() => setIndex(i)}
-            aria-label={t("slideLabel", { n: i + 1 })}
-            className={cn("h-2 rounded-full bg-white/45 transition-all", i === index ? "w-5 bg-white" : "w-2")}
-          />
-        ))}
-      </div>
+      <CarouselDots count={SLIDES.length} index={index} onSelect={setIndex} t={t} />
+    </div>
+  );
+}
+
+function CarouselDots({
+  count,
+  index,
+  onSelect,
+  t,
+}: {
+  count: number;
+  index: number;
+  onSelect: (i: number) => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  return (
+    <div className="absolute bottom-4 left-6 rtl:left-auto rtl:right-6 z-10 flex gap-1.5">
+      {Array.from({ length: count }).map((_, i) => (
+        <button
+          key={i}
+          onClick={() => onSelect(i)}
+          aria-label={t("slideLabel", { n: i + 1 })}
+          className={cn("h-2 rounded-full bg-white/45 transition-all", i === index ? "w-5 bg-white" : "w-2")}
+        />
+      ))}
     </div>
   );
 }

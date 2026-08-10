@@ -177,4 +177,25 @@ export class ProductsController {
   removeVariant(@Param("id") id: string, @Param("variantId") variantId: string) {
     return this.service.removeVariant(id, variantId);
   }
+
+  @Get(":id/upsells")
+  @UseGuards(JwtAuthGuard, StaffGuard, PermissionsGuard)
+  @RequirePermissions(PermissionCode.PRODUCT_READ)
+  listUpsells(@Param("id") id: string) {
+    return this.service.listUpsells(id);
+  }
+
+  @Post(":id/upsells")
+  @UseGuards(JwtAuthGuard, StaffGuard, PermissionsGuard)
+  @RequirePermissions(PermissionCode.PRODUCT_UPDATE)
+  addUpsell(@Param("id") id: string, @Body() body: { suggestedProductId: string }, @CurrentUser() user: RequestUser) {
+    return this.service.addUpsell(id, body.suggestedProductId, user.sub);
+  }
+
+  @Delete(":id/upsells/:upsellId")
+  @UseGuards(JwtAuthGuard, StaffGuard, PermissionsGuard)
+  @RequirePermissions(PermissionCode.PRODUCT_UPDATE)
+  removeUpsell(@Param("id") id: string, @Param("upsellId") upsellId: string, @CurrentUser() user: RequestUser) {
+    return this.service.removeUpsell(id, upsellId, user.sub);
+  }
 }

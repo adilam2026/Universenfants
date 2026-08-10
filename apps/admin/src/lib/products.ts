@@ -168,3 +168,23 @@ export interface StockValuation {
 }
 
 export const getStockValuation = () => apiFetch<StockValuation>("/products/admin/stock-valuation");
+
+export interface ProductSearchResult {
+  id: string;
+  nameFr: string;
+  sku: string;
+}
+
+export const searchProducts = (q: string) =>
+  apiFetch<{ items: ProductSearchResult[] }>(`/products?q=${encodeURIComponent(q)}&limit=10`);
+
+export interface UpsellEntry {
+  id: string;
+  suggestedProduct: { id: string; nameFr: string; sku: string; images: { url: string }[] };
+}
+
+export const listProductUpsells = (productId: string) => apiFetch<UpsellEntry[]>(`/products/${productId}/upsells`);
+export const addProductUpsell = (productId: string, suggestedProductId: string) =>
+  apiFetch<UpsellEntry[]>(`/products/${productId}/upsells`, { method: "POST", body: JSON.stringify({ suggestedProductId }) });
+export const removeProductUpsell = (productId: string, upsellId: string) =>
+  apiFetch<UpsellEntry[]>(`/products/${productId}/upsells/${upsellId}`, { method: "DELETE" });

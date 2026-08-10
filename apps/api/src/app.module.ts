@@ -25,6 +25,8 @@ import { AnalyticsModule } from "./analytics/analytics.module";
 import { ReviewsModule } from "./reviews/reviews.module";
 import { LandingPagesModule } from "./landing-pages/landing-pages.module";
 import { StaffUsersModule } from "./staff-users/staff-users.module";
+import { HeroBannersModule } from "./hero-banners/hero-banners.module";
+import { BundlesModule } from "./bundles/bundles.module";
 import { SearchModule } from "./search/search.module";
 import { StorageModule } from "./storage/storage.module";
 import { EmailModule } from "./email/email.module";
@@ -67,6 +69,8 @@ import { EmailModule } from "./email/email.module";
     ReviewsModule,
     LandingPagesModule,
     StaffUsersModule,
+    HeroBannersModule,
+    BundlesModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
