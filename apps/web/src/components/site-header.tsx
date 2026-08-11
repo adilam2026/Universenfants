@@ -2,14 +2,26 @@
 
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
-import { Menu, Search, ShoppingBag, User, X, Gift, Cake, Tag, Mail, Languages, Heart } from "lucide-react";
+import { Menu, Search, ShoppingBag, User, X, Gift, Cake, Tag, Mail, Languages, Heart, BookOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCartCount } from "@/hooks/use-cart";
 import { useStoreSettings } from "@/hooks/use-store-settings";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { SearchForm, SearchFormFallback } from "@/components/search-form";
+import { localized } from "@/lib/localized";
+import type { Category } from "@/lib/api";
 
-export function SiteHeader() {
+const CATEGORY_EMOJI: Record<string, string> = {
+  construction: "🧱",
+  poupees: "🎀",
+  educatifs: "🧩",
+  societe: "🎲",
+  "plein-air": "⚽",
+  bebe: "🍼",
+  scolaire: "🎒",
+};
+
+export function SiteHeader({ categories = [] }: { categories?: Category[] }) {
   const t = useTranslations();
   const locale = useLocale();
   const pathname = usePathname();
@@ -77,6 +89,7 @@ export function SiteHeader() {
     { label: t("nav.promotions"), href: "/recherche?promo=1", icon: Tag, accent: true },
     { label: t("nav.giftAdvisor"), href: "/conseiller-cadeau", icon: Gift, brand: true },
     { label: t("nav.birthdayList"), href: "/liste-anniversaire", icon: Cake, brand: true },
+    { label: t("nav.guides"), href: "/guides", icon: BookOpen },
     { label: t("wishlist.title"), href: "/favoris", icon: Heart },
     { label: t("nav.myAccount"), href: "/compte", icon: User },
     { label: t("nav.contact"), href: "/pages/contact", icon: Mail },
@@ -172,6 +185,28 @@ export function SiteHeader() {
               </Link>
             ))}
           </nav>
+
+          {/* Accès rapide aux univers (catégories) — mobile uniquement.
+              Auparavant, sur mobile, atteindre une catégorie demandait soit
+              d'ouvrir le tiroir latéral (générique, pas la vraie liste de
+              catégories), soit de revenir à l'accueil et scroller jusqu'à
+              "Explorer par univers". Cette rangée réplique cet accès
+              directement sous la barre âge/Tous les jouets, visible sur
+              toutes les pages, sans ouvrir aucun menu. */}
+          {categories.length > 0 && (
+            <nav className="md:hidden flex gap-2 overflow-x-auto pb-2.5 -mt-1 [scrollbar-width:none]">
+              {categories.map((cat) => (
+                <Link
+                  key={cat.id}
+                  href={`/categorie/${cat.slug}`}
+                  className="shrink-0 flex items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-card px-3 py-1.5 text-xs font-bold text-muted-foreground hover:border-primary hover:text-primary"
+                >
+                  <span aria-hidden>{cat.image ?? CATEGORY_EMOJI[cat.slug] ?? "🧸"}</span>
+                  {localized(cat.nameFr, cat.nameAr, locale)}
+                </Link>
+              ))}
+            </nav>
+          )}
         </div>
       </header>
 

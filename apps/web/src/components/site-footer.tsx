@@ -13,6 +13,7 @@ export function SiteFooter() {
         { label: t("catalog"), href: "/recherche" },
         { label: t("promotions"), href: "/recherche?promo=1" },
         { label: t("newArrivals"), href: "/recherche?sort=newest" },
+        { label: t("guides"), href: "/guides" },
       ],
     },
     {

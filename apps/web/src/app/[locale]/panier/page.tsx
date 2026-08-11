@@ -22,12 +22,13 @@ function dh(value: number) {
 // plus rien à voir avec "il ne manque que X DH" — la fenêtre de prix reste
 // centrée sur le montant restant, jamais une simple liste de produits au
 // hasard qui donnerait une impression de vente forcée.
-function FreeShippingProgress({ subtotal, threshold }: { subtotal: number; threshold: number }) {
+function FreeShippingProgress({ subtotal, threshold, cartProductIds }: { subtotal: number; threshold: number; cartProductIds: string[] }) {
   const t = useTranslations("cart");
   const [suggestions, setSuggestions] = useState<ProductSummary[] | null>(null);
   const remaining = threshold - subtotal;
   const reached = remaining <= 0;
   const progress = Math.min(100, Math.round((subtotal / threshold) * 100));
+  const cartIdsKey = cartProductIds.join(",");
 
   useEffect(() => {
     if (reached) {
@@ -35,9 +36,12 @@ function FreeShippingProgress({ subtotal, threshold }: { subtotal: number; thres
       return;
     }
     let cancelled = false;
-    getProducts({ priceMin: Math.max(0, remaining - 50), priceMax: remaining + 150, inStockOnly: true, limit: 3 })
+    // limit: 6 plutôt que 3 — on filtre ensuite les produits déjà présents
+    // dans le panier (les suggérer à nouveau n'aide pas à franchir le seuil,
+    // l'utilisateur en a déjà pris la quantité qu'il voulait).
+    getProducts({ priceMin: Math.max(0, remaining - 50), priceMax: remaining + 150, inStockOnly: true, limit: 6 })
       .then((data) => {
-        if (!cancelled) setSuggestions(data.items);
+        if (!cancelled) setSuggestions(data.items.filter((p) => !cartProductIds.includes(p.id)).slice(0, 3));
       })
       .catch(() => {
         if (!cancelled) setSuggestions(null);
@@ -45,7 +49,8 @@ function FreeShippingProgress({ subtotal, threshold }: { subtotal: number; thres
     return () => {
       cancelled = true;
     };
-  }, [remaining, reached]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remaining, reached, cartIdsKey]);
 
   return (
     <div className="rounded-2xl border border-border bg-card p-3.5 mb-4">
@@ -231,7 +236,13 @@ function CartPageContent() {
         </div>
       ) : (
         <>
-          {freeShippingThreshold !== null && <FreeShippingProgress subtotal={cart.subtotal} threshold={freeShippingThreshold} />}
+          {freeShippingThreshold !== null && (
+            <FreeShippingProgress
+              subtotal={cart.subtotal}
+              threshold={freeShippingThreshold}
+              cartProductIds={cart.lines.map((l) => l.productId)}
+            />
+          )}
           <div className="grid md:grid-cols-[1fr_320px] gap-7">
           <div className="flex flex-col gap-3">
             <div className="rounded-2xl border border-border divide-y divide-border overflow-hidden bg-card">

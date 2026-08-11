@@ -26,6 +26,7 @@
     "toysByUniverse": "Jouets par univers",
     "giftAdvisor": "Conseiller Cadeau",
     "birthdayList": "Liste anniversaire",
+    "guides": "Guides & conseils",
     "myAccount": "Mon compte",
     "contact": "Contact",
     "menu": "Menu",
@@ -41,6 +42,7 @@
     "catalog": "Catalogue",
     "promotions": "Promotions",
     "newArrivals": "Nouveautés",
+    "guides": "Guides & conseils",
     "help": "Aide",
     "faq": "FAQ",
     "shipping": "Livraison",
@@ -434,5 +436,16 @@
     "title": "Page introuvable",
     "description": "Cette page n'existe pas ou a été déplacée.",
     "cta": "Retour à l'accueil"
+  },
+  "guides": {
+    "title": "Guides & conseils",
+    "subtitle": "Des repères concrets pour bien choisir, jouer ensemble et éviter les pièges classiques — pas de fiches produit recopiées.",
+    "metaTitle": "Guides & conseils pour parents",
+    "metaDescription": "Conseils pratiques pour choisir le bon jouet, jouer avec son enfant et bien préparer chaque étape.",
+    "readTime": "{n, plural, one {# min de lecture} other {# min de lecture}}",
+    "ctaGiftAdvisor": "Essayer le Conseiller Cadeau",
+    "allGuides": "Tous les guides",
+    "homeSectionTitle": "Idées et conseils pour jouer avec eux",
+    "homeSectionSubtitle": "Parce que le meilleur jouet ne suffit pas toujours — quelques repères simples pour bien choisir et bien jouer ensemble."
   }
 }

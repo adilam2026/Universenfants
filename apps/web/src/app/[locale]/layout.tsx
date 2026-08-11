@@ -4,6 +4,7 @@ import { NextIntlClientProvider, hasLocale } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import "../globals.css";
 import { routing } from "@/i18n/routing";
+import { getCategoryTree } from "@/lib/api";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 
@@ -37,12 +38,17 @@ export default async function LocaleLayout({
 
   setRequestLocale(locale);
   const dir = locale === "ar" ? "rtl" : "ltr";
+  // Mis en cache 60s (voir apiFetch) et partagé par toutes les pages du
+  // layout : le coût réseau de ce fetch supplémentaire est négligeable,
+  // il sert la barre de catégories rapide du header mobile (accès direct
+  // aux univers depuis n'importe quelle page, pas seulement l'accueil).
+  const categories = await getCategoryTree().catch(() => []);
 
   return (
     <html lang={locale} dir={dir} className={`h-full antialiased ${fontVars}`}>
       <body className="min-h-full flex flex-col font-sans">
         <NextIntlClientProvider>
-          <SiteHeader />
+          <SiteHeader categories={categories} />
           <main className="flex-1 pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0">{children}</main>
           <SiteFooter />
         </NextIntlClientProvider>

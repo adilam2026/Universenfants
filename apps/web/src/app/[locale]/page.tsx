@@ -3,6 +3,7 @@ import { getTranslations, getLocale } from "next-intl/server";
 import { setRequestLocale } from "next-intl/server";
 import { getCategoryTree, getProducts, getActiveHeroBanners, getActiveBrands } from "@/lib/api";
 import { localized } from "@/lib/localized";
+import { GUIDES } from "@/lib/guides-content";
 import { ProductCard } from "@/components/product-card";
 import { HeroCarousel } from "@/components/hero-carousel";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
   setRequestLocale(locale);
   const t = await getTranslations("home");
   const tNav = await getTranslations("nav");
+  const tGuides = await getTranslations("guides");
   const currentLocale = await getLocale();
 
   const [categories, brands, trending, promo, bestSellers, newest, heroBanners] = await Promise.all([
@@ -55,7 +57,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
     { key: "age3to5", label: tNav("age3to5"), emoji: "🧸", min: 3, max: 5 },
     { key: "age6to8", label: tNav("age6to8"), emoji: "🧩", min: 6, max: 8 },
     { key: "age9to12", label: tNav("age9to12"), emoji: "🚲", min: 9, max: 12 },
-    { key: "age12plus", label: tNav("age12plus"), emoji: "🎮", min: 12, max: undefined },
+    { key: "age12plus", label: tNav("age12plus"), emoji: "🎯", min: 12, max: undefined },
   ];
 
   return (
@@ -166,6 +168,40 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
         <Button asChild variant="cta" size="sm">
           <Link href="/liste-anniversaire">{t("birthdayBannerButton")}</Link>
         </Button>
+      </section>
+
+      {/* Le parent comme acteur du jeu, pas seulement acheteur : une seule
+          rangée de 3 guides (pas un carrousel promotionnel supplémentaire)
+          entre les bannières d'aide à la décision et les blocs commerciaux
+          — volontairement léger pour ne pas alourdir l'accueil. */}
+      <section>
+        <SectionTitle title={tGuides("homeSectionTitle")} href="/guides" seeAll={t("seeAll")} />
+        <p className="text-xs text-muted-foreground -mt-2.5 mb-3.5">{tGuides("homeSectionSubtitle")}</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {GUIDES.slice(0, 3).map((guide) => {
+            const content = guide[currentLocale === "ar" ? "ar" : "fr"];
+            return (
+              <Link
+                key={guide.slug}
+                href={`/guides/${guide.slug}`}
+                className="group flex items-center gap-3 rounded-2xl border border-border bg-card p-3 hover:border-primary transition-colors"
+              >
+                <span
+                  className="flex size-14 shrink-0 items-center justify-center rounded-xl text-2xl"
+                  style={{ background: guide.gradient }}
+                >
+                  {guide.emoji}
+                </span>
+                <span className="flex flex-col gap-0.5 min-w-0">
+                  <span className="font-display font-extrabold text-xs leading-snug line-clamp-2 group-hover:text-primary">
+                    {content.title}
+                  </span>
+                  <span className="text-[11px] text-muted-foreground">{tGuides("readTime", { n: content.readMinutes })}</span>
+                </span>
+              </Link>
+            );
+          })}
+        </div>
       </section>
 
       <section>
