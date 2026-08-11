@@ -259,6 +259,10 @@ function ProductPicker({
     e.preventDefault();
     const requestId = ++requestIdRef.current;
     setLoading(true);
+    // Sans ce reset, les anciens résultats restent affichés (et leurs boutons
+    // "Ajouter" cliquables) pendant que la nouvelle recherche est en vol : un
+    // clic dans cette fenêtre ajoute le produit de la recherche précédente.
+    setResults(null);
     try {
       const data = await getProducts({ q: query || undefined, limit: 6 });
       if (requestId !== requestIdRef.current) return;
@@ -289,7 +293,7 @@ function ProductPicker({
           {results.map((p) => (
             <div key={p.id} className="flex items-center justify-between gap-2 text-sm">
               <span className="truncate">{localized(p.nameFr, p.nameAr, locale)}</span>
-              <Button size="sm" variant="outline" disabled={adding} onClick={() => onPick(p.id)}>{t("add")}</Button>
+              <Button size="sm" variant="outline" disabled={adding || loading} onClick={() => onPick(p.id)}>{t("add")}</Button>
             </div>
           ))}
         </div>
