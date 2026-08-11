@@ -8,7 +8,7 @@ import { Link, useRouter } from "@/i18n/navigation";
 import { localized } from "@/lib/localized";
 import { cn } from "@/lib/utils";
 
-const SORT_VALUES = ["relevance", "price_asc", "price_desc", "bestsellers", "newest"] as const;
+const SORT_VALUES = ["relevance", "price_asc", "price_desc", "bestsellers", "rating", "newest"] as const;
 
 const AGE_RANGES: { label: string; ageMin?: number; ageMax?: number }[] = [
   { label: "0-2", ageMin: 0, ageMax: 2 },
@@ -80,6 +80,11 @@ interface FilterCategory {
   children?: FilterCategory[];
 }
 
+interface FilterBrand {
+  slug: string;
+  name: string;
+}
+
 function useFilterParams() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -99,9 +104,11 @@ function useFilterParams() {
 function FilterContent({
   activeSlug,
   categories,
+  brands,
 }: {
   activeSlug?: string;
   categories: FilterCategory[];
+  brands: FilterBrand[];
 }) {
   const t = useTranslations("filters");
   const locale = useLocale();
@@ -111,6 +118,7 @@ function FilterContent({
   const activeAgeMax = searchParams.get("ageMax");
   const activePriceMin = searchParams.get("priceMin");
   const activePriceMax = searchParams.get("priceMax");
+  const activeBrand = searchParams.get("brand");
   const inStockOnly = searchParams.get("inStock") === "1";
   const promoOnly = searchParams.get("promo") === "1";
 
@@ -199,6 +207,27 @@ function FilterContent({
           })}
         </div>
       </div>
+      {brands.length > 0 && (
+        <div className="border-t border-border pt-4">
+          <h4 className="text-sm font-bold mb-2.5">{t("brand")}</h4>
+          <div className="flex flex-wrap gap-1.5">
+            {brands.map((b) => {
+              const active = activeBrand === b.slug;
+              return (
+                <button
+                  key={b.slug}
+                  type="button"
+                  onClick={() => updateParams({ brand: active ? undefined : b.slug })}
+                  className={chipClass(active)}
+                >
+                  {active && <Check className="size-3" />}
+                  {b.name}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
       <div className="border-t border-border pt-4">
         <h4 className="text-sm font-bold mb-2.5">{t("availability")}</h4>
         <button
@@ -228,7 +257,15 @@ function FilterContent({
   );
 }
 
-export function FilterSidebar({ activeSlug, categories }: { activeSlug?: string; categories: { slug: string; nameFr: string; nameAr?: string | null; image: string | null }[] }) {
+export function FilterSidebar({
+  activeSlug,
+  categories,
+  brands = [],
+}: {
+  activeSlug?: string;
+  categories: { slug: string; nameFr: string; nameAr?: string | null; image: string | null }[];
+  brands?: FilterBrand[];
+}) {
   const t = useTranslations("filters");
   const tNav = useTranslations("nav");
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -255,7 +292,7 @@ export function FilterSidebar({ activeSlug, categories }: { activeSlug?: string;
   return (
     <>
       <aside className="hidden md:block w-60 xl:w-64 shrink-0">
-        <FilterContent activeSlug={activeSlug} categories={categories} />
+        <FilterContent activeSlug={activeSlug} categories={categories} brands={brands} />
       </aside>
 
       <div
@@ -285,7 +322,7 @@ export function FilterSidebar({ activeSlug, categories }: { activeSlug?: string;
             <X className="size-5" />
           </button>
         </div>
-        <FilterContent activeSlug={activeSlug} categories={categories} />
+        <FilterContent activeSlug={activeSlug} categories={categories} brands={brands} />
       </aside>
     </>
   );
@@ -316,6 +353,7 @@ function countActiveFilters(searchParams: URLSearchParams) {
   if (searchParams.get("priceMin") !== null || searchParams.get("priceMax") !== null) count++;
   if (searchParams.get("inStock") === "1") count++;
   if (searchParams.get("promo") === "1") count++;
+  if (searchParams.get("brand") !== null) count++;
   return count;
 }
 
@@ -323,7 +361,7 @@ function countActiveFilters(searchParams: URLSearchParams) {
 // elle, retirer un seul filtre (ex: juste le prix, en gardant l'âge) obligeait
 // à rouvrir tout le panneau et à deviner lequel était actif — chaque filtre
 // n'avait aucun état visible en dehors de son propre contrôle.
-export function ActiveFiltersBar() {
+export function ActiveFiltersBar({ brands = [] }: { brands?: FilterBrand[] }) {
   const t = useTranslations("filters");
   const { searchParams, updateParams } = useFilterParams();
 
@@ -331,6 +369,7 @@ export function ActiveFiltersBar() {
   const ageMax = searchParams.get("ageMax");
   const priceMin = searchParams.get("priceMin");
   const priceMax = searchParams.get("priceMax");
+  const brand = searchParams.get("brand");
   const inStockOnly = searchParams.get("inStock") === "1";
   const promoOnly = searchParams.get("promo") === "1";
 
@@ -342,6 +381,10 @@ export function ActiveFiltersBar() {
   if (priceMin !== null || priceMax !== null) {
     const range = PRICE_RANGES.find((r) => String(r.priceMin ?? "") === (priceMin ?? "") && String(r.priceMax ?? "") === (priceMax ?? ""));
     pills.push({ key: "price", label: `${t("price")} : ${range?.label ?? `${priceMin ?? "0"}-${priceMax ?? "+"} DH`}`, clear: { priceMin: undefined, priceMax: undefined } });
+  }
+  if (brand !== null) {
+    const brandName = brands.find((b) => b.slug === brand)?.name ?? brand;
+    pills.push({ key: "brand", label: `${t("brand")} : ${brandName}`, clear: { brand: undefined } });
   }
   if (inStockOnly) pills.push({ key: "inStock", label: t("inStockOnly"), clear: { inStock: undefined } });
   if (promoOnly) pills.push({ key: "promo", label: t("promotionsOnly"), clear: { promo: undefined } });
@@ -363,7 +406,17 @@ export function ActiveFiltersBar() {
       ))}
       <button
         type="button"
-        onClick={() => updateParams({ ageMin: undefined, ageMax: undefined, priceMin: undefined, priceMax: undefined, inStock: undefined, promo: undefined })}
+        onClick={() =>
+          updateParams({
+            ageMin: undefined,
+            ageMax: undefined,
+            priceMin: undefined,
+            priceMax: undefined,
+            brand: undefined,
+            inStock: undefined,
+            promo: undefined,
+          })
+        }
         className="text-xs font-bold text-muted-foreground hover:text-destructive underline underline-offset-2"
       >
         {t("resetAll")}

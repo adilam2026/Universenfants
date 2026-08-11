@@ -156,6 +156,21 @@ export class ProductsService {
       if (bestsellerIds.length > 0) where.id = { in: bestsellerIds };
     }
 
+    // "Mieux notés" : contrairement aux ventes ci-dessus, un produit sans
+    // aucun avis ne doit pas disparaître du catalogue — seulement passer
+    // après les produits notés (ratingMap.get() renvoie undefined pour lui,
+    // traité comme la pire note possible dans le tri ci-dessous). D'où
+    // l'absence de tout `where.id` restreint ici, contrairement à bestsellers.
+    let ratingMap: Map<string, number> | null = null;
+    if (query.sort === "rating") {
+      const grouped = await this.prisma.review.groupBy({
+        by: ["productId"],
+        where: { status: "APPROVED" },
+        _avg: { rating: true },
+      });
+      ratingMap = new Map(grouped.map((g) => [g.productId, g._avg.rating ?? 0]));
+    }
+
     const orderBy: Prisma.ProductOrderByWithRelationInput =
       query.sort === "price_asc"
         ? { price: "asc" }
@@ -165,7 +180,8 @@ export class ProductsService {
 
     const useRelevanceOrder = rankedIds && rankedIds.length > 0 && (!query.sort || query.sort === "relevance");
     const useBestsellerOrder = query.sort === "bestsellers" && bestsellerIds !== null && bestsellerIds.length > 0;
-    const useCustomOrder = useRelevanceOrder || useBestsellerOrder;
+    const useRatingOrder = query.sort === "rating" && ratingMap !== null;
+    const useCustomOrder = useRelevanceOrder || useBestsellerOrder || useRatingOrder;
 
     const [items, total] = await this.prisma.$transaction([
       this.prisma.product.findMany({
@@ -197,6 +213,15 @@ export class ProductsService {
     if (useRelevanceOrder || useBestsellerOrder) {
       const order = new Map((useBestsellerOrder ? bestsellerIds! : rankedIds!).map((id, i) => [id, i]));
       ranked = [...items].sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
+      ranked = ranked.slice((page - 1) * limit, (page - 1) * limit + limit);
+    } else if (useRatingOrder) {
+      // Note absente = triée après tous les produits notés (0 est en dehors
+      // de l'échelle 1-5), à date de création décroissante en second critère
+      // pour un ordre stable entre produits à égalité.
+      ranked = [...items].sort((a, b) => {
+        const diff = (ratingMap!.get(b.id) ?? 0) - (ratingMap!.get(a.id) ?? 0);
+        return diff !== 0 ? diff : b.createdAt.getTime() - a.createdAt.getTime();
+      });
       ranked = ranked.slice((page - 1) * limit, (page - 1) * limit + limit);
     }
 

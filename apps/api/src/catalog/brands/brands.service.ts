@@ -22,6 +22,19 @@ export class BrandsService {
     });
   }
 
+  // Route publique (filtre "Marque" du catalogue) — seulement les marques
+  // actives ayant au moins un produit actif : lister une marque archivée ou
+  // sans aucun produit visible donnerait un filtre qui ne renvoie jamais
+  // rien une fois sélectionné.
+  async listActive() {
+    const brands = await this.prisma.brand.findMany({
+      where: { status: "ACTIVE", products: { some: { status: "ACTIVE" } } },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, slug: true },
+    });
+    return brands;
+  }
+
   async create(dto: UpsertBrandDto, staffUserId: string) {
     const created = await runCatchingDuplicate(
       () => this.prisma.brand.create({ data: dto }),

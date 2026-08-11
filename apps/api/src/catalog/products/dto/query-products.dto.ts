@@ -17,10 +17,10 @@ export class QueryProductsDto {
   @IsIn(["BOY", "GIRL", "UNISEX"])
   gender?: "BOY" | "GIRL" | "UNISEX";
 
-  @ApiPropertyOptional({ enum: ["relevance", "price_asc", "price_desc", "newest", "bestsellers"] })
+  @ApiPropertyOptional({ enum: ["relevance", "price_asc", "price_desc", "newest", "bestsellers", "rating"] })
   @IsOptional()
-  @IsIn(["relevance", "price_asc", "price_desc", "newest", "bestsellers"])
-  sort?: "relevance" | "price_asc" | "price_desc" | "newest" | "bestsellers";
+  @IsIn(["relevance", "price_asc", "price_desc", "newest", "bestsellers", "rating"])
+  sort?: "relevance" | "price_asc" | "price_desc" | "newest" | "bestsellers" | "rating";
 
   @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number = 1;
   @ApiPropertyOptional() @IsOptional() @Type(() => Number) @IsInt() @Min(1) limit?: number = 24;

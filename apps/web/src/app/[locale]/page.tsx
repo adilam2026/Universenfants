@@ -1,7 +1,7 @@
 import { Truck, Wallet, RotateCcw, Star, Gift, Cake, ArrowRight } from "lucide-react";
 import { getTranslations, getLocale } from "next-intl/server";
 import { setRequestLocale } from "next-intl/server";
-import { getCategoryTree, getProducts, getActiveHeroBanners } from "@/lib/api";
+import { getCategoryTree, getProducts, getActiveHeroBanners, getActiveBrands } from "@/lib/api";
 import { localized } from "@/lib/localized";
 import { ProductCard } from "@/components/product-card";
 import { HeroCarousel } from "@/components/hero-carousel";
@@ -38,8 +38,9 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
   const tNav = await getTranslations("nav");
   const currentLocale = await getLocale();
 
-  const [categories, trending, promo, bestSellers, newest, heroBanners] = await Promise.all([
+  const [categories, brands, trending, promo, bestSellers, newest, heroBanners] = await Promise.all([
     getCategoryTree(),
+    getActiveBrands().catch(() => []),
     getProducts({ sort: "newest", limit: 4 }),
     getProducts({ promoOnly: true, limit: 4 }),
     getProducts({ sort: "bestsellers", limit: 4 }),
@@ -88,6 +89,34 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
               {tile.label}
             </Link>
           ))}
+        </div>
+      </section>
+
+      {/* "Explorer par univers" remonté juste sous la recherche par âge — la
+          plupart des visiteurs choisissent une direction de navigation (une
+          catégorie) avant tout, l'ancienne position (tout en bas de la
+          page) obligeait à faire défiler la quasi-totalité de l'accueil
+          pour l'atteindre. Ça sert aussi de raccourci catégories immédiat
+          sur mobile, juste sous la barre "Tous les jouets / âges" du
+          header, plutôt que de dépendre uniquement du tiroir latéral. */}
+      <section>
+        <SectionTitle title={t("exploreCategories")} seeAll={t("seeAll")} />
+        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2.5">
+          {categories.map((cat) => {
+            const style = CATEGORY_STYLE[cat.slug] ?? { gradient: "linear-gradient(150deg, var(--primary), var(--brand-primary-strong))", motif: "🧸" };
+            return (
+              <Link
+                key={cat.id}
+                href={`/categorie/${cat.slug}`}
+                className="relative flex aspect-[10/9] flex-col justify-end overflow-hidden rounded-2xl p-3 text-white shadow-sm"
+                style={{ background: style.gradient }}
+              >
+                <span className="absolute -bottom-2.5 -right-1.5 rtl:right-auto rtl:-left-1.5 rotate-[-8deg] text-5xl opacity-20">{style.motif}</span>
+                <span className="relative z-10 text-lg">{cat.image ?? style.motif}</span>
+                <span className="relative z-10 text-xs font-extrabold text-balance">{localized(cat.nameFr, cat.nameAr, currentLocale)}</span>
+              </Link>
+            );
+          })}
         </div>
       </section>
 
@@ -178,37 +207,22 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
         </Button>
       </section>
 
-      <section>
-        <SectionTitle title={t("exploreCategories")} seeAll={t("seeAll")} />
-        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2.5">
-          {categories.map((cat) => {
-            const style = CATEGORY_STYLE[cat.slug] ?? { gradient: "linear-gradient(150deg, var(--primary), var(--brand-primary-strong))", motif: "🧸" };
-            return (
+      {brands.length > 0 && (
+        <section>
+          <SectionTitle title={t("ourBrands")} seeAll={t("seeAll")} />
+          <div className="grid grid-cols-4 gap-2.5">
+            {brands.slice(0, 8).map((b) => (
               <Link
-                key={cat.id}
-                href={`/categorie/${cat.slug}`}
-                className="relative flex aspect-[10/9] flex-col justify-end overflow-hidden rounded-2xl p-3 text-white shadow-sm"
-                style={{ background: style.gradient }}
+                key={b.id}
+                href={`/recherche?brand=${b.slug}`}
+                className="flex items-center justify-center rounded-xl border border-border bg-card p-4 font-display font-extrabold text-muted-foreground text-sm hover:border-primary hover:text-primary transition-colors"
               >
-                <span className="absolute -bottom-2.5 -right-1.5 rtl:right-auto rtl:-left-1.5 rotate-[-8deg] text-5xl opacity-20">{style.motif}</span>
-                <span className="relative z-10 text-lg">{cat.image ?? style.motif}</span>
-                <span className="relative z-10 text-xs font-extrabold text-balance">{localized(cat.nameFr, cat.nameAr, currentLocale)}</span>
+                {b.name}
               </Link>
-            );
-          })}
-        </div>
-      </section>
-
-      <section>
-        <SectionTitle title={t("ourBrands")} seeAll={t("seeAll")} />
-        <div className="grid grid-cols-4 gap-2.5">
-          {["LEGO", "Barbie", "Fisher-Price", "Hot Wheels", "VTech", "Playmobil", "Chicco", "Clairefontaine"].map((b) => (
-            <div key={b} className="flex items-center justify-center rounded-xl border border-border bg-card p-4 font-display font-extrabold text-muted-foreground text-sm">
-              {b}
-            </div>
-          ))}
-        </div>
-      </section>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

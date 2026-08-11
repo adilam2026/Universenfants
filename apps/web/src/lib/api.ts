@@ -119,6 +119,16 @@ export function getActiveHeroBanners() {
   return apiFetch<HeroBanner[]>("/hero-banners/active");
 }
 
+export interface Brand {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+export function getActiveBrands() {
+  return apiFetch<Brand[]>("/brands/active");
+}
+
 export interface BundleItemView {
   productId: string;
   nameFr: string;

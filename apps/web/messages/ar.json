@@ -121,8 +121,10 @@
       "price_asc": "السعر تصاعدي",
       "price_desc": "السعر تنازلي",
       "bestsellers": "الأكثر مبيعاً",
-      "newest": "وصل حديثاً"
-    }
+      "newest": "وصل حديثاً",
+      "rating": "الأعلى تقييماً"
+    },
+    "brand": "الماركة"
   },
   "search": {
     "title": "🧸 جميع الألعاب",
@@ -188,6 +190,9 @@
     "shipping": "التوصيل",
     "shippingTbd": "تُحسب في الخطوة التالية",
     "free": "مجاني",
+    "freeShippingRemaining": "ينقصك {amount} فقط للحصول على توصيل مجاني!",
+    "freeShippingReached": "التوصيل المجاني مكتسب!",
+    "freeShippingSuggestions": "للوصول إليه:",
     "total": "المجموع",
     "vatIncluded": "شامل ضريبة القيمة المضافة {rate}%: {amount}",
     "checkout": "إتمام الطلب",
@@ -346,6 +351,7 @@
     "age": "العمر",
     "budget": "الميزانية",
     "occasion": "المناسبة",
+    "optional": "اختياري",
     "birthday": "عيد ميلاد",
     "birth": "مولود جديد",
     "eid": "العيد",

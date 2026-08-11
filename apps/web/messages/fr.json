@@ -121,8 +121,10 @@
       "price_asc": "Prix croissant",
       "price_desc": "Prix décroissant",
       "bestsellers": "Meilleures ventes",
-      "newest": "Nouveautés"
-    }
+      "newest": "Nouveautés",
+      "rating": "Mieux notés"
+    },
+    "brand": "Marque"
   },
   "search": {
     "title": "🧸 Tous les jouets",
@@ -188,6 +190,9 @@
     "shipping": "Livraison",
     "shippingTbd": "Calculée à l'étape suivante",
     "free": "Offerte",
+    "freeShippingRemaining": "Plus que {amount} pour la livraison gratuite !",
+    "freeShippingReached": "Livraison gratuite acquise !",
+    "freeShippingSuggestions": "Pour l'atteindre :",
     "total": "Total",
     "vatIncluded": "dont TVA {rate}% incluse : {amount}",
     "checkout": "Passer la commande",
@@ -346,6 +351,7 @@
     "age": "Âge",
     "budget": "Budget",
     "occasion": "Occasion",
+    "optional": "facultatif",
     "birthday": "Anniversaire",
     "birth": "Naissance",
     "eid": "Aïd",

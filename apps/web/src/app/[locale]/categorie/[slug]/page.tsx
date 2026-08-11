@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getTranslations, getLocale, setRequestLocale } from "next-intl/server";
-import { getCategoryTree, getProducts, type Category } from "@/lib/api";
+import { getCategoryTree, getActiveBrands, getProducts, type Category } from "@/lib/api";
 import { localized } from "@/lib/localized";
 import { ProductCard } from "@/components/product-card";
 import { FilterSidebar, SortSelect, MobileFilterButton, ActiveFiltersBar } from "@/components/product-filters";
@@ -53,6 +53,7 @@ export default async function CategoryPage({
   const ageMax = typeof sp.ageMax === "string" ? Number(sp.ageMax) : undefined;
   const priceMin = typeof sp.priceMin === "string" ? Number(sp.priceMin) : undefined;
   const priceMax = typeof sp.priceMax === "string" ? Number(sp.priceMax) : undefined;
+  const brand = typeof sp.brand === "string" ? sp.brand : undefined;
   const promoOnly = sp.promo === "1" ? true : undefined;
   const inStockOnly = sp.inStock === "1" ? true : undefined;
   const t = await getTranslations("category");
@@ -66,9 +67,10 @@ export default async function CategoryPage({
   // production, l'API et la base ne vivant pas dans la même région que le
   // frontend (voir FETCH_TIMEOUT_MS ci-dessus, déjà relevé pour la même
   // raison). `/recherche` applique déjà ce même pattern.
-  const [categories, results] = await Promise.all([
+  const [categories, brands, results] = await Promise.all([
     getCategoryTree(),
-    getProducts({ category: slug, sort: sort as never, ageMin, ageMax, priceMin, priceMax, promoOnly, inStockOnly }),
+    getActiveBrands(),
+    getProducts({ category: slug, sort: sort as never, ageMin, ageMax, priceMin, priceMax, brand, promoOnly, inStockOnly }),
   ]);
   const current = findCategory(categories, slug);
   if (!current) notFound();
@@ -80,7 +82,7 @@ export default async function CategoryPage({
         {current.image} {localized(current.nameFr, current.nameAr, currentLocale)}
       </h1>
       <div className="flex gap-7 xl:gap-10">
-        <FilterSidebar activeSlug={slug} categories={categories} />
+        <FilterSidebar activeSlug={slug} categories={categories} brands={brands} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between mb-3.5">
             <span className="text-sm text-muted-foreground">{tSearch("resultsCount", { count: results.total })}</span>
@@ -89,7 +91,7 @@ export default async function CategoryPage({
               <SortSelect />
             </div>
           </div>
-          <ActiveFiltersBar />
+          <ActiveFiltersBar brands={brands} />
           {results.items.length === 0 ? (
             <p className="text-sm text-muted-foreground py-10 text-center">{t("noProducts")}</p>
           ) : (

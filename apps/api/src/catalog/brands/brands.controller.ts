@@ -15,6 +15,11 @@ import { UpsertBrandDto } from "./dto/upsert-brand.dto";
 export class BrandsController {
   constructor(private readonly service: BrandsService) {}
 
+  @Get("active")
+  listActive() {
+    return this.service.listActive();
+  }
+
   @Get()
   @UseGuards(JwtAuthGuard, StaffGuard, PermissionsGuard)
   @RequirePermissions(PermissionCode.PRODUCT_READ)

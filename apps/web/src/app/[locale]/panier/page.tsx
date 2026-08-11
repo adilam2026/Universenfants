@@ -1,18 +1,78 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useTranslations, useLocale } from "next-intl";
 import Image from "next/image";
-import { Minus, Plus, Trash2, Share2, ShoppingBag, Users } from "lucide-react";
+import { Minus, Plus, Trash2, Share2, ShoppingBag, Users, Truck, Check } from "lucide-react";
 import { useCart, broadcastCartUpdate } from "@/hooks/use-cart";
 import { useStoreSettings } from "@/hooks/use-store-settings";
 import { updateCartLine, removeCartLine, applyCoupon, removeCoupon, shareCart, joinSharedCart } from "@/lib/cart-client";
+import { getProducts, type ProductSummary } from "@/lib/api";
+import { ProductCard } from "@/components/product-card";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
 
 function dh(value: number) {
   return `${value.toLocaleString("fr-FR")} DH`;
+}
+
+// Suggestions ciblées sur le montant qui manque réellement (pas sur tout le
+// catalogue) : trop peu cher n'aide pas à franchir le seuil, trop cher n'a
+// plus rien à voir avec "il ne manque que X DH" — la fenêtre de prix reste
+// centrée sur le montant restant, jamais une simple liste de produits au
+// hasard qui donnerait une impression de vente forcée.
+function FreeShippingProgress({ subtotal, threshold }: { subtotal: number; threshold: number }) {
+  const t = useTranslations("cart");
+  const [suggestions, setSuggestions] = useState<ProductSummary[] | null>(null);
+  const remaining = threshold - subtotal;
+  const reached = remaining <= 0;
+  const progress = Math.min(100, Math.round((subtotal / threshold) * 100));
+
+  useEffect(() => {
+    if (reached) {
+      setSuggestions(null);
+      return;
+    }
+    let cancelled = false;
+    getProducts({ priceMin: Math.max(0, remaining - 50), priceMax: remaining + 150, inStockOnly: true, limit: 3 })
+      .then((data) => {
+        if (!cancelled) setSuggestions(data.items);
+      })
+      .catch(() => {
+        if (!cancelled) setSuggestions(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [remaining, reached]);
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-3.5 mb-4">
+      <div className="flex items-center gap-2 text-sm font-bold">
+        {reached ? <Check className="size-4 text-brand-success shrink-0" /> : <Truck className="size-4 text-primary shrink-0" />}
+        <span className={reached ? "text-brand-success" : ""}>
+          {reached ? t("freeShippingReached") : t("freeShippingRemaining", { amount: dh(remaining) })}
+        </span>
+      </div>
+      <div className="mt-2 h-1.5 rounded-full bg-secondary overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all ${reached ? "bg-brand-success" : "bg-primary"}`}
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+      {!reached && suggestions && suggestions.length > 0 && (
+        <div className="mt-3.5">
+          <p className="text-xs font-bold text-muted-foreground mb-2">{t("freeShippingSuggestions")}</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+            {suggestions.map((p) => (
+              <ProductCard key={p.id} product={p} />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function CartPage() {
@@ -170,7 +230,9 @@ function CartPageContent() {
           </Button>
         </div>
       ) : (
-        <div className="grid md:grid-cols-[1fr_320px] gap-7">
+        <>
+          {freeShippingThreshold !== null && <FreeShippingProgress subtotal={cart.subtotal} threshold={freeShippingThreshold} />}
+          <div className="grid md:grid-cols-[1fr_320px] gap-7">
           <div className="flex flex-col gap-3">
             <div className="rounded-2xl border border-border divide-y divide-border overflow-hidden bg-card">
               {cart.lines.map((line) => (
@@ -284,7 +346,8 @@ function CartPageContent() {
             </Button>
             <p className="text-[11px] text-muted-foreground text-center mt-2">{t("codOnly")}</p>
           </div>
-        </div>
+          </div>
+        </>
       )}
     </div>
   );
