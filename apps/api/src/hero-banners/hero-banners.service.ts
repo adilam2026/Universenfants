@@ -39,29 +39,41 @@ export class HeroBannersService {
     return all.filter((b) => (!b.startAt || b.startAt <= now) && (!b.endAt || b.endAt >= now));
   }
 
-  async create(fields: HeroBannerFields, imageBuffer: Buffer, staffUserId: string) {
+  async create(fields: HeroBannerFields, desktopBuffer: Buffer, mobileBuffer: Buffer | undefined, staffUserId: string) {
     if (!fields.titleFr?.trim()) throw new BadRequestException("Titre requis");
-    const uploaded = await this.images.processAndUpload(imageBuffer, "hero-banners");
+    const desktop = await this.images.processAndUpload(desktopBuffer, "hero-banners");
+    // Image mobile facultative : par défaut on réutilise le visuel desktop
+    // (recadré différemment côté site) plutôt que d'exiger deux uploads —
+    // un admin pressé peut toujours en ajouter une dédiée plus tard.
+    const mobile = mobileBuffer ? await this.images.processAndUpload(mobileBuffer, "hero-banners") : desktop;
     const created = await this.prisma.heroBanner.create({
       data: {
         ...this.parseFields(fields),
-        imageDesktop: uploaded.url,
-        imageMobile: uploaded.url,
+        imageDesktop: desktop.url,
+        imageMobile: mobile.url,
       },
     });
     await this.auditLog.record({ staffUserId, action: "heroBanner.create", entity: "HeroBanner", entityId: created.id, newValue: fields });
     return created;
   }
 
-  async update(id: string, fields: HeroBannerFields, imageBuffer: Buffer | undefined, staffUserId: string) {
+  async update(
+    id: string,
+    fields: HeroBannerFields,
+    desktopBuffer: Buffer | undefined,
+    mobileBuffer: Buffer | undefined,
+    staffUserId: string,
+  ) {
     const existing = await this.prisma.heroBanner.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException("Bannière introuvable");
-    const image = imageBuffer ? await this.images.processAndUpload(imageBuffer, "hero-banners") : null;
+    const desktop = desktopBuffer ? await this.images.processAndUpload(desktopBuffer, "hero-banners") : null;
+    const mobile = mobileBuffer ? await this.images.processAndUpload(mobileBuffer, "hero-banners") : null;
     const updated = await this.prisma.heroBanner.update({
       where: { id },
       data: {
         ...this.parseFields(fields),
-        ...(image ? { imageDesktop: image.url, imageMobile: image.url } : {}),
+        ...(desktop ? { imageDesktop: desktop.url } : {}),
+        ...(mobile ? { imageMobile: mobile.url } : {}),
       },
     });
     await this.auditLog.record({ staffUserId, action: "heroBanner.update", entity: "HeroBanner", entityId: id, newValue: fields });

@@ -10,6 +10,7 @@ export interface AdminHeroBanner {
   subtitleFr: string | null;
   subtitleAr: string | null;
   imageDesktop: string;
+  imageMobile: string;
   link: string | null;
   order: number;
   startAt: string | null;
@@ -31,12 +32,19 @@ export interface HeroBannerFieldsPayload {
 
 export const listHeroBanners = () => apiFetch<AdminHeroBanner[]>("/hero-banners");
 
-async function submitForm(url: string, method: "POST" | "PATCH", fields: HeroBannerFieldsPayload, file?: File | null): Promise<AdminHeroBanner> {
+async function submitForm(
+  url: string,
+  method: "POST" | "PATCH",
+  fields: HeroBannerFieldsPayload,
+  fileDesktop?: File | null,
+  fileMobile?: File | null,
+): Promise<AdminHeroBanner> {
   const formData = new FormData();
   for (const [key, value] of Object.entries(fields)) {
     if (value !== undefined && value !== "") formData.append(key, String(value));
   }
-  if (file) formData.append("file", file);
+  if (fileDesktop) formData.append("fileDesktop", fileDesktop);
+  if (fileMobile) formData.append("fileMobile", fileMobile);
   const token = getStaffToken();
   const res = await fetch(url, {
     method,
@@ -51,7 +59,8 @@ async function submitForm(url: string, method: "POST" | "PATCH", fields: HeroBan
   return res.json();
 }
 
-export const createHeroBanner = (fields: HeroBannerFieldsPayload, file: File) => submitForm(`${API_URL}/hero-banners`, "POST", fields, file);
-export const updateHeroBanner = (id: string, fields: HeroBannerFieldsPayload, file?: File | null) =>
-  submitForm(`${API_URL}/hero-banners/${id}`, "PATCH", fields, file);
+export const createHeroBanner = (fields: HeroBannerFieldsPayload, fileDesktop: File, fileMobile?: File | null) =>
+  submitForm(`${API_URL}/hero-banners`, "POST", fields, fileDesktop, fileMobile);
+export const updateHeroBanner = (id: string, fields: HeroBannerFieldsPayload, fileDesktop?: File | null, fileMobile?: File | null) =>
+  submitForm(`${API_URL}/hero-banners/${id}`, "PATCH", fields, fileDesktop, fileMobile);
 export const removeHeroBanner = (id: string) => apiFetch<{ ok: boolean }>(`/hero-banners/${id}`, { method: "DELETE" });

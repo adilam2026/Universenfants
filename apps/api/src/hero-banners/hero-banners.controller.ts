@@ -1,5 +1,5 @@
-import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
-import { FileInterceptor } from "@nestjs/platform-express";
+import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, UploadedFiles, UseGuards, UseInterceptors } from "@nestjs/common";
+import { FileFieldsInterceptor } from "@nestjs/platform-express";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { PermissionCode } from "@universenfants/shared";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
@@ -33,19 +33,45 @@ export class HeroBannersController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, StaffGuard, PermissionsGuard)
   @RequirePermissions(PermissionCode.PROMOTION_CREATE)
-  @UseInterceptors(FileInterceptor("file", { limits: { fileSize: 5 * 1024 * 1024 } }))
-  create(@UploadedFile() file: Express.Multer.File | undefined, @Body() fields: HeroBannerFields, @CurrentUser() user: RequestUser) {
-    if (!file) throw new BadRequestException("Image requise");
-    return this.service.create(fields, file.buffer, user.sub);
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: "fileDesktop", maxCount: 1 },
+        { name: "fileMobile", maxCount: 1 },
+      ],
+      { limits: { fileSize: 5 * 1024 * 1024 } },
+    ),
+  )
+  create(
+    @UploadedFiles() files: { fileDesktop?: Express.Multer.File[]; fileMobile?: Express.Multer.File[] },
+    @Body() fields: HeroBannerFields,
+    @CurrentUser() user: RequestUser,
+  ) {
+    const desktop = files.fileDesktop?.[0];
+    if (!desktop) throw new BadRequestException("Image desktop requise");
+    return this.service.create(fields, desktop.buffer, files.fileMobile?.[0]?.buffer, user.sub);
   }
 
   @Patch(":id")
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, StaffGuard, PermissionsGuard)
   @RequirePermissions(PermissionCode.PROMOTION_UPDATE)
-  @UseInterceptors(FileInterceptor("file", { limits: { fileSize: 5 * 1024 * 1024 } }))
-  update(@Param("id") id: string, @UploadedFile() file: Express.Multer.File | undefined, @Body() fields: HeroBannerFields, @CurrentUser() user: RequestUser) {
-    return this.service.update(id, fields, file?.buffer, user.sub);
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: "fileDesktop", maxCount: 1 },
+        { name: "fileMobile", maxCount: 1 },
+      ],
+      { limits: { fileSize: 5 * 1024 * 1024 } },
+    ),
+  )
+  update(
+    @Param("id") id: string,
+    @UploadedFiles() files: { fileDesktop?: Express.Multer.File[]; fileMobile?: Express.Multer.File[] },
+    @Body() fields: HeroBannerFields,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.service.update(id, fields, files.fileDesktop?.[0]?.buffer, files.fileMobile?.[0]?.buffer, user.sub);
   }
 
   @Delete(":id")

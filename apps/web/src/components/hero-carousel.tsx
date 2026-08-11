@@ -110,7 +110,6 @@ export function HeroCarousel({ banners = [] }: { banners?: HeroBanner[] }) {
         {banners.map((banner, i) => {
           const title = localized(banner.titleFr, banner.titleAr, locale);
           const subtitle = localized(banner.subtitleFr ?? "", banner.subtitleAr, locale);
-          const imageBroken = brokenImages[banner.id];
           const content = (
             <div
               className={cn(
@@ -118,20 +117,34 @@ export function HeroCarousel({ banners = [] }: { banners?: HeroBanner[] }) {
                 i === index ? "opacity-100" : "opacity-0 pointer-events-none",
               )}
             >
-              {imageBroken ? (
-                <div
-                  className="absolute inset-0"
-                  style={{ background: SLIDES[i % SLIDES.length].gradient }}
-                />
-              ) : (
+              {/* Dégradé toujours présent en dessous : si l'image (desktop ou
+                  mobile) échoue au chargement — URL périmée, fichier jamais
+                  réellement uploadé — elle se masque via `onError` et laisse
+                  apparaître ce repli au lieu d'un rectangle vide. Deux
+                  `<Image>` distinctes (plutôt qu'une seule) car le visuel
+                  mobile et desktop sont deux recadrages réellement
+                  différents, pas juste deux tailles de la même image. */}
+              <div className="absolute inset-0" style={{ background: SLIDES[i % SLIDES.length].gradient }} />
+              {!brokenImages[`${banner.id}-desktop`] && (
                 <Image
                   src={banner.imageDesktop}
                   alt={title}
                   fill
                   sizes="100vw"
-                  className="object-cover"
+                  className="hidden md:block object-cover"
                   priority={i === 0}
-                  onError={() => setBrokenImages((prev) => ({ ...prev, [banner.id]: true }))}
+                  onError={() => setBrokenImages((prev) => ({ ...prev, [`${banner.id}-desktop`]: true }))}
+                />
+              )}
+              {!brokenImages[`${banner.id}-mobile`] && (
+                <Image
+                  src={banner.imageMobile}
+                  alt={title}
+                  fill
+                  sizes="100vw"
+                  className="md:hidden object-cover"
+                  priority={i === 0}
+                  onError={() => setBrokenImages((prev) => ({ ...prev, [`${banner.id}-mobile`]: true }))}
                 />
               )}
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />

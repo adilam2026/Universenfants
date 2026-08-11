@@ -28,13 +28,15 @@ export default function HeroBannersPage() {
   const { data: banners, mutate: refresh } = useSWR<AdminHeroBanner[]>("/hero-banners", listHeroBanners);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [file, setFile] = useState<File | null>(null);
+  const desktopInputRef = useRef<HTMLInputElement>(null);
+  const mobileInputRef = useRef<HTMLInputElement>(null);
+  const [fileDesktop, setFileDesktop] = useState<File | null>(null);
+  const [fileMobile, setFileMobile] = useState<File | null>(null);
 
   async function handleCreate(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!file) {
-      setError("Une image est requise");
+    if (!fileDesktop) {
+      setError("Une image desktop est requise");
       return;
     }
     setError(null);
@@ -50,11 +52,14 @@ export default function HeroBannersPage() {
           link: String(form.get("link") || "") || undefined,
           status: "ACTIVE",
         },
-        file,
+        fileDesktop,
+        fileMobile,
       );
       formEl.reset();
-      setFile(null);
-      if (inputRef.current) inputRef.current.value = "";
+      setFileDesktop(null);
+      setFileMobile(null);
+      if (desktopInputRef.current) desktopInputRef.current.value = "";
+      if (mobileInputRef.current) mobileInputRef.current.value = "";
       refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Une erreur est survenue");
@@ -110,9 +115,28 @@ export default function HeroBannersPage() {
                 <Input name="link" placeholder="/categorie/construction" />
               </div>
             </div>
-            <div className="flex flex-col gap-1.5">
-              <Label>Image (recommandé : 1600×500px environ)</Label>
-              <input ref={inputRef} type="file" accept="image/*" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="text-sm" />
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1.5">
+                <Label>Image desktop (recommandé : 1600×340px, ratio ~4.7:1) *</Label>
+                <input
+                  ref={desktopInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setFileDesktop(e.target.files?.[0] ?? null)}
+                  className="text-sm"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label>Image mobile (recommandé : 800×500px, ratio ~1.6:1 — optionnel)</Label>
+                <input
+                  ref={mobileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setFileMobile(e.target.files?.[0] ?? null)}
+                  className="text-sm"
+                />
+                <p className="text-xs text-muted-foreground">Si vide, l&apos;image desktop est réutilisée (recadrée) sur mobile.</p>
+              </div>
             </div>
             {error && <p className="text-sm text-destructive">{error}</p>}
             <Button type="submit" disabled={creating} className="w-fit"><Plus className="size-4" /> Ajouter</Button>
@@ -130,6 +154,9 @@ export default function HeroBannersPage() {
               <div className="flex-1 min-w-0">
                 <p className="font-bold text-sm truncate">{b.titleFr}</p>
                 <p className="text-xs text-muted-foreground truncate">{b.subtitleFr}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  {b.imageMobile === b.imageDesktop ? "Même image desktop/mobile" : "Image mobile dédiée"}
+                </p>
               </div>
               <button
                 onClick={() => handleStatusToggle(b)}
