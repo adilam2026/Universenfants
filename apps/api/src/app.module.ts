@@ -8,7 +8,6 @@ import { AuditLogModule } from "./common/audit-log.module";
 import { RedisModule, REDIS_CLIENT } from "./redis/redis.module";
 import { ResilientThrottlerStorageService } from "./redis/resilient-throttler-storage.service";
 import { HealthController } from "./health/health.controller";
-import { InternalSeedController } from "./health/internal-seed.controller";
 import { AuthModule } from "./auth/auth.module";
 import { CategoriesModule } from "./catalog/categories/categories.module";
 import { BrandsModule } from "./catalog/brands/brands.module";
@@ -73,7 +72,7 @@ import { EmailModule } from "./email/email.module";
     HeroBannersModule,
     BundlesModule,
   ],
-  controllers: [HealthController, InternalSeedController],
+  controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}

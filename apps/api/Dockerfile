@@ -36,13 +36,4 @@ USER node
 EXPOSE 4000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD node -e "require('http').get('http://localhost:'+(process.env.PORT||4000)+'/api/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
-# UE_RUN_SEED=true (variable d'environnement, à retirer une fois le seed
-# confirmé) : exécute le seed avant de démarrer l'API — mécanisme temporaire
-# pour peupler une base déjà en production sans accès direct à la base
-# (prisma/seed.ts est idempotent, upsert par upsert : le rejouer sur une base
-# partiellement peuplée est sans danger). L'echo inconditionnel après
-# ts-node est ce qui rend le bloc `if` non-bloquant : même si le seed
-# plante, c'est cette dernière commande (toujours à 0) qui fixe le code de
-# sortie du bloc, donc l'API démarre quand même — vérifié localement en
-# forçant un DATABASE_URL invalide.
-CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy && (if [ \"$UE_RUN_SEED\" = \"true\" ]; then echo '=== UE_RUN_SEED=true: running prisma seed ===' && node_modules/.bin/ts-node prisma/seed.ts; echo '=== seed step finished (see exit above, non-fatal) ==='; fi) && node dist/main.js"]
+CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy && node dist/main.js"]
