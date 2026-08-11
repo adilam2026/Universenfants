@@ -20,8 +20,13 @@ export default function WishlistPage() {
   const locale = useLocale();
   const { lines, loading, loggedIn, toggle } = useWishlist();
   const [copied, setCopied] = useState(false);
+  const [needsLogin, setNeedsLogin] = useState(false);
 
   async function handleShare() {
+    if (!loggedIn) {
+      setNeedsLogin(true);
+      return;
+    }
     const { shareToken } = await shareWishlist();
     const url = `${window.location.origin}/${locale}/favoris/${shareToken}`;
     await navigator.clipboard.writeText(url);
@@ -29,25 +34,13 @@ export default function WishlistPage() {
     setTimeout(() => setCopied(false), 2000);
   }
 
-  if (loading || loggedIn === null) {
-    return <div className="mx-auto max-w-6xl px-4 py-16 text-center text-muted-foreground">…</div>;
-  }
-
-  if (!loggedIn) {
-    return (
-      <div className="mx-auto max-w-md px-4 py-16 text-center">
-        <Heart className="mx-auto size-10 mb-3 text-muted-foreground opacity-40" />
-        <p className="text-muted-foreground mb-4">{t("loginRequired")}</p>
-        <Button asChild>
-          <Link href="/compte">{t("title")}</Link>
-        </Button>
-      </div>
-    );
+  if (loading) {
+    return <div className="mx-auto max-w-4xl 2xl:max-w-5xl px-4 py-16 text-center text-muted-foreground">…</div>;
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 md:px-7 py-4">
-      <div className="flex items-center justify-between flex-wrap gap-2 mb-5">
+    <div className="mx-auto max-w-4xl 2xl:max-w-5xl px-4 md:px-7 py-4">
+      <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
         <h1 className="font-display text-2xl font-extrabold">{t("title")}</h1>
         {lines.length > 0 && (
           <Button variant="outline" size="sm" onClick={handleShare}>
@@ -55,6 +48,17 @@ export default function WishlistPage() {
           </Button>
         )}
       </div>
+
+      {/* Rappel discret, jamais bloquant : un invité voit et utilise déjà ses
+          favoris (stockés localement) sans avoir besoin d'un compte. */}
+      {!loggedIn && (
+        <p className="text-xs text-muted-foreground mb-5">
+          {needsLogin ? t("shareRequiresLogin") : t("loginRequired")}{" "}
+          <Link href="/compte" className="text-primary font-bold">
+            {t("login")}
+          </Link>
+        </p>
+      )}
 
       {lines.length === 0 ? (
         <div className="py-16 text-center text-muted-foreground">

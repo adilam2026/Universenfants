@@ -4,7 +4,7 @@ import { getTranslations, getLocale, setRequestLocale } from "next-intl/server";
 import { getCategoryTree, getProducts, type Category } from "@/lib/api";
 import { localized } from "@/lib/localized";
 import { ProductCard } from "@/components/product-card";
-import { FilterSidebar, SortSelect, MobileFilterButton } from "@/components/product-filters";
+import { FilterSidebar, SortSelect, MobileFilterButton, ActiveFiltersBar } from "@/components/product-filters";
 
 // getCategoryTree() ne renvoie que les catégories racines, avec leurs enfants
 // nichés dans `children` — un simple `.find()` sur ce tableau ne trouve
@@ -51,6 +51,9 @@ export default async function CategoryPage({
   const sort = typeof sp.sort === "string" ? sp.sort : undefined;
   const ageMin = typeof sp.ageMin === "string" ? Number(sp.ageMin) : undefined;
   const ageMax = typeof sp.ageMax === "string" ? Number(sp.ageMax) : undefined;
+  const priceMin = typeof sp.priceMin === "string" ? Number(sp.priceMin) : undefined;
+  const priceMax = typeof sp.priceMax === "string" ? Number(sp.priceMax) : undefined;
+  const promoOnly = sp.promo === "1" ? true : undefined;
   const inStockOnly = sp.inStock === "1" ? true : undefined;
   const t = await getTranslations("category");
   const tSearch = await getTranslations("search");
@@ -65,18 +68,18 @@ export default async function CategoryPage({
   // raison). `/recherche` applique déjà ce même pattern.
   const [categories, results] = await Promise.all([
     getCategoryTree(),
-    getProducts({ category: slug, sort: sort as never, ageMin, ageMax, inStockOnly }),
+    getProducts({ category: slug, sort: sort as never, ageMin, ageMax, priceMin, priceMax, promoOnly, inStockOnly }),
   ]);
   const current = findCategory(categories, slug);
   if (!current) notFound();
 
   return (
-    <div className="mx-auto max-w-6xl px-4 md:px-7 py-4">
+    <div className="mx-auto max-w-7xl 2xl:max-w-[1600px] px-4 md:px-7 py-4">
       <p className="text-xs text-muted-foreground mb-3">{t("home")} › {localized(current.nameFr, current.nameAr, currentLocale)}</p>
       <h1 className="font-display text-2xl font-extrabold mb-5">
         {current.image} {localized(current.nameFr, current.nameAr, currentLocale)}
       </h1>
-      <div className="flex gap-7">
+      <div className="flex gap-7 xl:gap-10">
         <FilterSidebar activeSlug={slug} categories={categories} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between mb-3.5">
@@ -86,10 +89,11 @@ export default async function CategoryPage({
               <SortSelect />
             </div>
           </div>
+          <ActiveFiltersBar />
           {results.items.length === 0 ? (
             <p className="text-sm text-muted-foreground py-10 text-center">{t("noProducts")}</p>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3.5 xl:gap-5">
               {results.items.map((p) => (
                 <ProductCard key={p.id} product={p} />
               ))}

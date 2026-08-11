@@ -24,11 +24,11 @@ export default function BundlesPage() {
   }, []);
 
   if (!bundles) {
-    return <div className="mx-auto max-w-6xl px-4 py-16 text-center text-muted-foreground">{t("loading")}</div>;
+    return <div className="mx-auto max-w-4xl px-4 py-16 text-center text-muted-foreground">{t("loading")}</div>;
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 md:px-7 py-6">
+    <div className="mx-auto max-w-4xl px-4 md:px-7 py-6">
       <h1 className="font-display text-2xl font-extrabold mb-1">{t("title")}</h1>
       <p className="text-sm text-muted-foreground mb-5">{t("subtitle")}</p>
 

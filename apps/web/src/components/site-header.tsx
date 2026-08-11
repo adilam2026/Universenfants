@@ -102,7 +102,7 @@ export function SiteHeader() {
       </div>
 
       <header className="sticky top-0 z-40 bg-card/95 backdrop-blur border-b border-border">
-        <div className="mx-auto max-w-6xl px-4 md:px-7">
+        <div className="mx-auto max-w-7xl 2xl:max-w-[1600px] px-4 md:px-7">
           <div className="flex items-center gap-2 md:gap-4 py-2.5 md:py-3.5">
             <button
               ref={menuButtonRef}

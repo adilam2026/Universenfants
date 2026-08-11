@@ -43,11 +43,11 @@ export default async function ProductPage({ params }: PageProps<"/[locale]/produ
   const categoryName = localized(product.category.nameFr, product.category.nameAr, currentLocale);
 
   return (
-    <div className="mx-auto max-w-6xl px-4 md:px-7 py-4">
+    <div className="mx-auto max-w-6xl 2xl:max-w-[1400px] px-4 md:px-7 py-4">
       <p className="text-xs text-muted-foreground mb-4">
         {categoryName} › {name}
       </p>
-      <div className="grid md:grid-cols-2 gap-8">
+      <div className="grid md:grid-cols-2 2xl:grid-cols-[1.1fr_0.9fr] gap-8 2xl:gap-14">
         <ProductGallery images={product.images} alt={name} />
 
         <div>

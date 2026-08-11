@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { useSearchParams } from "next/navigation";
-import { X } from "lucide-react";
+import { X, Check } from "lucide-react";
 import { Link, useRouter } from "@/i18n/navigation";
 import { localized } from "@/lib/localized";
 import { cn } from "@/lib/utils";
@@ -17,6 +17,27 @@ const AGE_RANGES: { label: string; ageMin?: number; ageMax?: number }[] = [
   { label: "9-12", ageMin: 9, ageMax: 12 },
   { label: "12+", ageMin: 12 },
 ];
+
+const PRICE_RANGES: { label: string; priceMin?: number; priceMax?: number }[] = [
+  { label: "< 100 DH", priceMax: 100 },
+  { label: "100-300 DH", priceMin: 100, priceMax: 300 },
+  { label: "300-500 DH", priceMin: 300, priceMax: 500 },
+  { label: "500+ DH", priceMin: 500 },
+];
+
+// Fond violet foncé (charte) + texte blanc + coche : le token --primary de
+// base (#8172d6) offrait un contraste insuffisant entre un chip actif et un
+// chip inactif pour être identifiable en un coup d'œil — --brand-primary-strong
+// est délibérément plus saturé/foncé, réservé aux états "sélectionné".
+function chipClass(active: boolean) {
+  return cn(
+    "rounded-full border-2 px-3 py-1.5 text-xs font-bold transition-colors inline-flex items-center gap-1",
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+    active
+      ? "border-brand-primary-strong bg-brand-primary-strong text-white"
+      : "border-border text-muted-foreground active:border-primary/60 md:hover:border-primary/40",
+  );
+}
 
 // MobileFilterButton et FilterSidebar sont rendus comme deux composants
 // frères dans les pages qui les utilisent (aucun état partagé possible via
@@ -59,21 +80,9 @@ interface FilterCategory {
   children?: FilterCategory[];
 }
 
-function FilterContent({
-  activeSlug,
-  categories,
-}: {
-  activeSlug?: string;
-  categories: FilterCategory[];
-}) {
-  const t = useTranslations("filters");
-  const locale = useLocale();
-  const router = useRouter();
+function useFilterParams() {
   const searchParams = useSearchParams();
-
-  const activeAgeMin = searchParams.get("ageMin");
-  const activeAgeMax = searchParams.get("ageMax");
-  const inStockOnly = searchParams.get("inStock") === "1";
+  const router = useRouter();
 
   function updateParams(next: Record<string, string | undefined>) {
     const params = new URLSearchParams(searchParams.toString());
@@ -84,11 +93,41 @@ function FilterContent({
     router.push(`?${params.toString()}`, { scroll: false });
   }
 
+  return { searchParams, updateParams };
+}
+
+function FilterContent({
+  activeSlug,
+  categories,
+}: {
+  activeSlug?: string;
+  categories: FilterCategory[];
+}) {
+  const t = useTranslations("filters");
+  const locale = useLocale();
+  const { searchParams, updateParams } = useFilterParams();
+
+  const activeAgeMin = searchParams.get("ageMin");
+  const activeAgeMax = searchParams.get("ageMax");
+  const activePriceMin = searchParams.get("priceMin");
+  const activePriceMax = searchParams.get("priceMax");
+  const inStockOnly = searchParams.get("inStock") === "1";
+  const promoOnly = searchParams.get("promo") === "1";
+
   function toggleAge(range: (typeof AGE_RANGES)[number]) {
-    const isActive = String(range.ageMin ?? "") === (activeAgeMin ?? "") && String(range.ageMax ?? "") === (activeAgeMax ?? "");
+    const isActive = String(range.ageMin ?? "") === (activeAgeMin ?? "") && String(range.ageMax ?? "") === (activeAgeMax ?? "") && activeAgeMin !== null;
     updateParams({
       ageMin: isActive ? undefined : range.ageMin !== undefined ? String(range.ageMin) : undefined,
       ageMax: isActive ? undefined : range.ageMax !== undefined ? String(range.ageMax) : undefined,
+    });
+  }
+
+  function togglePrice(range: (typeof PRICE_RANGES)[number]) {
+    const isActive =
+      String(range.priceMin ?? "") === (activePriceMin ?? "") && String(range.priceMax ?? "") === (activePriceMax ?? "") && activePriceMin !== null;
+    updateParams({
+      priceMin: isActive ? undefined : range.priceMin !== undefined ? String(range.priceMin) : undefined,
+      priceMax: isActive ? undefined : range.priceMax !== undefined ? String(range.priceMax) : undefined,
     });
   }
 
@@ -137,15 +176,23 @@ function FilterContent({
           {AGE_RANGES.map((range) => {
             const active = String(range.ageMin ?? "") === (activeAgeMin ?? "") && String(range.ageMax ?? "") === (activeAgeMax ?? "") && activeAgeMin !== null;
             return (
-              <button
-                key={range.label}
-                type="button"
-                onClick={() => toggleAge(range)}
-                className={cn(
-                  "rounded-full border px-3 py-1.5 text-xs font-bold transition-colors",
-                  active ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground hover:border-primary/40",
-                )}
-              >
+              <button key={range.label} type="button" onClick={() => toggleAge(range)} className={chipClass(active)}>
+                {active && <Check className="size-3" />}
+                {range.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <div className="border-t border-border pt-4">
+        <h4 className="text-sm font-bold mb-2.5">{t("price")}</h4>
+        <div className="flex flex-wrap gap-1.5">
+          {PRICE_RANGES.map((range) => {
+            const active =
+              String(range.priceMin ?? "") === (activePriceMin ?? "") && String(range.priceMax ?? "") === (activePriceMax ?? "") && activePriceMin !== null;
+            return (
+              <button key={range.label} type="button" onClick={() => togglePrice(range)} className={chipClass(active)}>
+                {active && <Check className="size-3" />}
                 {range.label}
               </button>
             );
@@ -154,15 +201,28 @@ function FilterContent({
       </div>
       <div className="border-t border-border pt-4">
         <h4 className="text-sm font-bold mb-2.5">{t("availability")}</h4>
-        <label className="flex items-center gap-2 text-sm cursor-pointer">
-          <input
-            type="checkbox"
-            checked={inStockOnly}
-            onChange={(e) => updateParams({ inStock: e.target.checked ? "1" : undefined })}
-            className="accent-primary"
-          />
+        <button
+          type="button"
+          role="checkbox"
+          aria-checked={inStockOnly}
+          onClick={() => updateParams({ inStock: inStockOnly ? undefined : "1" })}
+          className={chipClass(inStockOnly)}
+        >
+          {inStockOnly && <Check className="size-3" />}
           {t("inStockOnly")}
-        </label>
+        </button>
+      </div>
+      <div className="border-t border-border pt-4">
+        <button
+          type="button"
+          role="checkbox"
+          aria-checked={promoOnly}
+          onClick={() => updateParams({ promo: promoOnly ? undefined : "1" })}
+          className={chipClass(promoOnly)}
+        >
+          {promoOnly && <Check className="size-3" />}
+          {t("promotionsOnly")}
+        </button>
       </div>
     </div>
   );
@@ -194,7 +254,7 @@ export function FilterSidebar({ activeSlug, categories }: { activeSlug?: string;
 
   return (
     <>
-      <aside className="hidden md:block w-56 shrink-0">
+      <aside className="hidden md:block w-60 xl:w-64 shrink-0">
         <FilterContent activeSlug={activeSlug} categories={categories} />
       </aside>
 
@@ -233,12 +293,81 @@ export function FilterSidebar({ activeSlug, categories }: { activeSlug?: string;
 
 export function MobileFilterButton() {
   const t = useTranslations("filters");
+  const { searchParams } = useFilterParams();
+  const activeCount = countActiveFilters(searchParams);
   return (
     <button
-      className="md:hidden shrink-0 rounded-full border border-border bg-card px-3.5 py-2 text-xs font-bold"
+      className="md:hidden shrink-0 relative rounded-full border border-border bg-card px-3.5 py-2 text-xs font-bold"
       onClick={() => window.dispatchEvent(new Event(TOGGLE_MOBILE_FILTERS_EVENT))}
     >
       {t("filter")}
+      {activeCount > 0 && (
+        <span className="absolute -top-1.5 -right-1.5 rtl:right-auto rtl:-left-1.5 flex size-4 items-center justify-center rounded-full bg-brand-cta text-[10px] font-bold text-brand-cta-foreground">
+          {activeCount}
+        </span>
+      )}
     </button>
+  );
+}
+
+function countActiveFilters(searchParams: URLSearchParams) {
+  let count = 0;
+  if (searchParams.get("ageMin") !== null || searchParams.get("ageMax") !== null) count++;
+  if (searchParams.get("priceMin") !== null || searchParams.get("priceMax") !== null) count++;
+  if (searchParams.get("inStock") === "1") count++;
+  if (searchParams.get("promo") === "1") count++;
+  return count;
+}
+
+// Barre de filtres actifs affichée au-dessus de la grille de résultats : sans
+// elle, retirer un seul filtre (ex: juste le prix, en gardant l'âge) obligeait
+// à rouvrir tout le panneau et à deviner lequel était actif — chaque filtre
+// n'avait aucun état visible en dehors de son propre contrôle.
+export function ActiveFiltersBar() {
+  const t = useTranslations("filters");
+  const { searchParams, updateParams } = useFilterParams();
+
+  const ageMin = searchParams.get("ageMin");
+  const ageMax = searchParams.get("ageMax");
+  const priceMin = searchParams.get("priceMin");
+  const priceMax = searchParams.get("priceMax");
+  const inStockOnly = searchParams.get("inStock") === "1";
+  const promoOnly = searchParams.get("promo") === "1";
+
+  const pills: { key: string; label: string; clear: Record<string, undefined> }[] = [];
+  if (ageMin !== null || ageMax !== null) {
+    const range = AGE_RANGES.find((r) => String(r.ageMin ?? "") === (ageMin ?? "") && String(r.ageMax ?? "") === (ageMax ?? ""));
+    pills.push({ key: "age", label: `${t("age")} : ${range?.label ?? `${ageMin ?? "0"}-${ageMax ?? "+"}`}`, clear: { ageMin: undefined, ageMax: undefined } });
+  }
+  if (priceMin !== null || priceMax !== null) {
+    const range = PRICE_RANGES.find((r) => String(r.priceMin ?? "") === (priceMin ?? "") && String(r.priceMax ?? "") === (priceMax ?? ""));
+    pills.push({ key: "price", label: `${t("price")} : ${range?.label ?? `${priceMin ?? "0"}-${priceMax ?? "+"} DH`}`, clear: { priceMin: undefined, priceMax: undefined } });
+  }
+  if (inStockOnly) pills.push({ key: "inStock", label: t("inStockOnly"), clear: { inStock: undefined } });
+  if (promoOnly) pills.push({ key: "promo", label: t("promotionsOnly"), clear: { promo: undefined } });
+
+  if (pills.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 mb-3.5" aria-label={t("activeFilters")}>
+      {pills.map((pill) => (
+        <span
+          key={pill.key}
+          className="inline-flex items-center gap-1.5 rounded-full bg-brand-primary-soft text-brand-primary-strong px-3 py-1 text-xs font-bold"
+        >
+          {pill.label}
+          <button type="button" aria-label={t("removeFilter")} onClick={() => updateParams(pill.clear)} className="hover:opacity-70">
+            <X className="size-3" />
+          </button>
+        </span>
+      ))}
+      <button
+        type="button"
+        onClick={() => updateParams({ ageMin: undefined, ageMax: undefined, priceMin: undefined, priceMax: undefined, inStock: undefined, promo: undefined })}
+        className="text-xs font-bold text-muted-foreground hover:text-destructive underline underline-offset-2"
+      >
+        {t("resetAll")}
+      </button>
+    </div>
   );
 }

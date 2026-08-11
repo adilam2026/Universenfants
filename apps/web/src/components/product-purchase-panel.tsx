@@ -68,7 +68,7 @@ export function ProductPurchasePanel({ product }: { product: ProductDetail }) {
 
       <div className="mt-6 flex items-center gap-2.5 fixed inset-x-4 bottom-20 z-30 md:static md:inset-auto bg-card md:bg-transparent rounded-2xl md:rounded-none border md:border-0 border-border p-3 md:p-0 shadow-lg md:shadow-none">
         <WishlistButton
-          productId={product.id}
+          product={product}
           className="inline-flex size-10 items-center justify-center rounded-full border-[1.5px] border-border bg-transparent text-foreground hover:bg-secondary transition-colors"
         />
         {available <= 0 ? (

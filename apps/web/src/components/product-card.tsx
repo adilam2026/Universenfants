@@ -29,7 +29,7 @@ export function ProductCard({ product }: { product: ProductSummary }) {
           {outOfStock && <Badge variant="outline">{t("outOfStockShort")}</Badge>}
         </div>
         <WishlistButton
-          productId={product.id}
+          product={product}
           className="absolute right-2 rtl:right-auto rtl:left-2 top-2 flex size-8 items-center justify-center rounded-full bg-card/90 text-muted-foreground shadow-sm hover:text-brand-cta"
         />
         {product.images[0] ? (

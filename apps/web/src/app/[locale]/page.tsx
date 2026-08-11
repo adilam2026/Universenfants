@@ -58,7 +58,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
   ];
 
   return (
-    <div className="mx-auto max-w-6xl px-4 md:px-7 py-3 flex flex-col gap-7">
+    <div className="mx-auto max-w-7xl 2xl:max-w-[1600px] px-4 md:px-7 py-3 flex flex-col gap-7">
       <HeroCarousel banners={heroBanners} />
 
       <section className="grid grid-cols-2 md:grid-cols-4 gap-2">

@@ -115,7 +115,7 @@ function CartPageContent() {
     }
   }
 
-  if (loading) return <div className="mx-auto max-w-6xl px-4 py-16 text-center text-muted-foreground">…</div>;
+  if (loading) return <div className="mx-auto max-w-7xl 2xl:max-w-[1600px] px-4 py-16 text-center text-muted-foreground">…</div>;
 
   const isEmpty = !cart || cart.lines.length === 0;
   // Le seuil de livraison offerte réel (réglage Back-Office) — le frais de
@@ -128,7 +128,7 @@ function CartPageContent() {
   const vatRate = storeSettings?.settings.vatRate ?? null;
 
   return (
-    <div className="mx-auto max-w-6xl px-4 md:px-7 py-4">
+    <div className="mx-auto max-w-6xl 2xl:max-w-[1280px] px-4 md:px-7 py-4">
       <h1 className="font-display text-2xl font-extrabold mb-5">{t("title")}</h1>
 
       {shareToken && cart && (

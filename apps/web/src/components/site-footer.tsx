@@ -36,7 +36,7 @@ export function SiteFooter() {
 
   return (
     <footer className="mt-10 bg-brand-primary-strong text-primary-foreground">
-      <div className="mx-auto max-w-6xl px-4 md:px-7 py-10 grid grid-cols-2 md:grid-cols-4 gap-8">
+      <div className="mx-auto max-w-7xl 2xl:max-w-[1600px] px-4 md:px-7 py-10 grid grid-cols-2 md:grid-cols-4 gap-8">
         {COLUMNS.map((col) => (
           <div key={col.title}>
             <h5 className="text-sm font-bold mb-3">{col.title}</h5>
