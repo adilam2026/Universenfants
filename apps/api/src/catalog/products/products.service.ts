@@ -138,23 +138,41 @@ export class ProductsService {
       }
     }
 
+    // "Meilleures ventes" classé sur les quantités réellement commandées
+    // (toute commande non annulée compte — le COD n'a pas de PaymentStatus
+    // fiable avant livraison) plutôt qu'un alias silencieux de "newest", qui
+    // faisait afficher exactement les mêmes produits que la section
+    // "Nouveautés" sous un intitulé différent.
+    let bestsellerIds: string[] | null = null;
+    if (query.sort === "bestsellers") {
+      const grouped = await this.prisma.orderLine.groupBy({
+        by: ["productId"],
+        where: { order: { status: { not: "CANCELLED" } } },
+        _sum: { quantity: true },
+        orderBy: { _sum: { quantity: "desc" } },
+        take: 200,
+      });
+      bestsellerIds = grouped.map((g) => g.productId);
+      if (bestsellerIds.length > 0) where.id = { in: bestsellerIds };
+    }
+
     const orderBy: Prisma.ProductOrderByWithRelationInput =
       query.sort === "price_asc"
         ? { price: "asc" }
         : query.sort === "price_desc"
           ? { price: "desc" }
-          : query.sort === "newest"
-            ? { createdAt: "desc" }
-            : { createdAt: "desc" }; // "bestsellers" affiné une fois les stats de vente branchées à l'index
+          : { createdAt: "desc" }; // "newest" et repli par défaut (bestsellers sans historique de ventes)
 
     const useRelevanceOrder = rankedIds && rankedIds.length > 0 && (!query.sort || query.sort === "relevance");
+    const useBestsellerOrder = query.sort === "bestsellers" && bestsellerIds !== null && bestsellerIds.length > 0;
+    const useCustomOrder = useRelevanceOrder || useBestsellerOrder;
 
     const [items, total] = await this.prisma.$transaction([
       this.prisma.product.findMany({
         where,
-        ...(useRelevanceOrder ? {} : { orderBy }),
-        skip: useRelevanceOrder ? 0 : (page - 1) * limit,
-        take: useRelevanceOrder ? undefined : limit,
+        ...(useCustomOrder ? {} : { orderBy }),
+        skip: useCustomOrder ? 0 : (page - 1) * limit,
+        take: useCustomOrder ? undefined : limit,
         include: {
           images: { orderBy: { order: "asc" }, take: 1 },
           brand: true,
@@ -172,11 +190,12 @@ export class ProductsService {
       this.prisma.product.count({ where }),
     ]);
 
-    // Meilisearch a déjà classé par pertinence — Postgres ne garantit pas l'ordre
-    // d'un `id IN (...)`, donc on ré-applique le classement puis on pagine.
+    // Meilisearch/le classement ventes ont déjà ordonné les ids — Postgres ne
+    // garantit pas l'ordre d'un `id IN (...)`, donc on ré-applique le
+    // classement voulu puis on pagine.
     let ranked = items;
-    if (useRelevanceOrder) {
-      const order = new Map(rankedIds!.map((id, i) => [id, i]));
+    if (useRelevanceOrder || useBestsellerOrder) {
+      const order = new Map((useBestsellerOrder ? bestsellerIds! : rankedIds!).map((id, i) => [id, i]));
       ranked = [...items].sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
       ranked = ranked.slice((page - 1) * limit, (page - 1) * limit + limit);
     }

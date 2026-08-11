@@ -371,20 +371,20 @@ async function main() {
   }
 
   console.log("Seeding a bundle...");
+  // FP-EVL-1145 vient de la boucle productsData plus haut (pas
+  // demoProductsData) — chercher les deux dans demoProductIds uniquement
+  // faisait manquer ce SKU et créait un bundle à 2 produits sur 3.
   const bundleProductSkus = ["FP-EVL-1145", "CHI-POR-0001", "BEB-DOU-1301"];
-  const bundleProductIds = bundleProductSkus
-    .map((sku) => demoProductIds[sku] ?? null)
-    .filter((id): id is string => !!id);
-  if (bundleProductIds.length === 0) {
-    const fpEveil = await prisma.product.findUnique({ where: { sku: "FP-EVL-1145" } });
-    if (fpEveil) bundleProductIds.push(fpEveil.id);
-  }
+  const bundleProducts = await prisma.product.findMany({ where: { sku: { in: bundleProductSkus } }, select: { id: true } });
+  const bundleProductIds = bundleProducts.map((p) => p.id);
   const existingBundle = await prisma.bundle.findFirst({ where: { name: "Pack Découverte Bébé" } });
-  if (!existingBundle && bundleProductIds.length > 0) {
+  if (!existingBundle && bundleProductIds.length === bundleProductSkus.length) {
+    // 449 (promo 399) + 349 + 129 = 877 DH au prix effectif : un vrai rabais,
+    // pas un bundle plus cher que l'achat séparé.
     await prisma.bundle.create({
       data: {
         name: "Pack Découverte Bébé",
-        bundlePrice: 750,
+        bundlePrice: 749,
         status: "ACTIVE",
         items: { create: bundleProductIds.map((productId) => ({ productId, quantity: 1 })) },
       },
