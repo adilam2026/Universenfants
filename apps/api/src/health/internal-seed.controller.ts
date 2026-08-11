@@ -22,7 +22,12 @@ export class InternalSeedController {
     try {
       const { stdout, stderr } = await execFileAsync("node_modules/.bin/ts-node", ["prisma/seed.ts"], {
         cwd: process.cwd(),
-        timeout: 100_000,
+        // Chaque upsert est un aller-retour réseau vers le pooler Supabase —
+        // nettement plus lent qu'en local (~5-10s) : un premier essai en
+        // production a été tué par un délai de 100s après seulement 6 des
+        // ~11 étapes du script (jusqu'à "brands"), sans conséquence puisque
+        // chaque étape déjà passée est un upsert déjà validé en base.
+        timeout: 280_000,
         maxBuffer: 10 * 1024 * 1024,
       });
       return { ok: true, stdout, stderr };
