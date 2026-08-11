@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useTranslations, useLocale } from "next-intl";
 import { Gift, Cake, Sparkles, type LucideIcon } from "lucide-react";
@@ -52,9 +52,55 @@ export function HeroCarousel({ banners = [] }: { banners?: HeroBanner[] }) {
     return () => clearInterval(id);
   }, [count]);
 
+  // Swipe tactile : suit le doigt via Pointer Events (touch + souris/pen en
+  // un seul jeu de handlers). `touch-action: pan-y` laisse le scroll
+  // vertical de la page passer nativement pendant qu'on capture le geste
+  // horizontal en JS. Un swipe réel (au-delà du seuil) intercepte le clic
+  // qui suit — via `onClickCapture`, avant qu'il n'atteigne le CTA/lien —
+  // pour qu'un swipe ne déclenche jamais accidentellement une navigation.
+  const swipeStartX = useRef<number | null>(null);
+  const swipeDeltaX = useRef(0);
+  const wasSwipe = useRef(false);
+  const SWIPE_THRESHOLD = 40;
+
+  function handlePointerDown(e: React.PointerEvent) {
+    swipeStartX.current = e.clientX;
+    swipeDeltaX.current = 0;
+    wasSwipe.current = false;
+  }
+  function handlePointerMove(e: React.PointerEvent) {
+    if (swipeStartX.current === null) return;
+    swipeDeltaX.current = e.clientX - swipeStartX.current;
+  }
+  function handlePointerUp() {
+    if (swipeStartX.current === null) return;
+    if (Math.abs(swipeDeltaX.current) > SWIPE_THRESHOLD) {
+      wasSwipe.current = true;
+      setIndex((i) => (swipeDeltaX.current < 0 ? (i + 1) % count : (i - 1 + count) % count));
+    }
+    swipeStartX.current = null;
+    swipeDeltaX.current = 0;
+  }
+  function handleClickCapture(e: React.MouseEvent) {
+    if (wasSwipe.current) {
+      e.preventDefault();
+      e.stopPropagation();
+      wasSwipe.current = false;
+    }
+  }
+
+  const swipeHandlers = {
+    onPointerDown: handlePointerDown,
+    onPointerMove: handlePointerMove,
+    onPointerUp: handlePointerUp,
+    onPointerCancel: handlePointerUp,
+    onClickCapture: handleClickCapture,
+    style: { touchAction: "pan-y" as const },
+  };
+
   if (banners.length > 0) {
     return (
-      <div className="relative h-[250px] md:h-[340px] overflow-hidden rounded-3xl">
+      <div className="relative h-[250px] md:h-[340px] overflow-hidden rounded-3xl" {...swipeHandlers}>
         {banners.map((banner, i) => {
           const title = localized(banner.titleFr, banner.titleAr, locale);
           const subtitle = localized(banner.subtitleFr ?? "", banner.subtitleAr, locale);
@@ -89,7 +135,7 @@ export function HeroCarousel({ banners = [] }: { banners?: HeroBanner[] }) {
   }
 
   return (
-    <div className="relative h-[250px] md:h-[340px] overflow-hidden rounded-3xl">
+    <div className="relative h-[250px] md:h-[340px] overflow-hidden rounded-3xl" {...swipeHandlers}>
       {SLIDES.map((slide, i) => (
         <div
           key={slide.key}

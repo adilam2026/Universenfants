@@ -12,11 +12,12 @@ export default async function SearchPage({ params, searchParams }: PageProps<"/[
   const ageMin = typeof sp.ageMin === "string" ? Number(sp.ageMin) : undefined;
   const ageMax = typeof sp.ageMax === "string" ? Number(sp.ageMax) : undefined;
   const promoOnly = sp.promo === "1" ? true : undefined;
+  const inStockOnly = sp.inStock === "1" ? true : undefined;
   const t = await getTranslations("search");
 
   const [categories, results] = await Promise.all([
     getCategoryTree(),
-    getProducts({ sort: sort as never, q, ageMin, ageMax, promoOnly }),
+    getProducts({ sort: sort as never, q, ageMin, ageMax, promoOnly, inStockOnly }),
   ]);
 
   return (

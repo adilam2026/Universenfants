@@ -212,6 +212,9 @@ model Product {
   // sans scan complet, contrairement à l'index status seul ci-dessus.
   @@index([status, createdAt])
   @@index([status, price])
+  // Filtre "pour qui" (Conseiller Cadeau, filtre catalogue) — combinaison
+  // fréquente avec status, sans index dédié jusqu'ici.
+  @@index([status, targetGender])
 }
 
 model ProductImage {

@@ -43,6 +43,7 @@ export default function GiftAdvisorPage() {
   const [budgetIdx, setBudgetIdx] = useState(1);
   const [occasion, setOccasion] = useState(0);
   const [results, setResults] = useState<ProductSummary[] | null>(null);
+  const [widened, setWidened] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const WHO_OPTIONS = [t("boy"), t("girl"), t("any")];
@@ -50,21 +51,37 @@ export default function GiftAdvisorPage() {
   const BUDGET_LABELS = ["< 100 DH", "100-300 DH", "300-500 DH", "500+ DH"];
   const OCCASION_OPTIONS = [t("birthday"), t("schoolSuccess"), t("birth"), t("eid")];
 
+  // Une correspondance exacte (âge + budget + sexe) sur un catalogue de
+  // taille modeste retombe souvent sur 0 résultat pour une sélection tout à
+  // fait normale — sans repli, le Conseiller Cadeau paraît cassé. On
+  // élargit donc progressivement (on ne garde que le premier niveau qui
+  // renvoie au moins un produit) : jamais d'invention de compatibilité,
+  // seulement les mêmes filtres réels du catalogue, appliqués avec moins de
+  // contraintes à la fois.
   async function handleSubmit() {
     setLoading(true);
+    setResults(null);
+    setWidened(false);
     const age = AGE_OPTIONS[ageIdx];
     const budget = BUDGET_OPTIONS[budgetIdx];
     const gender = who === 0 ? "BOY" : who === 1 ? "GIRL" : undefined;
+
+    const attempts: Record<string, string | number | boolean | undefined>[] = [
+      { ageMin: age.ageMin, ageMax: age.ageMax, priceMin: budget.priceMin, priceMax: budget.priceMax, gender },
+      { ageMin: age.ageMin, ageMax: age.ageMax, priceMin: budget.priceMin, priceMax: budget.priceMax },
+      { ageMin: age.ageMin, ageMax: age.ageMax },
+      { sort: "bestsellers" },
+    ];
+
     try {
-      const data = await getProducts({
-        ageMin: age.ageMin,
-        ageMax: age.ageMax,
-        priceMin: budget.priceMin,
-        priceMax: budget.priceMax,
-        gender,
-        limit: 8,
-      });
-      setResults(data.items);
+      for (let i = 0; i < attempts.length; i++) {
+        const data = await getProducts({ ...attempts[i], limit: 8 });
+        if (data.items.length > 0 || i === attempts.length - 1) {
+          setResults(data.items);
+          setWidened(i > 0 && data.items.length > 0);
+          return;
+        }
+      }
     } finally {
       setLoading(false);
     }
@@ -118,10 +135,11 @@ export default function GiftAdvisorPage() {
 
       {results && (
         <div className="mt-6">
-          <h2 className="font-display text-lg font-extrabold mb-3.5">
+          <h2 className="font-display text-lg font-extrabold mb-1">
             {results.length > 0 ? t("suggestions") : t("noResults")}
           </h2>
-          <div className="grid grid-cols-2 gap-3.5">
+          {widened && <p className="text-xs text-muted-foreground mb-3.5">{t("suggestionsWidened")}</p>}
+          <div className={cn("grid grid-cols-2 gap-3.5", !widened && "mt-3.5")}>
             {results.map((p) => (
               <ProductCard key={p.id} product={p} />
             ))}

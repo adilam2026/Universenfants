@@ -35,15 +35,26 @@ export default async function CategoryPage({
   setRequestLocale(locale);
   const sp = await searchParams;
   const sort = typeof sp.sort === "string" ? sp.sort : undefined;
+  const ageMin = typeof sp.ageMin === "string" ? Number(sp.ageMin) : undefined;
+  const ageMax = typeof sp.ageMax === "string" ? Number(sp.ageMax) : undefined;
+  const inStockOnly = sp.inStock === "1" ? true : undefined;
   const t = await getTranslations("category");
   const tSearch = await getTranslations("search");
   const currentLocale = await getLocale();
 
-  const categories = await getCategoryTree();
+  // Deux appels indépendants (le catalogue de catégories ne dépend pas des
+  // produits filtrés, et inversement) : les lancer en parallèle plutôt qu'en
+  // séquence évite d'ajouter un aller-retour réseau complet à chaque
+  // changement de tri/filtre — coût negligeable en local mais réel en
+  // production, l'API et la base ne vivant pas dans la même région que le
+  // frontend (voir FETCH_TIMEOUT_MS ci-dessus, déjà relevé pour la même
+  // raison). `/recherche` applique déjà ce même pattern.
+  const [categories, results] = await Promise.all([
+    getCategoryTree(),
+    getProducts({ category: slug, sort: sort as never, ageMin, ageMax, inStockOnly }),
+  ]);
   const current = categories.find((c) => c.slug === slug);
   if (!current) notFound();
-
-  const results = await getProducts({ category: slug, sort: sort as never });
 
   return (
     <div className="mx-auto max-w-6xl px-4 md:px-7 py-4">

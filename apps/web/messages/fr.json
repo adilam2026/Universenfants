@@ -346,7 +346,8 @@
     "seeResults": "Voir les recommandations",
     "searching": "Recherche en cours…",
     "suggestions": "✨ Nos suggestions pour vous",
-    "noResults": "Aucun résultat pour ces critères"
+    "suggestionsWidened": "Aucun produit ne correspond exactement à ces critères — voici une sélection élargie.",
+    "noResults": "Aucun produit disponible pour le moment. Essayez d'élargir vos critères."
   },
   "birthdayList": {
     "title": "🎂 Liste anniversaire",

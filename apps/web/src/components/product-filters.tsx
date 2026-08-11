@@ -10,6 +10,14 @@ import { cn } from "@/lib/utils";
 
 const SORT_VALUES = ["relevance", "price_asc", "price_desc", "bestsellers", "newest"] as const;
 
+const AGE_RANGES: { label: string; ageMin?: number; ageMax?: number }[] = [
+  { label: "0-2", ageMin: 0, ageMax: 2 },
+  { label: "3-5", ageMin: 3, ageMax: 5 },
+  { label: "6-8", ageMin: 6, ageMax: 8 },
+  { label: "9-12", ageMin: 9, ageMax: 12 },
+  { label: "12+", ageMin: 12 },
+];
+
 // MobileFilterButton et FilterSidebar sont rendus comme deux composants
 // frères dans les pages qui les utilisent (aucun état partagé possible via
 // les props) — on relie donc le bouton mobile à l'ouverture du tiroir via un
@@ -52,6 +60,29 @@ function FilterContent({
 }) {
   const t = useTranslations("filters");
   const locale = useLocale();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const activeAgeMin = searchParams.get("ageMin");
+  const activeAgeMax = searchParams.get("ageMax");
+  const inStockOnly = searchParams.get("inStock") === "1";
+
+  function updateParams(next: Record<string, string | undefined>) {
+    const params = new URLSearchParams(searchParams.toString());
+    for (const [key, value] of Object.entries(next)) {
+      if (value === undefined) params.delete(key);
+      else params.set(key, value);
+    }
+    router.push(`?${params.toString()}`, { scroll: false });
+  }
+
+  function toggleAge(range: (typeof AGE_RANGES)[number]) {
+    const isActive = String(range.ageMin ?? "") === (activeAgeMin ?? "") && String(range.ageMax ?? "") === (activeAgeMax ?? "");
+    updateParams({
+      ageMin: isActive ? undefined : range.ageMin !== undefined ? String(range.ageMin) : undefined,
+      ageMax: isActive ? undefined : range.ageMax !== undefined ? String(range.ageMax) : undefined,
+    });
+  }
 
   return (
     <div className="space-y-5">
@@ -75,17 +106,34 @@ function FilterContent({
       <div className="border-t border-border pt-4">
         <h4 className="text-sm font-bold mb-2.5">{t("age")}</h4>
         <div className="flex flex-wrap gap-1.5">
-          {["0-2", "3-5", "6-8", "9-12", "12+"].map((a) => (
-            <span key={a} className="rounded-full border border-border px-3 py-1.5 text-xs font-bold text-muted-foreground">
-              {a}
-            </span>
-          ))}
+          {AGE_RANGES.map((range) => {
+            const active = String(range.ageMin ?? "") === (activeAgeMin ?? "") && String(range.ageMax ?? "") === (activeAgeMax ?? "") && activeAgeMin !== null;
+            return (
+              <button
+                key={range.label}
+                type="button"
+                onClick={() => toggleAge(range)}
+                className={cn(
+                  "rounded-full border px-3 py-1.5 text-xs font-bold transition-colors",
+                  active ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground hover:border-primary/40",
+                )}
+              >
+                {range.label}
+              </button>
+            );
+          })}
         </div>
       </div>
       <div className="border-t border-border pt-4">
         <h4 className="text-sm font-bold mb-2.5">{t("availability")}</h4>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" defaultChecked className="accent-primary" /> {t("inStockOnly")}
+        <label className="flex items-center gap-2 text-sm cursor-pointer">
+          <input
+            type="checkbox"
+            checked={inStockOnly}
+            onChange={(e) => updateParams({ inStock: e.target.checked ? "1" : undefined })}
+            className="accent-primary"
+          />
+          {t("inStockOnly")}
         </label>
       </div>
     </div>
