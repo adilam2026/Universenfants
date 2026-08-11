@@ -1,8 +1,5 @@
-import { Controller, ForbiddenException, Headers, Post } from "@nestjs/common";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-
-const execFileAsync = promisify(execFile);
+import { Controller, ForbiddenException, Get, Headers, Post } from "@nestjs/common";
+import { spawn } from "node:child_process";
 
 // Endpoint temporaire, à retirer une fois la base de production repeuplée
 // (voir historique de la branche) : déclenche prisma/seed.ts (idempotent,
@@ -14,26 +11,54 @@ const execFileAsync = promisify(execFile);
 // connaître).
 const INTERNAL_SEED_TOKEN = "430b1ff8b16bcb2eedbee17eb96265c485bffa2a40855a11";
 
+// Le proxy Railway coupe les requêtes HTTP en amont après ~60-70s, bien
+// avant que le script (plusieurs minutes contre le pooler Supabase en
+// production) n'ait le temps de finir — POST déclenche donc le process en
+// tâche de fond et répond immédiatement ; GET /seed-status permet de suivre
+// la progression via de petites requêtes rapides, sans jamais dépendre
+// d'une connexion HTTP longue.
+type SeedState = {
+  status: "idle" | "running" | "done" | "error";
+  log: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  exitCode: number | null;
+};
+const state: SeedState = { status: "idle", log: "", startedAt: null, finishedAt: null, exitCode: null };
+
 @Controller("internal")
 export class InternalSeedController {
   @Post("seed-once")
-  async runSeedOnce(@Headers("x-internal-token") token?: string) {
+  startSeed(@Headers("x-internal-token") token?: string) {
     if (token !== INTERNAL_SEED_TOKEN) throw new ForbiddenException();
-    try {
-      const { stdout, stderr } = await execFileAsync("node_modules/.bin/ts-node", ["prisma/seed.ts"], {
-        cwd: process.cwd(),
-        // Chaque upsert est un aller-retour réseau vers le pooler Supabase —
-        // nettement plus lent qu'en local (~5-10s) : un premier essai en
-        // production a été tué par un délai de 100s après seulement 6 des
-        // ~11 étapes du script (jusqu'à "brands"), sans conséquence puisque
-        // chaque étape déjà passée est un upsert déjà validé en base.
-        timeout: 280_000,
-        maxBuffer: 10 * 1024 * 1024,
-      });
-      return { ok: true, stdout, stderr };
-    } catch (err) {
-      const e = err as { message?: string; stdout?: string; stderr?: string };
-      return { ok: false, error: e.message, stdout: e.stdout, stderr: e.stderr };
-    }
+    if (state.status === "running") return { ok: true, ...state };
+
+    state.status = "running";
+    state.log = "";
+    state.startedAt = new Date().toISOString();
+    state.finishedAt = null;
+    state.exitCode = null;
+
+    const child = spawn("node_modules/.bin/ts-node", ["prisma/seed.ts"], { cwd: process.cwd() });
+    child.stdout.on("data", (d) => (state.log += d.toString()));
+    child.stderr.on("data", (d) => (state.log += d.toString()));
+    child.on("close", (code) => {
+      state.status = code === 0 ? "done" : "error";
+      state.exitCode = code;
+      state.finishedAt = new Date().toISOString();
+    });
+    child.on("error", (err) => {
+      state.status = "error";
+      state.log += `\n[spawn error] ${err.message}`;
+      state.finishedAt = new Date().toISOString();
+    });
+
+    return { ok: true, ...state };
+  }
+
+  @Get("seed-status")
+  getStatus(@Headers("x-internal-token") token?: string) {
+    if (token !== INTERNAL_SEED_TOKEN) throw new ForbiddenException();
+    return state;
   }
 }
