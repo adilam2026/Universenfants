@@ -5,6 +5,7 @@ import { useTranslations, useLocale } from "next-intl";
 import { Menu, Search, ShoppingBag, User, X, Gift, Cake, Tag, Mail, Languages, Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCartCount } from "@/hooks/use-cart";
+import { useStoreSettings } from "@/hooks/use-store-settings";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { SearchForm, SearchFormFallback } from "@/components/search-form";
 
@@ -13,6 +14,7 @@ export function SiteHeader() {
   const locale = useLocale();
   const pathname = usePathname();
   const router = useRouter();
+  const storeSettings = useStoreSettings();
   const [open, setOpen] = useState(false);
   const cartCount = useCartCount();
   const menuButtonRef = useRef<HTMLButtonElement>(null);
@@ -80,14 +82,23 @@ export function SiteHeader() {
     { label: t("nav.contact"), href: "/pages/contact", icon: Mail },
   ];
 
+  // Lit la query string au moment du clic plutôt que via useSearchParams() —
+  // ce hook forcerait tout le header (rendu sur chaque page du site) à sortir
+  // du rendu statique. Sans ceci, changer de langue perdait les filtres actifs
+  // (âge, stock, tri...) puisque router.replace(pathname) ne portait que le
+  // chemin, jamais les paramètres de recherche.
   function switchLocale(next: string) {
-    router.replace(pathname, { locale: next });
+    const search = typeof window !== "undefined" ? window.location.search : "";
+    router.replace(`${pathname}${search}`, { locale: next });
   }
 
   return (
     <>
       <div className="bg-brand-primary-strong text-primary-foreground text-center text-xs font-bold py-1.5 px-3">
-        {t.rich("promoBar.text", { amount: 400, strong: (chunks) => <strong>{chunks}</strong> })}
+        {t.rich("promoBar.text", {
+          amount: storeSettings?.settings.freeShippingThreshold ?? 400,
+          strong: (chunks) => <strong>{chunks}</strong>,
+        })}
       </div>
 
       <header className="sticky top-0 z-40 bg-card/95 backdrop-blur border-b border-border">
@@ -215,7 +226,10 @@ export function SiteHeader() {
       </aside>
 
       {/* Barre de navigation mobile basse */}
-      <nav className="fixed bottom-0 inset-x-0 z-40 flex border-t border-border bg-card md:hidden">
+      <nav
+        className="fixed bottom-0 inset-x-0 z-40 flex border-t border-border bg-card md:hidden"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      >
         {[
           { href: "/", label: t("nav.home"), icon: ShoppingBag },
           { href: "/recherche", label: t("nav.search"), icon: Search },

@@ -82,31 +82,34 @@ export class CartController {
   @Post("coupon")
   async applyCoupon(
     @Headers("x-cart-token") cartToken: string | undefined,
+    @Query("shareToken") shareToken: string | undefined,
     @CurrentUser() user: RequestUser | null,
     @Res({ passthrough: true }) res: Response,
     @Body() dto: ApplyCouponDto,
   ) {
-    const cart = await this.resolve(cartToken, undefined, user, res);
+    const cart = await this.resolve(cartToken, shareToken, user, res);
     return this.service.applyCoupon(cart.id, dto.code);
   }
 
   @Delete("coupon")
   async removeCoupon(
     @Headers("x-cart-token") cartToken: string | undefined,
+    @Query("shareToken") shareToken: string | undefined,
     @CurrentUser() user: RequestUser | null,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const cart = await this.resolve(cartToken, undefined, user, res);
+    const cart = await this.resolve(cartToken, shareToken, user, res);
     return this.service.removeCoupon(cart.id);
   }
 
   @Post("share")
   async share(
     @Headers("x-cart-token") cartToken: string | undefined,
+    @Query("shareToken") shareToken: string | undefined,
     @CurrentUser() user: RequestUser | null,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const cart = await this.resolve(cartToken, undefined, user, res);
+    const cart = await this.resolve(cartToken, shareToken, user, res);
     return this.service.share(cart.id);
   }
 

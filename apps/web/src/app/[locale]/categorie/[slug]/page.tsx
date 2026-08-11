@@ -1,10 +1,24 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getTranslations, getLocale, setRequestLocale } from "next-intl/server";
-import { getCategoryTree, getProducts } from "@/lib/api";
+import { getCategoryTree, getProducts, type Category } from "@/lib/api";
 import { localized } from "@/lib/localized";
 import { ProductCard } from "@/components/product-card";
 import { FilterSidebar, SortSelect, MobileFilterButton } from "@/components/product-filters";
+
+// getCategoryTree() ne renvoie que les catégories racines, avec leurs enfants
+// nichés dans `children` — un simple `.find()` sur ce tableau ne trouve
+// jamais une sous-catégorie, ce qui faisait 404 toute page /categorie/<slug>
+// d'une sous-catégorie (et generateMetadata retournait silencieusement {}
+// pour la même raison).
+function findCategory(categories: Category[], slug: string): Category | undefined {
+  for (const c of categories) {
+    if (c.slug === slug) return c;
+    const found = findCategory(c.children ?? [], slug);
+    if (found) return found;
+  }
+  return undefined;
+}
 
 // Sans generateMetadata, chaque page catégorie héritait du titre/description
 // générique du site (layout.tsx) au lieu d'un titre distinctif par univers
@@ -12,7 +26,7 @@ import { FilterSidebar, SortSelect, MobileFilterButton } from "@/components/prod
 export async function generateMetadata({ params }: PageProps<"/[locale]/categorie/[slug]">): Promise<Metadata> {
   const { locale, slug } = await params;
   const categories = await getCategoryTree().catch(() => []);
-  const current = categories.find((c) => c.slug === slug);
+  const current = findCategory(categories, slug);
   if (!current) return {};
   const name = localized(current.nameFr, current.nameAr, locale);
   // Le SEO manuel (metaTitle/metaDescription, saisi dans l'admin) prime sur
@@ -53,7 +67,7 @@ export default async function CategoryPage({
     getCategoryTree(),
     getProducts({ category: slug, sort: sort as never, ageMin, ageMax, inStockOnly }),
   ]);
-  const current = categories.find((c) => c.slug === slug);
+  const current = findCategory(categories, slug);
   if (!current) notFound();
 
   return (

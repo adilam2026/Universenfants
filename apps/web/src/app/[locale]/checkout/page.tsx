@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { Suspense, useEffect, useState, type FormEvent } from "react";
+import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useCart, broadcastCartUpdate } from "@/hooks/use-cart";
 import { useStoreSettings } from "@/hooks/use-store-settings";
@@ -14,8 +15,21 @@ function dh(value: number) {
 }
 
 export default function CheckoutPage() {
+  // useSearchParams() exige une frontière Suspense en page top-level (même
+  // motif que /panier) — nécessaire ici pour lire le shareToken d'un panier
+  // partagé : sans lui, un participant qui commande depuis le panier
+  // collaboratif voyait son propre panier (vide) résolu côté API à la place.
+  return (
+    <Suspense>
+      <CheckoutPageContent />
+    </Suspense>
+  );
+}
+
+function CheckoutPageContent() {
   const t = useTranslations("checkout");
-  const { cart, loading } = useCart();
+  const shareToken = useSearchParams().get("shareToken") ?? undefined;
+  const { cart, loading } = useCart(shareToken);
   const storeSettings = useStoreSettings();
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
@@ -34,16 +48,19 @@ export default function CheckoutPage() {
     setSubmitting(true);
     const form = new FormData(e.currentTarget);
     try {
-      const order = await checkout({
-        firstName: String(form.get("firstName")),
-        lastName: String(form.get("lastName")),
-        phone: String(form.get("phone")),
-        email: String(form.get("email") || "") || undefined,
-        city: String(form.get("city")),
-        addressLine: String(form.get("addressLine")),
-        comment: String(form.get("comment") || "") || undefined,
-        useLoyaltyPoints: useLoyaltyPoints || undefined,
-      });
+      const order = await checkout(
+        {
+          firstName: String(form.get("firstName")),
+          lastName: String(form.get("lastName")),
+          phone: String(form.get("phone")),
+          email: String(form.get("email") || "") || undefined,
+          city: String(form.get("city")),
+          addressLine: String(form.get("addressLine")),
+          comment: String(form.get("comment") || "") || undefined,
+          useLoyaltyPoints: useLoyaltyPoints || undefined,
+        },
+        shareToken,
+      );
       broadcastCartUpdate();
       router.push(`/commande/confirmation?orderNumber=${order.orderNumber}&total=${order.total}`);
     } catch (err) {

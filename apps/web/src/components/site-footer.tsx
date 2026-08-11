@@ -12,7 +12,7 @@ export function SiteFooter() {
       links: [
         { label: t("catalog"), href: "/recherche" },
         { label: t("promotions"), href: "/recherche?promo=1" },
-        { label: t("newArrivals"), href: "/recherche" },
+        { label: t("newArrivals"), href: "/recherche?sort=newest" },
       ],
     },
     {

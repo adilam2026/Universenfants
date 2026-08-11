@@ -85,7 +85,7 @@ function CartPageContent() {
   async function handleCoupon() {
     setCouponError(null);
     try {
-      await applyCoupon(couponInput.trim().toUpperCase());
+      await applyCoupon(couponInput.trim().toUpperCase(), shareToken);
       refresh();
     } catch (e) {
       setCouponError(e instanceof Error ? e.message : "Code invalide");
@@ -93,7 +93,7 @@ function CartPageContent() {
   }
 
   async function handleShare() {
-    const { shareToken: newToken } = await shareCart();
+    const { shareToken: newToken } = await shareCart(shareToken);
     // Le lien généré omettait le préfixe de locale (/fr ou /ar) requis par
     // le routing (localePrefix: "always") : ouvert tel quel, il tombait sur
     // la page 404 au lieu du panier partagé.
@@ -245,7 +245,7 @@ function CartPageContent() {
                 <span className="text-xs font-bold text-brand-success">{t("couponApplied", { code: cart.couponCode })}</span>
                 <button
                   onClick={async () => {
-                    await removeCoupon();
+                    await removeCoupon(shareToken);
                     refresh();
                   }}
                   className="text-xs text-muted-foreground underline"
@@ -280,7 +280,7 @@ function CartPageContent() {
               )}
             </div>
             <Button asChild variant="cta" className="w-full mt-4">
-              <Link href="/checkout">{t("checkout")}</Link>
+              <Link href={shareToken ? `/checkout?shareToken=${shareToken}` : "/checkout"}>{t("checkout")}</Link>
             </Button>
             <p className="text-[11px] text-muted-foreground text-center mt-2">{t("codOnly")}</p>
           </div>

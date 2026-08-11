@@ -29,7 +29,9 @@ export class CartService {
   async resolveCart(ownerToken: string, customerId?: string | null, shareToken?: string) {
     if (shareToken) {
       const shared = await this.prisma.cart.findUnique({ where: { shareToken } });
-      if (!shared || shared.status !== "ACTIVE") throw new NotFoundException("Panier partagé introuvable ou expiré");
+      if (!shared || shared.status !== "ACTIVE" || (shared.expiresAt && shared.expiresAt < new Date())) {
+        throw new NotFoundException("Panier partagé introuvable ou expiré");
+      }
       return shared;
     }
 

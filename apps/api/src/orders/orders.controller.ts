@@ -29,11 +29,12 @@ export class OrdersController {
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
   async checkout(
     @Headers("x-cart-token") cartToken: string,
+    @Query("shareToken") shareToken: string | undefined,
     @CurrentUser() user: RequestUser | null,
     @Body() dto: CheckoutDto,
   ) {
     const customerId = user?.kind === "customer" ? user.sub : null;
-    const cart = await this.cart.resolveCart(cartToken, customerId);
+    const cart = await this.cart.resolveCart(cartToken, customerId, shareToken);
     return this.service.checkout(cart.id, dto);
   }
 

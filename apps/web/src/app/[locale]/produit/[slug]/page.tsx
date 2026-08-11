@@ -1,14 +1,14 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { Share2, Star } from "lucide-react";
+import { Star } from "lucide-react";
 import { getTranslations, getLocale, setRequestLocale } from "next-intl/server";
 import { getProductBySlug, getProducts } from "@/lib/api";
 import { localized } from "@/lib/localized";
 import { ProductCard } from "@/components/product-card";
 import { ProductGallery } from "@/components/product-gallery";
 import { ProductPurchasePanel } from "@/components/product-purchase-panel";
+import { ShareProductButton } from "@/components/share-product-button";
 import { WriteReviewForm } from "@/components/write-review-form";
-import { Button } from "@/components/ui/button";
 
 // Sans generateMetadata, chaque fiche produit héritait du titre/description
 // générique du site (layout.tsx) — un problème de fond pour le SEO d'un
@@ -74,9 +74,7 @@ export default async function ProductPage({ params }: PageProps<"/[locale]/produ
 
           <ProductPurchasePanel product={product} />
 
-          <Button variant="ghost" size="sm" className="mt-2.5">
-            <Share2 className="size-4" /> {t("share")}
-          </Button>
+          <ShareProductButton title={name} />
         </div>
       </div>
 

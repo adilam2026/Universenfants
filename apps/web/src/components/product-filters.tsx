@@ -51,12 +51,20 @@ export function SortSelect() {
   );
 }
 
+interface FilterCategory {
+  slug: string;
+  nameFr: string;
+  nameAr?: string | null;
+  image: string | null;
+  children?: FilterCategory[];
+}
+
 function FilterContent({
   activeSlug,
   categories,
 }: {
   activeSlug?: string;
-  categories: { slug: string; nameFr: string; nameAr?: string | null; image: string | null }[];
+  categories: FilterCategory[];
 }) {
   const t = useTranslations("filters");
   const locale = useLocale();
@@ -92,15 +100,35 @@ function FilterContent({
           <Link href="/recherche" className={`text-sm ${!activeSlug ? "font-extrabold text-primary" : "text-muted-foreground"}`}>
             {t("allToys")}
           </Link>
-          {categories.map((c) => (
-            <Link
-              key={c.slug}
-              href={`/categorie/${c.slug}`}
-              className={`text-sm ${activeSlug === c.slug ? "font-extrabold text-primary" : "text-muted-foreground"}`}
-            >
-              {c.image} {localized(c.nameFr, c.nameAr, locale)}
-            </Link>
-          ))}
+          {categories.map((c) => {
+            const childActive = c.children?.some((child) => child.slug === activeSlug) ?? false;
+            return (
+              <div key={c.slug}>
+                <Link
+                  href={`/categorie/${c.slug}`}
+                  className={`text-sm ${activeSlug === c.slug ? "font-extrabold text-primary" : "text-muted-foreground"}`}
+                >
+                  {c.image} {localized(c.nameFr, c.nameAr, locale)}
+                </Link>
+                {/* Sous-catégories : repliées sauf quand l'une d'elles (ou leur
+                    parent) est la page courante — sinon elles n'ont aucun point
+                    d'entrée navigable malgré leur indexation dans le sitemap. */}
+                {(activeSlug === c.slug || childActive) && c.children && c.children.length > 0 && (
+                  <div className="flex flex-col gap-1.5 mt-1.5 ms-4 border-s border-border ps-3">
+                    {c.children.map((child) => (
+                      <Link
+                        key={child.slug}
+                        href={`/categorie/${child.slug}`}
+                        className={`text-sm ${activeSlug === child.slug ? "font-extrabold text-primary" : "text-muted-foreground"}`}
+                      >
+                        {localized(child.nameFr, child.nameAr, locale)}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
       <div className="border-t border-border pt-4">

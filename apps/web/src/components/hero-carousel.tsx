@@ -33,7 +33,7 @@ const SLIDES: Slide[] = [
   {
     key: "promotions",
     icon: Sparkles,
-    href: "/categorie/construction",
+    href: "/recherche?promo=1",
     gradient: "linear-gradient(135deg, var(--brand-warning), #efb870)",
   },
 ];

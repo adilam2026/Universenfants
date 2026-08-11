@@ -58,7 +58,7 @@ export default function AccountPage() {
           )}
         </div>
         <Button asChild>
-          <Link href="/panier">{t("usePoints")}</Link>
+          <Link href="/checkout">{t("usePoints")}</Link>
         </Button>
       </div>
 

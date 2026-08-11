@@ -156,9 +156,15 @@ export const updateCartLine = (lineId: string, quantity: number, shareToken?: st
   });
 export const removeCartLine = (lineId: string, shareToken?: string) =>
   cartFetch<CartData>(`/cart/lines/${lineId}${shareToken ? `?shareToken=${encodeURIComponent(shareToken)}` : ""}`, { method: "DELETE" });
-export const applyCoupon = (code: string) => cartFetch<CartData>("/cart/coupon", { method: "POST", body: JSON.stringify({ code }) });
-export const removeCoupon = () => cartFetch<CartData>("/cart/coupon", { method: "DELETE" });
-export const shareCart = () => cartFetch<{ shareToken: string }>("/cart/share", { method: "POST" });
+export const applyCoupon = (code: string, shareToken?: string) =>
+  cartFetch<CartData>(`/cart/coupon${shareToken ? `?shareToken=${encodeURIComponent(shareToken)}` : ""}`, {
+    method: "POST",
+    body: JSON.stringify({ code }),
+  });
+export const removeCoupon = (shareToken?: string) =>
+  cartFetch<CartData>(`/cart/coupon${shareToken ? `?shareToken=${encodeURIComponent(shareToken)}` : ""}`, { method: "DELETE" });
+export const shareCart = (shareToken?: string) =>
+  cartFetch<{ shareToken: string }>(`/cart/share${shareToken ? `?shareToken=${encodeURIComponent(shareToken)}` : ""}`, { method: "POST" });
 
 export interface CheckoutPayload {
   firstName: string;
@@ -171,8 +177,8 @@ export interface CheckoutPayload {
   useLoyaltyPoints?: boolean;
 }
 
-export const checkout = (payload: CheckoutPayload) =>
-  cartFetch<{ id: string; orderNumber: string; total: string }>("/orders/checkout", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
+export const checkout = (payload: CheckoutPayload, shareToken?: string) =>
+  cartFetch<{ id: string; orderNumber: string; total: string }>(
+    `/orders/checkout${shareToken ? `?shareToken=${encodeURIComponent(shareToken)}` : ""}`,
+    { method: "POST", body: JSON.stringify(payload) },
+  );

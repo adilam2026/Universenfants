@@ -43,7 +43,7 @@ export default async function LocaleLayout({
       <body className="min-h-full flex flex-col font-sans">
         <NextIntlClientProvider>
           <SiteHeader />
-          <main className="flex-1 pb-20 md:pb-0">{children}</main>
+          <main className="flex-1 pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0">{children}</main>
           <SiteFooter />
         </NextIntlClientProvider>
       </body>

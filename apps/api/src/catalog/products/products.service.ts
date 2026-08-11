@@ -73,7 +73,15 @@ export class ProductsService {
     const active = await this.pricing.getActivePromotions();
 
     const where: Prisma.ProductWhereInput = { status: "ACTIVE" };
-    if (query.category) where.category = { slug: query.category };
+    if (query.category) {
+      // Un filtre { category: { slug } } n'incluait que les produits
+      // rattachés directement à cette catégorie — tout produit classé
+      // uniquement dans une sous-catégorie restait invisible depuis la page
+      // de la catégorie parente, alors que le sitemap/l'admin les traitent
+      // bien comme des descendants navigables.
+      const categoryIds = await this.resolveCategoryIds(query.category);
+      where.categoryId = { in: categoryIds.length > 0 ? categoryIds : ["__none__"] };
+    }
     if (query.brand) where.brand = { slug: query.brand };
     if (query.ageMin !== undefined) where.ageMax = { gte: query.ageMin };
     if (query.ageMax !== undefined) where.ageMin = { lte: query.ageMax };
@@ -147,7 +155,19 @@ export class ProductsService {
         ...(useRelevanceOrder ? {} : { orderBy }),
         skip: useRelevanceOrder ? 0 : (page - 1) * limit,
         take: useRelevanceOrder ? undefined : limit,
-        include: { images: { orderBy: { order: "asc" }, take: 1 }, brand: true, category: true },
+        include: {
+          images: { orderBy: { order: "asc" }, take: 1 },
+          brand: true,
+          category: true,
+          // Le stock au niveau Product n'est qu'un instantané pour les
+          // produits sans variante (§2 Partie 4, cf. schema.prisma) — pour un
+          // produit à variantes, le stock réel vit sur ProductVariant et
+          // n'est jamais resynchronisé. Sans ces colonnes ici, toPublicShape()
+          // calculait "available" sur le stock Product périmé et pouvait
+          // afficher "Épuisé" sur toute la grille pour un produit dont les
+          // variantes sont en réalité disponibles (et inversement).
+          variants: { select: { stock: true, reservedStock: true } },
+        },
       }),
       this.prisma.product.count({ where }),
     ]);
@@ -168,6 +188,23 @@ export class ProductsService {
       limit,
       totalPages: Math.max(1, Math.ceil(total / limit)),
     };
+  }
+
+  /** Slug d'une catégorie -> son id + celui de tous ses descendants (BFS,
+   * profondeur non bornée pour rester correct si l'arborescence s'approfondit). */
+  private async resolveCategoryIds(slug: string): Promise<string[]> {
+    const root = await this.prisma.category.findUnique({ where: { slug }, select: { id: true } });
+    if (!root) return [];
+    const ids = [root.id];
+    let frontier = [root.id];
+    while (frontier.length > 0) {
+      const children = await this.prisma.category.findMany({ where: { parentId: { in: frontier } }, select: { id: true } });
+      if (children.length === 0) break;
+      const childIds = children.map((c) => c.id);
+      ids.push(...childIds);
+      frontier = childIds;
+    }
+    return ids;
   }
 
   async findBySlug(slug: string, sessionId?: string) {
@@ -223,9 +260,19 @@ export class ProductsService {
   }
 
   /** Ne renvoie jamais costPrice/reservedStock au Front — marge = donnée interne. */
-  private toPublicShape<T extends { costPrice: unknown; reservedStock: number; stock: number }>(product: T) {
-    const { costPrice: _costPrice, reservedStock, stock, ...rest } = product as any;
-    return { ...rest, stock, available: Math.max(0, stock - reservedStock) };
+  private toPublicShape<
+    T extends { costPrice: unknown; reservedStock: number; stock: number; variants?: { stock: number; reservedStock: number }[] },
+  >(product: T) {
+    const { costPrice: _costPrice, reservedStock, stock, variants, ...rest } = product as any;
+    // Un produit à variantes n'a pas de stock propre significatif : au moins
+    // une variante achetable suffit à le rendre disponible, même si le champ
+    // Product.stock (jamais mis à jour après la création — cf. product-form.tsx)
+    // est à 0 ou périmé.
+    const available: number =
+      variants && variants.length > 0
+        ? Math.max(0, ...variants.map((v: { stock: number; reservedStock: number }) => v.stock - v.reservedStock))
+        : Math.max(0, stock - reservedStock);
+    return { ...rest, stock, available };
   }
 
   // ------------------------------------------------------------------

@@ -140,7 +140,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
       </section>
 
       <section>
-        <SectionTitle title={t("promotions")} href="/categorie/construction" seeAll={t("seeAll")} />
+        <SectionTitle title={t("promotions")} href="/recherche?promo=1" seeAll={t("seeAll")} />
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3.5">
           {promo.items.map((p) => (
             <ProductCard key={p.id} product={p} />
