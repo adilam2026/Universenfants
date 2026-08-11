@@ -45,6 +45,12 @@ export function HeroCarousel({ banners = [] }: { banners?: HeroBanner[] }) {
   const t = useTranslations("hero");
   const locale = useLocale();
   const [index, setIndex] = useState(0);
+  // Une bannière saisie côté admin avec une image cassée (URL de dev
+  // périmée, fichier jamais réellement uploadé…) ne doit jamais s'afficher
+  // comme un rectangle vide : on bascule cette bannière précise sur le même
+  // dégradé soigné que le repli "aucune bannière configurée" plus bas,
+  // titre/sous-titre/lien réels conservés.
+  const [brokenImages, setBrokenImages] = useState<Record<string, boolean>>({});
   const count = banners.length > 0 ? banners.length : SLIDES.length;
 
   useEffect(() => {
@@ -104,6 +110,7 @@ export function HeroCarousel({ banners = [] }: { banners?: HeroBanner[] }) {
         {banners.map((banner, i) => {
           const title = localized(banner.titleFr, banner.titleAr, locale);
           const subtitle = localized(banner.subtitleFr ?? "", banner.subtitleAr, locale);
+          const imageBroken = brokenImages[banner.id];
           const content = (
             <div
               className={cn(
@@ -111,7 +118,22 @@ export function HeroCarousel({ banners = [] }: { banners?: HeroBanner[] }) {
                 i === index ? "opacity-100" : "opacity-0 pointer-events-none",
               )}
             >
-              <Image src={banner.imageDesktop} alt={title} fill sizes="100vw" className="object-cover" priority={i === 0} />
+              {imageBroken ? (
+                <div
+                  className="absolute inset-0"
+                  style={{ background: SLIDES[i % SLIDES.length].gradient }}
+                />
+              ) : (
+                <Image
+                  src={banner.imageDesktop}
+                  alt={title}
+                  fill
+                  sizes="100vw"
+                  className="object-cover"
+                  priority={i === 0}
+                  onError={() => setBrokenImages((prev) => ({ ...prev, [banner.id]: true }))}
+                />
+              )}
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
               <div className="relative z-10 h-full flex items-end px-6 md:px-12 pb-8 max-w-md text-white">
                 <div>
