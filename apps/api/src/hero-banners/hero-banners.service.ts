@@ -71,7 +71,7 @@ export class HeroBannersService {
     const updated = await this.prisma.heroBanner.update({
       where: { id },
       data: {
-        ...this.parseFields(fields),
+        ...this.parsePartialFields(fields),
         ...(desktop ? { imageDesktop: desktop.url } : {}),
         ...(mobile ? { imageMobile: mobile.url } : {}),
       },
@@ -104,5 +104,32 @@ export class HeroBannersService {
       endAt: fields.endAt ? new Date(fields.endAt) : null,
       status,
     };
+  }
+
+  // À la différence de parseFields (utilisé à la création, où toutes les
+  // valeurs doivent exister), une mise à jour ne doit toucher QUE les
+  // champs réellement envoyés — sinon un appel partiel comme le simple
+  // bouton "Activer/Désactiver" (qui n'envoie que titleFr + status)
+  // écrasait silencieusement le sous-titre, le lien et les dates de
+  // validité existants avec null à chaque clic.
+  private parsePartialFields(fields: HeroBannerFields) {
+    const data: Record<string, unknown> = {};
+    if (fields.titleFr !== undefined) data.titleFr = fields.titleFr;
+    if (fields.titleAr !== undefined) data.titleAr = fields.titleAr || null;
+    if (fields.subtitleFr !== undefined) data.subtitleFr = fields.subtitleFr || null;
+    if (fields.subtitleAr !== undefined) data.subtitleAr = fields.subtitleAr || null;
+    if (fields.link !== undefined) data.link = fields.link || null;
+    if (fields.order !== undefined) {
+      const order = Number(fields.order);
+      if (!Number.isFinite(order)) throw new BadRequestException("Ordre invalide");
+      data.order = order;
+    }
+    if (fields.startAt !== undefined) data.startAt = fields.startAt ? new Date(fields.startAt) : null;
+    if (fields.endAt !== undefined) data.endAt = fields.endAt ? new Date(fields.endAt) : null;
+    if (fields.status !== undefined) {
+      if (!["DRAFT", "SCHEDULED", "ACTIVE", "ENDED"].includes(fields.status)) throw new BadRequestException("Statut invalide");
+      data.status = fields.status;
+    }
+    return data;
   }
 }

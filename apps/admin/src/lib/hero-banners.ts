@@ -40,8 +40,12 @@ async function submitForm(
   fileMobile?: File | null,
 ): Promise<AdminHeroBanner> {
   const formData = new FormData();
+  // Une valeur vide ("") est envoyée telle quelle — c'est ce qui permet à
+  // l'admin d'effacer volontairement un sous-titre ou une date de
+  // validité existants ; seul `undefined` (champ non concerné par cet
+  // appel, ex. le simple bouton Activer/Désactiver) est omis.
   for (const [key, value] of Object.entries(fields)) {
-    if (value !== undefined && value !== "") formData.append(key, String(value));
+    if (value !== undefined) formData.append(key, String(value));
   }
   if (fileDesktop) formData.append("fileDesktop", fileDesktop);
   if (fileMobile) formData.append("fileMobile", fileMobile);
