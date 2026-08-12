@@ -475,6 +475,7 @@ model Order {
   stockMovements      StockMovement[]
   loyaltyTransactions LoyaltyTransaction[]
   couponRedemption    CouponRedemption?
+  trackingOtps        OrderTrackingOtp[]
 
   createdAt   DateTime  @default(now())
   confirmedAt DateTime?
@@ -485,6 +486,29 @@ model Order {
   @@index([customerId])
   @@index([status])
   @@index([createdAt])
+}
+
+// Suivi de commande invité (sans compte) : numéro de commande + OTP envoyé
+// par WhatsApp au téléphone associé à LA commande (shippingPhone, pas
+// Customer.phone qui peut changer depuis) — jamais le numéro de commande
+// seul comme preuve d'identité. Le code n'est jamais stocké en clair
+// (codeHash), contrairement à passwordResetToken/emailChangeToken qui sont
+// des tokens longs et aléatoires non devinables : un OTP à 6 chiffres est
+// court et saisi manuellement, donc soumis à un risque de force brute
+// réel — d'où codeHash + attempts + expiration courte, absents de ce
+// pattern-là.
+model OrderTrackingOtp {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  codeHash  String
+  phone     String
+  attempts  Int      @default(0)
+  used      Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([orderId, createdAt])
 }
 
 // ⚠️ Le prix d'achat ET le prix de vente sont figés dans la ligne pour

@@ -9,6 +9,7 @@ import { useStoreSettings } from "@/hooks/use-store-settings";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { SearchForm, SearchFormFallback } from "@/components/search-form";
 import { localized } from "@/lib/localized";
+import { isCheckoutTunnelPath } from "@/lib/checkout-tunnel";
 import type { Category } from "@/lib/api";
 
 const CATEGORY_EMOJI: Record<string, string> = {
@@ -26,6 +27,12 @@ export function SiteHeader({ categories = [] }: { categories?: Category[] }) {
   const locale = useLocale();
   const pathname = usePathname();
   const router = useRouter();
+  // Tunnel de commande : interface allégée pour limiter les sorties
+  // involontaires (navigation catalogue, recherche, tiroir de menu). Le
+  // panier et la confirmation restent hors de ce mode — seul /checkout est
+  // le moment où l'utilisateur saisit ses informations et peut être
+  // distrait par une envie de continuer à naviguer.
+  const isCheckoutTunnel = isCheckoutTunnelPath(pathname);
   const storeSettings = useStoreSettings();
   const [open, setOpen] = useState(false);
   const cartCount = useCartCount();
@@ -117,21 +124,32 @@ export function SiteHeader({ categories = [] }: { categories?: Category[] }) {
       <header className="sticky top-0 z-40 bg-card/95 backdrop-blur border-b border-border">
         <div className="mx-auto max-w-7xl 2xl:max-w-[1600px] px-4 md:px-7">
           <div className="flex items-center gap-2 md:gap-4 py-2.5 md:py-3.5">
-            <button
-              ref={menuButtonRef}
-              className="md:hidden flex size-9 items-center justify-center rounded-full hover:bg-secondary"
-              aria-label={t("nav.menu")}
-              onClick={() => setOpen(true)}
+            {!isCheckoutTunnel && (
+              <button
+                ref={menuButtonRef}
+                className="md:hidden flex size-9 items-center justify-center rounded-full hover:bg-secondary"
+                aria-label={t("nav.menu")}
+                onClick={() => setOpen(true)}
+              >
+                <Menu className="size-5" />
+              </button>
+            )}
+            <Link
+              href="/"
+              dir="ltr"
+              className={cn(
+                "flex items-center font-display font-extrabold text-xl text-primary shrink-0",
+                !isCheckoutTunnel && "hidden md:flex",
+              )}
             >
-              <Menu className="size-5" />
-            </button>
-            <Link href="/" dir="ltr" className="hidden md:flex items-center font-display font-extrabold text-xl text-primary shrink-0">
               Univers<span className="text-brand-cta">Enfants</span>
             </Link>
-            <Suspense fallback={<SearchFormFallback />}>
-              <SearchForm />
-            </Suspense>
-            <nav className="flex items-center gap-1 shrink-0">
+            {!isCheckoutTunnel && (
+              <Suspense fallback={<SearchFormFallback />}>
+                <SearchForm />
+              </Suspense>
+            )}
+            <nav className={cn("flex items-center gap-1 shrink-0", isCheckoutTunnel && "ms-auto")}>
               <button
                 onClick={() => switchLocale(locale === "fr" ? "ar" : "fr")}
                 className="flex h-9 items-center justify-center gap-1 rounded-full px-2.5 text-xs font-bold text-muted-foreground hover:bg-secondary hover:text-foreground"
@@ -169,22 +187,24 @@ export function SiteHeader({ categories = [] }: { categories?: Category[] }) {
             </nav>
           </div>
 
-          <nav className="flex gap-2 overflow-x-auto pb-2.5 [scrollbar-width:none]">
-            {QUICK_NAV.map((item) => (
-              <Link
-                key={item.label}
-                href={item.href}
-                className={cn(
-                  "shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-bold",
-                  item.strong && "bg-primary text-primary-foreground",
-                  item.accent && "bg-brand-cta-soft text-brand-cta-hover",
-                  !item.strong && !item.accent && "bg-secondary text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
+          {!isCheckoutTunnel && (
+            <nav className="flex gap-2 overflow-x-auto pb-2.5 [scrollbar-width:none]">
+              {QUICK_NAV.map((item) => (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  className={cn(
+                    "shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-bold",
+                    item.strong && "bg-primary text-primary-foreground",
+                    item.accent && "bg-brand-cta-soft text-brand-cta-hover",
+                    !item.strong && !item.accent && "bg-secondary text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </nav>
+          )}
 
           {/* Accès rapide aux univers (catégories) — mobile uniquement.
               Auparavant, sur mobile, atteindre une catégorie demandait soit
@@ -192,8 +212,9 @@ export function SiteHeader({ categories = [] }: { categories?: Category[] }) {
               catégories), soit de revenir à l'accueil et scroller jusqu'à
               "Explorer par univers". Cette rangée réplique cet accès
               directement sous la barre âge/Tous les jouets, visible sur
-              toutes les pages, sans ouvrir aucun menu. */}
-          {categories.length > 0 && (
+              toutes les pages, sans ouvrir aucun menu. Masquée dans le tunnel
+              de commande, comme QUICK_NAV, pour la même raison. */}
+          {!isCheckoutTunnel && categories.length > 0 && (
             <nav className="md:hidden flex gap-2 overflow-x-auto pb-2.5 -mt-1 [scrollbar-width:none]">
               {categories.map((cat) => (
                 <Link
@@ -260,7 +281,11 @@ export function SiteHeader({ categories = [] }: { categories?: Category[] }) {
         </nav>
       </aside>
 
-      {/* Barre de navigation mobile basse */}
+      {/* Barre de navigation mobile basse — masquée dans le tunnel de
+          commande (même raison que QUICK_NAV : chaque lien y mène hors du
+          tunnel). L'espace qu'elle réserve en bas de page est retiré en
+          cohérence par <MainContent>. */}
+      {!isCheckoutTunnel && (
       <nav
         className="fixed bottom-0 inset-x-0 z-40 flex border-t border-border bg-card md:hidden"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
@@ -286,6 +311,7 @@ export function SiteHeader({ categories = [] }: { categories?: Category[] }) {
           </Link>
         ))}
       </nav>
+      )}
     </>
   );
 }

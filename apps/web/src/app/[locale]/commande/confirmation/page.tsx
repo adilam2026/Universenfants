@@ -2,6 +2,7 @@ import { PartyPopper } from "lucide-react";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
+import { TrackOrderButton } from "@/components/track-order-button";
 
 function dh(value: number) {
   return `${value.toLocaleString("fr-FR")} DH`;
@@ -37,9 +38,7 @@ export default async function OrderConfirmationPage({ params, searchParams }: Pa
       )}
 
       <div className="flex gap-2.5 mt-6 justify-center flex-wrap">
-        <Button asChild>
-          <Link href="/compte/commandes">{t("trackOrder")}</Link>
-        </Button>
+        <TrackOrderButton orderNumber={orderNumber} />
         <Button asChild variant="ghost">
           <Link href="/">{t("continueShopping")}</Link>
         </Button>

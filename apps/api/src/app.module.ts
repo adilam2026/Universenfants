@@ -30,6 +30,7 @@ import { BundlesModule } from "./bundles/bundles.module";
 import { SearchModule } from "./search/search.module";
 import { StorageModule } from "./storage/storage.module";
 import { EmailModule } from "./email/email.module";
+import { WhatsAppModule } from "./whatsapp/whatsapp.module";
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { EmailModule } from "./email/email.module";
     SearchModule,
     StorageModule,
     EmailModule,
+    WhatsAppModule,
     AuthModule,
     CategoriesModule,
     BrandsModule,

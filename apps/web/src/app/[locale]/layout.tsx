@@ -7,6 +7,7 @@ import { routing } from "@/i18n/routing";
 import { getCategoryTree } from "@/lib/api";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
+import { MainContent } from "@/components/main-content";
 
 // Polices système (pas de next/font/google : aucune dépendance réseau au
 // build, cohérent avec la direction artistique validée en Phase 1).
@@ -49,7 +50,7 @@ export default async function LocaleLayout({
       <body className="min-h-full flex flex-col font-sans">
         <NextIntlClientProvider>
           <SiteHeader categories={categories} />
-          <main className="flex-1 pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0">{children}</main>
+          <MainContent>{children}</MainContent>
           <SiteFooter />
         </NextIntlClientProvider>
       </body>

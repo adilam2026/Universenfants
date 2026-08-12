@@ -3,9 +3,9 @@ import { getTranslations, getLocale } from "next-intl/server";
 import { setRequestLocale } from "next-intl/server";
 import { getCategoryTree, getProducts, getActiveHeroBanners, getActiveBrands } from "@/lib/api";
 import { localized } from "@/lib/localized";
-import { GUIDES } from "@/lib/guides-content";
 import { ProductCard } from "@/components/product-card";
 import { HeroCarousel } from "@/components/hero-carousel";
+import { GuidesCarousel } from "@/components/guides-carousel";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
 
@@ -37,7 +37,6 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
   setRequestLocale(locale);
   const t = await getTranslations("home");
   const tNav = await getTranslations("nav");
-  const tGuides = await getTranslations("guides");
   const currentLocale = await getLocale();
 
   const [categories, brands, trending, promo, bestSellers, newest, heroBanners] = await Promise.all([
@@ -144,65 +143,12 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
         </div>
       </section>
 
-      <section className="flex items-center gap-3.5 rounded-2xl bg-brand-primary-soft p-4">
-        <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
-          <Gift className="size-5" />
-        </div>
-        <div className="flex-1">
-          <h3 className="font-bold text-sm">{t("giftBannerTitle")}</h3>
-          <p className="hidden sm:block text-xs text-muted-foreground mt-0.5">{t("giftBannerText")}</p>
-        </div>
-        <Button asChild variant="default" size="sm">
-          <Link href="/conseiller-cadeau">{t("giftBannerButton")}</Link>
-        </Button>
-      </section>
-
-      <section className="flex items-center gap-3.5 rounded-2xl bg-brand-cta-soft p-4">
-        <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-brand-cta text-brand-cta-foreground">
-          <Cake className="size-5" />
-        </div>
-        <div className="flex-1">
-          <h3 className="font-bold text-sm">{t("birthdayBannerTitle")}</h3>
-          <p className="hidden sm:block text-xs text-muted-foreground mt-0.5">{t("birthdayBannerText")}</p>
-        </div>
-        <Button asChild variant="cta" size="sm">
-          <Link href="/liste-anniversaire">{t("birthdayBannerButton")}</Link>
-        </Button>
-      </section>
-
-      {/* Le parent comme acteur du jeu, pas seulement acheteur : une seule
-          rangée de 3 guides (pas un carrousel promotionnel supplémentaire)
-          entre les bannières d'aide à la décision et les blocs commerciaux
-          — volontairement léger pour ne pas alourdir l'accueil. */}
-      <section>
-        <SectionTitle title={tGuides("homeSectionTitle")} href="/guides" seeAll={t("seeAll")} />
-        <p className="text-xs text-muted-foreground -mt-2.5 mb-3.5">{tGuides("homeSectionSubtitle")}</p>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {GUIDES.slice(0, 3).map((guide) => {
-            const content = guide[currentLocale === "ar" ? "ar" : "fr"];
-            return (
-              <Link
-                key={guide.slug}
-                href={`/guides/${guide.slug}`}
-                className="group flex items-center gap-3 rounded-2xl border border-border bg-card p-3 hover:border-primary transition-colors"
-              >
-                <span
-                  className="flex size-14 shrink-0 items-center justify-center rounded-xl text-2xl"
-                  style={{ background: guide.gradient }}
-                >
-                  {guide.emoji}
-                </span>
-                <span className="flex flex-col gap-0.5 min-w-0">
-                  <span className="font-display font-extrabold text-xs leading-snug line-clamp-2 group-hover:text-primary">
-                    {content.title}
-                  </span>
-                  <span className="text-[11px] text-muted-foreground">{tGuides("readTime", { n: content.readMinutes })}</span>
-                </span>
-              </Link>
-            );
-          })}
-        </div>
-      </section>
+      {/* Le parent comme acteur du jeu, pas seulement acheteur : carrousel
+          éditorial entre les bannières d'aide à la décision et les blocs
+          commerciaux — remplace l'ancienne rangée de 3 cartes compactes
+          (mêmes conseils, présentation nettement plus visuelle) plutôt que
+          d'empiler deux blocs "conseils" consécutifs sur l'accueil. */}
+      <GuidesCarousel />
 
       <section>
         <SectionTitle title={t("promotions")} href="/recherche?promo=1" seeAll={t("seeAll")} />

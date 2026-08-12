@@ -343,6 +343,26 @@
     "cancelSuccess": "Votre commande a été annulée.",
     "cancelError": "Impossible d'annuler cette commande."
   },
+  "orderTracking": {
+    "title": "Suivre ma commande",
+    "subtitle": "Entrez votre numéro de commande — nous vous enverrons un code de vérification par WhatsApp au numéro associé.",
+    "orderNumberLabel": "Numéro de commande",
+    "orderNumberPlaceholder": "UE-2026-000001",
+    "sendCode": "Envoyer le code",
+    "sending": "Envoi…",
+    "otpSentTo": "Un code de vérification a été envoyé par WhatsApp au numéro {phone}.",
+    "otpSentGeneric": "Si cette commande existe, un code de vérification a été envoyé par WhatsApp au numéro associé.",
+    "codeLabel": "Code de vérification (6 chiffres)",
+    "codePlaceholder": "123456",
+    "verify": "Vérifier",
+    "verifying": "Vérification…",
+    "resend": "Renvoyer le code",
+    "resendIn": "Renvoyer le code dans {n}s",
+    "changeOrderNumber": "Ce n'est pas la bonne commande ?",
+    "trackAnother": "Suivre une autre commande",
+    "loading": "Chargement…",
+    "genericError": "Une erreur est survenue, veuillez réessayer."
+  },
   "giftAdvisor": {
     "title": "Conseiller Cadeau",
     "subtitle": "4 questions, une sélection de cadeaux adaptée en 30 secondes.",
@@ -446,6 +466,12 @@
     "ctaGiftAdvisor": "Essayer le Conseiller Cadeau",
     "allGuides": "Tous les guides",
     "homeSectionTitle": "Idées et conseils pour jouer avec eux",
-    "homeSectionSubtitle": "Parce que le meilleur jouet ne suffit pas toujours — quelques repères simples pour bien choisir et bien jouer ensemble."
+    "homeSectionSubtitle": "Parce que le meilleur jouet ne suffit pas toujours — quelques repères simples pour bien choisir et bien jouer ensemble.",
+    "carouselTitle": "Idées et conseils pour jouer avec eux",
+    "carouselSubtitle": "Parce que le meilleur jouet ne suffit pas toujours — quelques repères simples pour bien choisir et bien jouer ensemble.",
+    "carouselCta": "Voir tous les conseils",
+    "carouselPrev": "Conseil précédent",
+    "carouselNext": "Conseil suivant",
+    "cardCta": "Voir le conseil"
   }
 }

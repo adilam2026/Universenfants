@@ -7,6 +7,7 @@ import { EmailService } from "../email/email.service";
 import { PricingService, type ActivePromotions } from "../catalog/pricing/pricing.service";
 import { calculateCouponDiscount } from "../marketing/coupons/coupon-discount.util";
 import { calculateLoyaltyRedemption, calculateVat } from "./order-pricing.util";
+import { sanitizeOrderForCustomer } from "./order-sanitize.util";
 import { ORDER_NEXT_STATUS, ORDER_NUMBER_PREFIX } from "@universenfants/shared";
 import type { CheckoutDto } from "./dto/checkout.dto";
 import type { UpdateOrderStatusDto } from "./dto/update-order-status.dto";
@@ -251,7 +252,7 @@ export class OrdersService {
         Number(order.total),
       );
     }
-    return this.sanitizeForCustomer(order);
+    return sanitizeOrderForCustomer(order);
   }
 
   private async resolveCustomer(
@@ -340,18 +341,13 @@ export class OrdersService {
 
   // ------------------------------------------------------------------
 
-  /** costPriceSnapshot = marge interne, ne doit jamais atteindre un client (Front). */
-  private sanitizeForCustomer<T extends { lines: { costPriceSnapshot: unknown }[] }>(order: T) {
-    return { ...order, lines: order.lines.map(({ costPriceSnapshot: _omit, ...line }) => line) };
-  }
-
   async findForCustomer(customerId: string, orderId: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       include: { lines: true, statusHistory: { orderBy: { createdAt: "asc" } } },
     });
     if (!order || order.customerId !== customerId) throw new NotFoundException("Commande introuvable");
-    return this.sanitizeForCustomer(order);
+    return sanitizeOrderForCustomer(order);
   }
 
   listForCustomer(customerId: string) {
