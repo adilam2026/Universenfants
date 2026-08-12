@@ -23,6 +23,10 @@ const nextConfig: NextConfig = {
       ...(process.env.R2_PUBLIC_URL
         ? [{ protocol: "https" as const, hostname: new URL(process.env.R2_PUBLIC_URL).hostname }]
         : []),
+      // Stockage Vercel Blob (voir apps/api/src/storage/vercel-blob.provider.ts)
+      // — le sous-domaine <store-id>.public.blob.vercel-storage.com varie par
+      // store, d'où le hostname générique plutôt qu'une valeur exacte.
+      { protocol: "https", hostname: "*.public.blob.vercel-storage.com" },
     ],
     // `localhost` resolves to a private IP, blocked by Next's SSRF protection by
     // default. Only the local-disk storage fallback (dev only) serves images from
