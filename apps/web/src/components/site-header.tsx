@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
-import { Menu, Search, ShoppingBag, User, X, Gift, Cake, Tag, Mail, Languages, Heart, BookOpen } from "lucide-react";
+import { Menu, Search, ShoppingBag, User, X, Gift, Cake, Tag, Mail, Languages, Heart, BookOpen, ChevronDown, Grid2x2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCartCount } from "@/hooks/use-cart";
 import { useStoreSettings } from "@/hooks/use-store-settings";
@@ -39,6 +39,26 @@ export function SiteHeader({ categories = [] }: { categories?: Category[] }) {
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const drawerRef = useRef<HTMLElement>(null);
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
+  const categoriesRef = useRef<HTMLDivElement>(null);
+
+  // Fermeture du menu "Catégories" au clic extérieur ou à l'échap — même
+  // exigence d'accessibilité clavier que le tiroir mobile ci-dessous.
+  useEffect(() => {
+    if (!categoriesOpen) return;
+    function onPointerDown(e: PointerEvent) {
+      if (categoriesRef.current && !categoriesRef.current.contains(e.target as Node)) setCategoriesOpen(false);
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setCategoriesOpen(false);
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [categoriesOpen]);
 
   // Le tiroir mobile n'avait ni piège à focus ni fermeture au clavier (Échap) :
   // au clavier, Tab continuait de traverser les éléments du header masqué
@@ -100,6 +120,19 @@ export function SiteHeader({ categories = [] }: { categories?: Category[] }) {
     { label: t("wishlist.title"), href: "/favoris", icon: Heart },
     { label: t("nav.myAccount"), href: "/compte", icon: User },
     { label: t("nav.contact"), href: "/pages/contact", icon: Mail },
+  ];
+
+  // Menu principal desktop : jusqu'ici, seule la barre de chips "âge" était
+  // visible sur desktop — aucun accès direct aux univers/catégories ni aux
+  // fonctionnalités clés (conseiller cadeau, liste anniversaire, guides)
+  // sans ouvrir le tiroir mobile (masqué sur desktop). Réutilise les mêmes
+  // libellés/hrefs que DRAWER_LINKS plutôt que d'en redéfinir de nouveaux.
+  // Les promotions restent uniquement dans QUICK_NAV juste en dessous —
+  // les répéter ici aurait été un doublon immédiatement adjacent.
+  const MAIN_NAV: { label: string; href: Parameters<typeof Link>[0]["href"] }[] = [
+    { label: t("nav.giftAdvisor"), href: "/conseiller-cadeau" },
+    { label: t("nav.birthdayList"), href: "/liste-anniversaire" },
+    { label: t("nav.guides"), href: "/guides" },
   ];
 
   // Lit la query string au moment du clic plutôt que via useSearchParams() —
@@ -186,6 +219,47 @@ export function SiteHeader({ categories = [] }: { categories?: Category[] }) {
               </Link>
             </nav>
           </div>
+
+          {/* Menu principal desktop : rangée distincte au-dessus des chips
+              "âge" (QUICK_NAV) pour créer une vraie hiérarchie — un menu
+              (sections du site) plutôt que des filtres (QUICK_NAV reste des
+              raccourcis de recherche rapide, pas une navigation). */}
+          {!isCheckoutTunnel && (
+            <nav className="hidden md:flex items-center gap-5 pb-2.5 text-sm font-bold">
+              <div ref={categoriesRef} className="relative">
+                <button
+                  type="button"
+                  onClick={() => setCategoriesOpen((v) => !v)}
+                  aria-expanded={categoriesOpen}
+                  className="flex items-center gap-1.5 rounded-full px-3 py-1.5 -ms-3 text-foreground hover:bg-secondary"
+                >
+                  <Grid2x2 className="size-4 text-primary" />
+                  {t("nav.categories")}
+                  <ChevronDown className={cn("size-3.5 transition-transform", categoriesOpen && "rotate-180")} />
+                </button>
+                {categoriesOpen && categories.length > 0 && (
+                  <div className="absolute start-0 top-full z-30 mt-1 grid w-64 grid-cols-2 gap-1 rounded-2xl border border-border bg-card p-2 shadow-lg">
+                    {categories.map((cat) => (
+                      <Link
+                        key={cat.id}
+                        href={`/categorie/${cat.slug}`}
+                        onClick={() => setCategoriesOpen(false)}
+                        className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-bold text-foreground hover:bg-secondary"
+                      >
+                        <span aria-hidden>{cat.image ?? CATEGORY_EMOJI[cat.slug] ?? "🧸"}</span>
+                        {localized(cat.nameFr, cat.nameAr, locale)}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {MAIN_NAV.map((item) => (
+                <Link key={item.label} href={item.href} className="text-muted-foreground hover:text-foreground">
+                  {item.label}
+                </Link>
+              ))}
+            </nav>
+          )}
 
           {!isCheckoutTunnel && (
             <nav className="flex gap-2 overflow-x-auto pb-2.5 [scrollbar-width:none]">

@@ -1,5 +1,5 @@
-import { ApiProperty } from "@nestjs/swagger";
-import { IsNumber, Max, Min } from "class-validator";
+import { ApiPropertyOptional, ApiProperty } from "@nestjs/swagger";
+import { IsNumber, IsOptional, IsString, Matches, Max, Min } from "class-validator";
 
 export class UpdateSettingsDto {
   // Fraction (0.2 = 20%), jamais un pourcentage brut — @Max(1) borne donc à
@@ -14,4 +14,13 @@ export class UpdateSettingsDto {
   // calcul, ici en complément pour empêcher la saisie même du côté admin).
   @ApiProperty() @IsNumber() @Min(1) loyaltyRedeemRate!: number;
   @ApiProperty() @IsNumber() @Min(0) freeShippingThreshold!: number;
+  // Numéro affiché tel quel dans le lien wa.me (bouton "Commander via
+  // WhatsApp" de la fiche produit) — chiffres uniquement, indicatif pays
+  // inclus (ex : 212600000000), jamais de "+" ni d'espaces au format wa.me.
+  // Optionnel et distinct de WHATSAPP_PHONE_NUMBER_ID (identifiant technique
+  // Meta Graph API pour l'envoi des OTP, non lisible par un humain).
+  // Chaîne vide acceptée : c'est le moyen de retirer le numéro déjà
+  // enregistré (masque à nouveau le bouton WhatsApp côté boutique).
+  @ApiPropertyOptional() @IsOptional() @IsString() @Matches(/^(\d{6,15})?$/, { message: "Numéro WhatsApp invalide (chiffres uniquement, indicatif pays inclus)" })
+  whatsappOrderNumber?: string;
 }

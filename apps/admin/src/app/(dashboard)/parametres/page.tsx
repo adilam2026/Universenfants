@@ -106,6 +106,9 @@ export default function SettingsPage() {
         vatRate: Number(form.get("vatRate")) / 100,
         loyaltyRedeemRate: Number(form.get("loyaltyRedeemRate")),
         freeShippingThreshold: Number(form.get("freeShippingThreshold")),
+        // Chiffres uniquement (espaces retirés) : le lien wa.me côté boutique
+        // n'accepte pas d'espaces/tirets dans le numéro.
+        whatsappOrderNumber: String(form.get("whatsappOrderNumber") ?? "").replace(/\D/g, ""),
       });
       refreshSettings(updated, { revalidate: false });
       setSaved(true);
@@ -146,6 +149,20 @@ export default function SettingsPage() {
                   <Label htmlFor="freeShippingThreshold">Seuil de livraison gratuite global (DH)</Label>
                   <Input id="freeShippingThreshold" name="freeShippingThreshold" type="number" min={0} defaultValue={settings.freeShippingThreshold} />
                   <p className="text-xs text-muted-foreground">S&apos;applique aux villes sans seuil spécifique (voir Livraison).</p>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="whatsappOrderNumber">Numéro WhatsApp — commande (fiche produit)</Label>
+                  <Input
+                    id="whatsappOrderNumber"
+                    name="whatsappOrderNumber"
+                    type="tel"
+                    placeholder="212600000000"
+                    defaultValue={settings.whatsappOrderNumber ?? ""}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Indicatif pays inclus, chiffres uniquement (ex : 212600000000). Affiche le bouton « Commander via WhatsApp »
+                    sur chaque fiche produit ; laisser vide pour le masquer.
+                  </p>
                 </div>
               </fieldset>
               {error && <p className="text-sm text-destructive">{error}</p>}

@@ -22,6 +22,7 @@
     "age9to12": "9-12 ans",
     "age12plus": "12 ans et +",
     "promotions": "🔥 Promotions",
+    "categories": "Catégories",
     "toysByAge": "Jouets par âge",
     "toysByUniverse": "Jouets par univers",
     "giftAdvisor": "Conseiller Cadeau",
@@ -73,7 +74,9 @@
       "text": "Découvrez nos meilleures offres et nouveautés, jusqu'à -25% sur une sélection de jouets.",
       "cta": "Voir les promotions"
     },
-    "slideLabel": "Diapositive {n}"
+    "slideLabel": "Diapositive {n}",
+    "prevSlide": "Diapositive précédente",
+    "nextSlide": "Diapositive suivante"
   },
   "home": {
     "reassurance": {
@@ -142,6 +145,7 @@
     "sku": "SKU",
     "variant": "Choisir une option",
     "addToCart": "Ajouter au panier",
+    "addedToCart": "Ajouté au panier",
     "addToCartError": "Échec — indisponible",
     "addToCartPrice": "Ajouter au panier — {price}",
     "unavailable": "Indisponible",
@@ -164,7 +168,14 @@
     "submitReview": "Publier mon avis",
     "ratingStars": "{n} étoile(s)",
     "alreadyReviewed": "Merci, vous avez déjà laissé un avis pour ce produit.",
-    "reviewSubmitted": "Merci ! Votre avis a été envoyé et sera publié après modération."
+    "reviewSubmitted": "Merci ! Votre avis a été envoyé et sera publié après modération.",
+    "quantity": "Quantité",
+    "decreaseQuantity": "Diminuer la quantité",
+    "increaseQuantity": "Augmenter la quantité",
+    "continueShopping": "Continuer mes achats",
+    "viewCart": "Voir mon panier",
+    "orderViaWhatsapp": "Commander via WhatsApp",
+    "whatsappOrderMessage": "Bonjour, je souhaite commander :\n{name}\nRéf : {sku}\nQuantité : {qty}\n{url}"
   },
   "cart": {
     "title": "🛍 Mon panier",

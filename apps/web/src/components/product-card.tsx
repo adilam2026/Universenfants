@@ -57,7 +57,21 @@ export function ProductCard({ product }: { product: ProductSummary }) {
           <span className="text-[11px] text-muted-foreground">
             {outOfStock ? t("outOfStockShort") : product.ageMin != null ? `${product.ageMin}-${product.ageMax} ${t("years")}` : ""}
           </span>
-          <AddToCartButton productId={product.id} disabled={outOfStock} />
+          {/* Mobile : icône compacte, toujours visible (pas de survol tactile).
+              Desktop : masquée, remplacée par le bouton texte ci-dessous qui
+              n'apparaît qu'au survol de la carte. */}
+          <AddToCartButton productId={product.id} disabled={outOfStock} className="md:hidden" />
+        </div>
+        {/* Desktop : « Ajouter au panier » explicite au survol de la carte,
+            plutôt que la seule icône — l'icône seule ne se comprenait pas
+            d'un coup d'œil. Masqué par défaut (max-h-0) et révélé au survol
+            (group-hover, le conteneur .group est le wrapper de la carte) au
+            lieu d'un overlay sur l'image, qui aurait imbriqué un <button>
+            dans le <Link> de l'image (HTML invalide). */}
+        <div className="hidden md:block overflow-hidden transition-all duration-200 max-h-0 group-hover:max-h-10 group-hover:mt-2">
+          <AddToCartButton productId={product.id} disabled={outOfStock} className="w-full justify-center py-2 text-xs">
+            {t("addToCart")}
+          </AddToCartButton>
         </div>
       </div>
     </div>

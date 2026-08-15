@@ -7,6 +7,7 @@ export interface PublicSettings {
   vatRate: number;
   loyaltyRedeemRate: number;
   freeShippingThreshold: number;
+  whatsappOrderNumber: string | null;
 }
 
 export interface DeliveryCity {

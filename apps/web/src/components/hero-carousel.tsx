@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useTranslations, useLocale } from "next-intl";
-import { Gift, Cake, Sparkles, type LucideIcon } from "lucide-react";
+import { Gift, Cake, Sparkles, ChevronLeft, ChevronRight, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
 import { localized } from "@/lib/localized";
@@ -57,6 +57,13 @@ export function HeroCarousel({ banners = [] }: { banners?: HeroBanner[] }) {
     const id = setInterval(() => setIndex((i) => (i + 1) % count), 5000);
     return () => clearInterval(id);
   }, [count]);
+
+  function goPrev() {
+    setIndex((i) => (i - 1 + count) % count);
+  }
+  function goNext() {
+    setIndex((i) => (i + 1) % count);
+  }
 
   // Swipe tactile : suit le doigt via Pointer Events (touch + souris/pen en
   // un seul jeu de handlers). `touch-action: pan-y` laisse le scroll
@@ -164,6 +171,7 @@ export function HeroCarousel({ banners = [] }: { banners?: HeroBanner[] }) {
             <div key={banner.id}>{content}</div>
           );
         })}
+        <CarouselArrows onPrev={goPrev} onNext={goNext} t={t} />
         <CarouselDots count={banners.length} index={index} onSelect={setIndex} t={t} />
       </div>
     );
@@ -195,8 +203,45 @@ export function HeroCarousel({ banners = [] }: { banners?: HeroBanner[] }) {
           </div>
         </div>
       ))}
+      <CarouselArrows onPrev={goPrev} onNext={goNext} t={t} />
       <CarouselDots count={SLIDES.length} index={index} onSelect={setIndex} t={t} />
     </div>
+  );
+}
+
+// Desktop uniquement (hidden md:flex) : le swipe tactile suffit sur mobile,
+// des flèches en plus y ajouteraient du bruit visuel sans réel bénéfice
+// (priorité au geste tactile, cf. point 11 — mobile n'est pas juste un
+// desktop réduit). Rendues en dehors des <Link> par bannière (siblings,
+// comme CarouselDots) pour ne jamais imbriquer de <button> dans un <a>.
+function CarouselArrows({
+  onPrev,
+  onNext,
+  t,
+}: {
+  onPrev: () => void;
+  onNext: () => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  return (
+    <>
+      <button
+        type="button"
+        onClick={onPrev}
+        aria-label={t("prevSlide")}
+        className="hidden md:flex absolute left-3 rtl:left-auto rtl:right-3 top-1/2 z-10 -translate-y-1/2 size-9 items-center justify-center rounded-full bg-white/25 text-white backdrop-blur transition-colors hover:bg-white/40"
+      >
+        <ChevronLeft className="size-5 rtl:rotate-180" />
+      </button>
+      <button
+        type="button"
+        onClick={onNext}
+        aria-label={t("nextSlide")}
+        className="hidden md:flex absolute right-3 rtl:right-auto rtl:left-3 top-1/2 z-10 -translate-y-1/2 size-9 items-center justify-center rounded-full bg-white/25 text-white backdrop-blur transition-colors hover:bg-white/40"
+      >
+        <ChevronRight className="size-5 rtl:rotate-180" />
+      </button>
+    </>
   );
 }
 

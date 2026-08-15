@@ -10,15 +10,19 @@ import { cn } from "@/lib/utils";
 export function AddToCartButton({
   productId,
   variantId,
+  quantity = 1,
   disabled,
   className,
   children,
+  onAdded,
 }: {
   productId: string;
   variantId?: string;
+  quantity?: number;
   disabled?: boolean;
   className?: string;
   children?: React.ReactNode;
+  onAdded?: () => void;
 }) {
   const t = useTranslations("product");
   const [state, setState] = useState<"idle" | "loading" | "done" | "error">("idle");
@@ -27,9 +31,10 @@ export function AddToCartButton({
     if (disabled || state === "loading") return;
     setState("loading");
     try {
-      await addToCart(productId, 1, variantId);
+      await addToCart(productId, quantity, variantId);
       broadcastCartUpdate();
       setState("done");
+      onAdded?.();
       setTimeout(() => setState("idle"), 1200);
     } catch {
       // Sans ceci, un échec (rupture de stock détectée côté serveur, réseau)
@@ -59,7 +64,7 @@ export function AddToCartButton({
         ) : state === "error" ? (
           <AlertCircle className="size-4" />
         ) : null}
-        {state === "done" ? t("addToCart") : state === "error" ? t("addToCartError") : children}
+        {state === "done" ? t("addedToCart") : state === "error" ? t("addToCartError") : children}
       </button>
     );
   }
@@ -69,11 +74,14 @@ export function AddToCartButton({
       onClick={handleClick}
       disabled={disabled}
       className={cn(
-        "flex size-8 items-center justify-center rounded-full bg-brand-cta text-brand-cta-foreground disabled:opacity-40",
+        // size-9 plutôt que size-8 : icône seule utilisée uniquement sur
+        // mobile désormais (variante desktop = bouton texte au survol, voir
+        // ProductCard) — cible tactile un peu plus généreuse.
+        "flex size-9 items-center justify-center rounded-full bg-brand-cta text-brand-cta-foreground disabled:opacity-40",
         state === "error" && "bg-destructive text-destructive-foreground",
         className,
       )}
-      aria-label={state === "error" ? t("addToCartError") : t("addToCart")}
+      aria-label={state === "error" ? t("addToCartError") : state === "done" ? t("addedToCart") : t("addToCart")}
       title={state === "error" ? t("addToCartError") : undefined}
     >
       {state === "loading" ? (
@@ -83,7 +91,7 @@ export function AddToCartButton({
       ) : state === "error" ? (
         <AlertCircle className="size-4" />
       ) : (
-        <PackagePlus className="size-4" />
+        <PackagePlus className="size-[18px]" />
       )}
     </button>
   );

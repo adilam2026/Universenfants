@@ -12,6 +12,7 @@ const KEYS = {
   vatRate: "vat_rate",
   loyaltyRedeemRate: "loyalty_redeem_rate",
   freeShippingThreshold: "free_shipping_threshold",
+  whatsappOrderNumber: "whatsapp_order_number",
 } as const;
 
 const DEFAULTS = {
@@ -31,11 +32,15 @@ export class SettingsService {
     const rows = await this.prisma.systemSetting.findMany({
       where: { key: { in: Object.values(KEYS) } },
     });
-    const byKey = new Map(rows.map((r) => [r.key, r.value as number]));
+    const byKey = new Map(rows.map((r) => [r.key, r.value]));
     return {
-      vatRate: byKey.get(KEYS.vatRate) ?? DEFAULTS.vatRate,
-      loyaltyRedeemRate: byKey.get(KEYS.loyaltyRedeemRate) ?? DEFAULTS.loyaltyRedeemRate,
-      freeShippingThreshold: byKey.get(KEYS.freeShippingThreshold) ?? DEFAULTS.freeShippingThreshold,
+      vatRate: (byKey.get(KEYS.vatRate) as number | undefined) ?? DEFAULTS.vatRate,
+      loyaltyRedeemRate: (byKey.get(KEYS.loyaltyRedeemRate) as number | undefined) ?? DEFAULTS.loyaltyRedeemRate,
+      freeShippingThreshold: (byKey.get(KEYS.freeShippingThreshold) as number | undefined) ?? DEFAULTS.freeShippingThreshold,
+      // Pas de valeur par défaut sensée pour un numéro de téléphone — null
+      // tant qu'aucun admin ne l'a saisi, ce qui masque le bouton "Commander
+      // via WhatsApp" côté boutique plutôt que d'afficher un lien cassé.
+      whatsappOrderNumber: (byKey.get(KEYS.whatsappOrderNumber) as string | undefined) || null,
     };
   }
 
@@ -57,6 +62,17 @@ export class SettingsService {
         update: { value: dto.freeShippingThreshold },
         create: { key: KEYS.freeShippingThreshold, value: dto.freeShippingThreshold },
       });
+      // Champ optionnel : seule sa présence explicite dans le DTO (y compris
+      // une chaîne vide, pour l'effacer) déclenche l'écriture — sinon un
+      // ancien client d'API n'envoyant pas ce champ écraserait silencieusement
+      // le numéro déjà enregistré à chaque sauvegarde.
+      if (dto.whatsappOrderNumber !== undefined) {
+        await tx.systemSetting.upsert({
+          where: { key: KEYS.whatsappOrderNumber },
+          update: { value: dto.whatsappOrderNumber },
+          create: { key: KEYS.whatsappOrderNumber, value: dto.whatsappOrderNumber },
+        });
+      }
       // Paramètres globaux (TVA, taux de conversion fidélité, seuil de
       // livraison offerte) : impact direct et immédiat sur tous les prix
       // affichés/facturés — trace d'audit atomique avec l'écriture elle-même.

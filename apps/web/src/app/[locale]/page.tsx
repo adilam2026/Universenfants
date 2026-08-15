@@ -42,10 +42,14 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
   const [categories, brands, trending, promo, bestSellers, newest, heroBanners] = await Promise.all([
     getCategoryTree(),
     getActiveBrands().catch(() => []),
-    getProducts({ sort: "newest", limit: 4 }),
-    getProducts({ promoOnly: true, limit: 4 }),
-    getProducts({ sort: "bestsellers", limit: 4 }),
-    getProducts({ sort: "newest", limit: 4, page: 1 }),
+    // 5 plutôt que 4 : les grilles ci-dessous montent jusqu'à 5 colonnes sur
+    // grand écran (2xl), comme le catalogue — s'arrêter à 4 produits y
+    // aurait laissé une 5e colonne vide, un des grands espaces vides que la
+    // hiérarchie visuelle doit justement éviter.
+    getProducts({ sort: "newest", limit: 5 }),
+    getProducts({ promoOnly: true, limit: 5 }),
+    getProducts({ sort: "bestsellers", limit: 5 }),
+    getProducts({ sort: "newest", limit: 5, page: 1 }),
     // Pas de fallback statique nécessaire côté page : HeroCarousel retombe
     // déjà sur ses slides codées en dur si aucune bannière n'est active.
     getActiveHeroBanners().catch(() => []),
@@ -136,7 +140,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
 
       <section>
         <SectionTitle title={t("trending")} href="/recherche" seeAll={t("seeAll")} />
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3.5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3.5 xl:gap-5">
           {trending.items.map((p) => (
             <ProductCard key={p.id} product={p} />
           ))}
@@ -152,7 +156,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
 
       <section>
         <SectionTitle title={t("promotions")} href="/recherche?promo=1" seeAll={t("seeAll")} />
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3.5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3.5 xl:gap-5">
           {promo.items.map((p) => (
             <ProductCard key={p.id} product={p} />
           ))}
@@ -161,7 +165,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
 
       <section>
         <SectionTitle title={t("bestSellers")} href="/recherche" seeAll={t("seeAll")} />
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3.5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3.5 xl:gap-5">
           {bestSellers.items.map((p) => (
             <ProductCard key={p.id} product={p} />
           ))}
@@ -170,7 +174,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
 
       <section>
         <SectionTitle title={t("newArrivals")} href="/recherche" seeAll={t("seeAll")} />
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3.5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3.5 xl:gap-5">
           {newest.items.map((p) => (
             <ProductCard key={p.id} product={p} />
           ))}

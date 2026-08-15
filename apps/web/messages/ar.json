@@ -22,6 +22,7 @@
     "age9to12": "9-12 سنة",
     "age12plus": "12 سنة وأكثر",
     "promotions": "🔥 العروض",
+    "categories": "الفئات",
     "toysByAge": "ألعاب حسب العمر",
     "toysByUniverse": "ألعاب حسب الفئة",
     "giftAdvisor": "مستشار الهدايا",
@@ -73,7 +74,9 @@
       "text": "اكتشف أفضل عروضنا ومنتجاتنا الجديدة، بتخفيضات تصل إلى -25% على مجموعة من الألعاب.",
       "cta": "شاهد العروض"
     },
-    "slideLabel": "الشريحة {n}"
+    "slideLabel": "الشريحة {n}",
+    "prevSlide": "الشريحة السابقة",
+    "nextSlide": "الشريحة التالية"
   },
   "home": {
     "reassurance": {
@@ -142,6 +145,7 @@
     "sku": "المرجع",
     "variant": "اختر خيارًا",
     "addToCart": "أضف إلى السلة",
+    "addedToCart": "أُضيف إلى السلة",
     "addToCartError": "فشل — غير متوفر",
     "addToCartPrice": "أضف إلى السلة — {price}",
     "unavailable": "غير متوفر",
@@ -164,7 +168,14 @@
     "submitReview": "نشر رأيي",
     "ratingStars": "{n} نجوم",
     "alreadyReviewed": "شكراً، لقد سبق أن أضفت رأياً حول هذا المنتج.",
-    "reviewSubmitted": "شكراً! تم إرسال رأيك وسيُنشر بعد المراجعة."
+    "reviewSubmitted": "شكراً! تم إرسال رأيك وسيُنشر بعد المراجعة.",
+    "quantity": "الكمية",
+    "decreaseQuantity": "إنقاص الكمية",
+    "increaseQuantity": "زيادة الكمية",
+    "continueShopping": "متابعة التسوق",
+    "viewCart": "عرض سلتي",
+    "orderViaWhatsapp": "اطلب عبر واتساب",
+    "whatsappOrderMessage": "مرحباً، أرغب في طلب:\n{name}\nالمرجع: {sku}\nالكمية: {qty}\n{url}"
   },
   "cart": {
     "title": "🛍 سلتي",
